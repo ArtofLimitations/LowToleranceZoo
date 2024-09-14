@@ -1,16 +1,18 @@
 body {
     font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
+    background-color: #2f3a3f;
     margin: 0;
     padding: 0;
 }
 
 h1 {
-    color: #333;
+    color: #303030;
     text-align: center;
     margin-top: 50px;
 }
 
 canvas { 
     display: block;
+    background-color: #131313;
+    margin: 0 auto;
 }
