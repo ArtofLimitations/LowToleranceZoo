@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>32x32 Sprite Editor</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            background-color: #fff;
+            image-rendering: pixelated;
+            /* Makes the canvas appear pixelated */
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #1a1a1a;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="spriteCanvas" width="584" height="520"></canvas>
+
+    <script>
+        // Get the canvas element and context
+        const canvas = document.getElementById('spriteCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set up the grid and colors
+        // Grid width 520px
+        const gridSize = 16;
+        const sidebar = 64;
+        const pixelSize = (canvas.width - sidebar) / gridSize;
+        const colors = ['white', 'black']; // Only two colors: white and black
+        let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(0)); // 32x32 grid, initially all white (0)
+
+        // Function to draw the grid and sprite data
+        function drawGrid() {
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    ctx.fillStyle = colors[spriteData[y][x]];
+                    ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+                    ctx.strokeStyle = 'gray'; // Grid line color
+                    ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize); // Draw grid lines
+                }
+            }
+        }
+
+        // Function to handle mouse clicks and toggle pixel color
+        function handleCanvasClick(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((event.clientX - rect.left) / pixelSize);
+            const y = Math.floor((event.clientY - rect.top) / pixelSize);
+
+            // Toggle between 0 (white) and 1 (black)
+            if (x < gridSize) {
+            spriteData[y][x] = spriteData[y][x] === 0 ? 1 : 0;
+            drawGrid();
+            }
+            else {
+                alert('sidebar!');
+            }
+        }
+
+        // Event listener for mouse click
+        canvas.addEventListener('mousedown', handleCanvasClick);
+
+        /*function onMouseMove(event) {
+            // detect possible changes in mouse position
+            if (mousePosition.x != event.clientX || mousePosition.y != event.clientY) {
+                mousePosition.x = event.clientX;
+                mousePosition.y = event.clientY;
+                // code to draw goes here ....
+            }
+        }
+        canvas.addEventListener("mousemove", onMouseMove);*/
+
+        // Initial draw
+        drawGrid();
+    </script>
+</body>
+
+</html>
