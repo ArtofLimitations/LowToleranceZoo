@@ -1,10 +1,10 @@
 // In sprites.js
+//console.log('Function called from sprite.js');
 
 const canvas = document.getElementById('tileCanvas');
 const ctx = canvas.getContext('2d');
 
 const spriteImage = new Image();
-console.log('Function called from sprite.js');
 spriteImage.src = '../assets/log.png'; // Path to your sprite image
 
 // Draw the sprite in the center of a specific tile

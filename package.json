@@ -1,0 +1,11 @@
+{
+  "name": "zplus",
+  "version": "1.0.0",
+  "description": "a zzt like sprite based game maker and player",
+  "main": "/js/main.js",
+  "scripts": {
+    "test": "http-server ./ -c-1 -->"
+  },
+  "author": "Dustin Davidson",
+  "license": "ISC"
+}

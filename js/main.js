@@ -26,12 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const tileSizeY = 32;
     const toolBarSize = 320;          // Right side toolbar sized in tiles
     const placedSprites = {};         // Store the positions of placed sprites (as key-value pairs)
+    const spriteSheet = {};
     let tilesX = 36;                  // Board width and height
     let tilesY = 25;
     let currentSprite = 1;            // Sprite to draw. Default = 1
     let [cursorX, cursorY] = [9, 4];  // Keyboard cursor
-
-
 
     // Draw the grid of tiles
     function drawBoard() {
@@ -53,12 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const posY = y * tileSizeY;
         //console.log(`tile:${x},${y} cursor:${cursorX},${cursorY}`);
         ctx.lineWidth = 1;
-        if (x === cursorX && y === cursorY) {
+        if (x === cursorX && y === cursorY) { // Tile = red if cursor pos
             ctx.beginPath();
             ctx.strokeStyle = 'rgba(255, 10, 10, 0.6)';
         } else {
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(90, 100, 10, 0.1)';
+            //ctx.strokeStyle = 'rgba(90, 100, 10, 0.1)';
+            ctx.strokeStyle = 'rgba(255, 111, 94, 0.1)';
         }
         ctx.strokeRect(posX, posY, tileSizeX, tileSizeY);
     }
@@ -86,14 +86,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const { x, y } = getTileCoordinates(mouseX, mouseY);
         const tileKey = `${x},${y}`;
-        [cursorX, cursorY] = [x,y];
+        [cursorX, cursorY] = [x, y];
+        console.log(`mouse: cursor ${cursorX},${cursorY}`);
 
         if (placedSprites[tileKey]) {
             // Remove sprite if it exists
             delete placedSprites[tileKey];
         } else {
             // Place sprite
-            placedSprites[tileKey] = 1;
+            placedSprites[tileKey] = currentSprite;
         }
         drawBoard();
         drawSprites();
@@ -116,27 +117,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleKeyboard(event) {
-        console.log(`keyboard cursor ${cursorX},${cursorY}`);
+
         switch (event.key) {
-            
+
             case 'ArrowUp':
                 if (cursorY > 0) cursorY -= 1; // Move up
                 break;
             case 'ArrowDown':
-                if (cursorY < tilesY) cursorY += 1; // Move down
+                if (cursorY < tilesY - 1) cursorY += 1; // Move down
                 break;
             case 'ArrowLeft':
                 if (cursorX > 0) cursorX -= 1; // Move left
                 break;
             case 'ArrowRight':
-                if (cursorX < tilesX) cursorX += 1; // Move right
+                if (cursorX < tilesX - 1) cursorX += 1; // Move right
+                break;
+            case ' ':
+                const tileKey = `${cursorX},${cursorY}`;
+                if (placedSprites[tileKey]) {
+                    // Remove sprite if it exists
+                    delete placedSprites[tileKey];
+                } else {
+                    // Place sprite
+                    placedSprites[tileKey] = currentSprite;
+                }
+                drawBoard(); // Refresh board
+                drawSprites();
                 break;
         }
+        console.log(`key: cursor ${cursorX},${cursorY}`);
         drawBoard(); // Redraw the board and cursor
     }
     // Handle events for keyboard, mouse, etc
     canvas.addEventListener('click', handleClick);        // canvas.removeEventListener('click', myFunction);
-    canvas.addEventListener('keydown', handleKeyboard) ;  // handles keypresses 
+    document.addEventListener('keydown', handleKeyboard);  // handles keypresses 
 
 
     // Initial canvas setup

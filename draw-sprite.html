@@ -8,9 +8,12 @@
     <style>
         canvas {
             border: 1px solid black;
-            background-color: #fff;
             image-rendering: pixelated;
             /* Makes the canvas appear pixelated */
+            background-color: #e5e5f7;
+
+            background-image: linear-gradient(45deg, #eeeefd 50%, #e5e5f7 50%);
+            background-size: 16px 16px;
         }
 
         body {
@@ -24,7 +27,7 @@
     </style>
 </head>
 
-<body>
+<body oncontextmenu="return false;">
     <canvas id="spriteCanvas" width="584" height="520"></canvas>
 
     <script>
@@ -38,40 +41,63 @@
         const sidebar = 64;
         const pixelSize = (canvas.width - sidebar) / gridSize;
         const colors = ['white', 'black']; // Only two colors: white and black
-        let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(0)); // 32x32 grid, initially all white (0)
+        let imageData = new Uint32Array(gridSize * gridSize);
+        let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); // 32x32 grid, initially all white (0)
+        let [cursorX, cursorY] = [9, 4];
+        let mousePosition = {
+            x: 0,
+            y: 0
+        };
 
         // Function to draw the grid and sprite data
         function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath(); // sidebar
+            ctx.fillStyle = '#2c3d63';
+            ctx.fillRect(canvas.width - sidebar, 0, canvas.width, canvas.height);
             for (let y = 0; y < gridSize; y++) {
                 for (let x = 0; x < gridSize; x++) {
-                    ctx.fillStyle = colors[spriteData[y][x]];
-                    ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-                    ctx.strokeStyle = 'gray'; // Grid line color
+                    if (spriteData[y][x] !== 2) {
+                        ctx.fillStyle = colors[spriteData[y][x]]; // Draw pixels to grid
+                        ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+             
+                        ctx.fillRect((canvas.width - sidebar + 10) + x * 2, 10 + y * 2, 2, 2 ); // Draw small preview in sidebar (same color)
+                        ctx.beginPath();
+                        ctx.fillStyle = spriteData[y][x] === 1 ? '#9ed474' : '#ffb940';
+                        ctx.fillRect((canvas.width - sidebar + 10) + x * 2, 64 + y * 2, 2, 2 ); // Draw small preview in sidebar (same color)
+                    }
+                    ctx.strokeStyle = 'black'; // Grid line color
                     ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize); // Draw grid lines
+                    ctx.beginPath();
+                    
                 }
             }
         }
 
         // Function to handle mouse clicks and toggle pixel color
         function handleCanvasClick(event) {
+            //event.preventDefault()
             const rect = canvas.getBoundingClientRect();
             const x = Math.floor((event.clientX - rect.left) / pixelSize);
             const y = Math.floor((event.clientY - rect.top) / pixelSize);
 
             // Toggle between 0 (white) and 1 (black)
             if (x < gridSize) {
-            spriteData[y][x] = spriteData[y][x] === 0 ? 1 : 0;
-            drawGrid();
+                switch (event.button) {
+                    case 0:
+                        spriteData[y][x] = spriteData[y][x] === 1 ? 0 : 1;
+                        break;
+                    case 2:
+                        spriteData[y][x] = 2;
+                }
+                drawGrid();
             }
             else {
                 alert('sidebar!');
             }
         }
 
-        // Event listener for mouse click
-        canvas.addEventListener('mousedown', handleCanvasClick);
-
-        /*function onMouseMove(event) {
+        function onMouseMove(event) {
             // detect possible changes in mouse position
             if (mousePosition.x != event.clientX || mousePosition.y != event.clientY) {
                 mousePosition.x = event.clientX;
@@ -79,7 +105,11 @@
                 // code to draw goes here ....
             }
         }
-        canvas.addEventListener("mousemove", onMouseMove);*/
+        
+        // Event listener for mouse click
+        canvas.addEventListener('mousedown', handleCanvasClick);
+
+        canvas.addEventListener("mousemove", onMouseMove);
 
         // Initial draw
         drawGrid();
