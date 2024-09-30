@@ -41,13 +41,29 @@
         const sidebar = 64;
         const pixelSize = (canvas.width - sidebar) / gridSize;
         const colors = ['white', 'black']; // Only two colors: white and black
+        let currentColor = 1;
         let imageData = new Uint32Array(gridSize * gridSize);
         let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); // 32x32 grid, initially all white (0)
         let [cursorX, cursorY] = [9, 4];
-        let mousePosition = {
+        let mouse = {
             x: 0,
-            y: 0
+            y: 0,
+            down: false,
+            button: 0
         };
+
+        const buttons = [
+            { x: 8, y: 100, width: 48, height: 40, label: 'Dark' },
+            { x: 8, y: 150, width: 48, height: 40, label: 'Light' }
+        ]
+
+        function isInsideButton(bX, x, y, button) {
+            console.log(`offset: ${bX} X: ${x} Y: ${y}`);
+            return (
+                x > bX + button.x && x < bX + button.x + button.width &&
+                y > button.y && y < button.y + button.height
+            );
+        }
 
         // Function to draw the grid and sprite data
         function drawGrid() {
@@ -60,32 +76,43 @@
                     if (spriteData[y][x] !== 2) {
                         ctx.fillStyle = colors[spriteData[y][x]]; // Draw pixels to grid
                         ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-             
-                        ctx.fillRect((canvas.width - sidebar + 10) + x * 2, 10 + y * 2, 2, 2 ); // Draw small preview in sidebar (same color)
+
+                        ctx.fillRect((canvas.width - sidebar + 10) + x * 2, 10 + y * 2, 2, 2); // Draw small preview in sidebar (same color)
                         ctx.beginPath();
-                        ctx.fillStyle = spriteData[y][x] === 1 ? '#9ed474' : '#ffb940';
-                        ctx.fillRect((canvas.width - sidebar + 10) + x * 2, 64 + y * 2, 2, 2 ); // Draw small preview in sidebar (same color)
+                        ctx.fillStyle = spriteData[y][x] === 1 ? '#9ed474' : '#00b940';
+                        ctx.fillRect((canvas.width - sidebar + 10) + x * 2, 54 + y * 2, 2, 2); // Draw small preview in sidebar (picked color)
                     }
                     ctx.strokeStyle = 'black'; // Grid line color
                     ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize); // Draw grid lines
                     ctx.beginPath();
-                    
                 }
             }
+            buttons.forEach(button => {
+                ctx.fillStyle = '#f7f8f3';
+                ctx.fillRect(canvas.width - sidebar + button.x, button.y, button.width, button.height);
+
+                ctx.fillStyle = '#222';
+                ctx.font = 'bold 14px Arial';
+                ctx.fillText(button.label, canvas.width - sidebar + button.x + 8, button.y + 25);
+            });
         }
 
-        // Function to handle mouse clicks and toggle pixel color
-        function handleCanvasClick(event) {
+        function draw() {
+            // code to draw
             //event.preventDefault()
             const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
             const x = Math.floor((event.clientX - rect.left) / pixelSize);
             const y = Math.floor((event.clientY - rect.top) / pixelSize);
+            console.log(x * pixelSize);
 
             // Toggle between 0 (white) and 1 (black)
             if (x < gridSize) {
-                switch (event.button) {
+                switch (mouse.button) {
                     case 0:
-                        spriteData[y][x] = spriteData[y][x] === 1 ? 0 : 1;
+                        //spriteData[y][x] = spriteData[y][x] === 1 ? 0 : 1;
+                        spriteData[y][x] = currentColor;
                         break;
                     case 2:
                         spriteData[y][x] = 2;
@@ -93,23 +120,46 @@
                 drawGrid();
             }
             else {
-                alert('sidebar!');
+                //alert('sidebar!');
+                let offset = canvas.width - sidebar;
+                buttons.forEach(button => {
+                    if (isInsideButton(offset, mouseX, mouseY, button)) {
+                        console.log(`${button.label} clicked!`);
+                        switch (button.label) {
+                            case 'Dark':
+                                currentColor = 1;
+                                break;
+                            case 'Light':
+                                currentColor = 0;
+                                break;
+                        }
+                    }
+                });
             }
         }
 
-        function onMouseMove(event) {
+        // Function to handle mouse clicks and toggle pixel color
+        function handleCanvasClick(event) {
+            mouse.down = true;
+            mouse.button = event.button;
+            draw();
+        }
+
+        function handleMouseMove(event) {
             // detect possible changes in mouse position
-            if (mousePosition.x != event.clientX || mousePosition.y != event.clientY) {
-                mousePosition.x = event.clientX;
-                mousePosition.y = event.clientY;
-                // code to draw goes here ....
+            if (mouse.down) {
+                if (mouse.x != event.clientX || mouse.y != event.clientY) {
+                    mouse.x = event.clientX;
+                    mouse.y = event.clientY;
+                    draw();
+                }
             }
         }
-        
+
         // Event listener for mouse click
         canvas.addEventListener('mousedown', handleCanvasClick);
-
-        canvas.addEventListener("mousemove", onMouseMove);
+        canvas.addEventListener('mouseup', () => { mouse.down = false; });
+        canvas.addEventListener("mousemove", handleMouseMove);
 
         // Initial draw
         drawGrid();
