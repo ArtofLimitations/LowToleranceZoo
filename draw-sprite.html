@@ -10,9 +10,10 @@
             border: 1px solid black;
             image-rendering: pixelated;
             /* Makes the canvas appear pixelated */
-            background-color: #e5e5f7;
-
-            background-image: linear-gradient(45deg, #eeeefd 50%, #e5e5f7 50%);
+            /* background-color: #e5e5f7; */
+            /* background-image: linear-gradient(45deg, #eeeefd 50%, #e5e5f7 50%); */
+            background-color: #5f5f64;
+            background-image: linear-gradient(45deg, #b1b1b1 50%, #c0c0c5 50%);
             background-size: 16px 16px;
         }
 
@@ -24,11 +25,18 @@
             margin: 0;
             background-color: #1a1a1a;
         }
+
+        .spriteContainer {
+            background-color: #222;
+            padding: 64px;
+        }
     </style>
 </head>
 
 <body oncontextmenu="return false;">
-    <canvas id="spriteCanvas" width="584" height="520"></canvas>
+    <div class="spriteContainer">
+        <canvas id="spriteCanvas" width="584" height="520"></canvas>
+    </div>
 
     <script>
         // Get the canvas element and context
@@ -54,15 +62,36 @@
 
         const buttons = [
             { x: 8, y: 100, width: 48, height: 40, label: 'Dark' },
-            { x: 8, y: 150, width: 48, height: 40, label: 'Light' }
+            { x: 8, y: 150, width: 48, height: 40, label: 'Light' },
+            { x: 8, y: 350, width: 48, height: 40, label: 'Flip ↕' },
+            { x: 8, y: 400, width: 48, height: 40, label: 'Flip ↔' },
+            { x: 8, y: 450, width: 48, height: 40, label: 'CLR' }
         ]
 
         function isInsideButton(bX, x, y, button) {
-            console.log(`offset: ${bX} X: ${x} Y: ${y}`);
+            //console.log(`offset: ${bX} X: ${x} Y: ${y}`);
             return (
                 x > bX + button.x && x < bX + button.x + button.width &&
                 y > button.y && y < button.y + button.height
             );
+        }
+
+        function drawButtons() {
+            buttons.forEach(button => {
+                //ctx.fillStyle = '#9ed474';
+                if (currentColor === 1 && button.label === 'Dark') {
+                    ctx.fillStyle = '#576b47';
+                } else if (currentColor === 0 && button.label === 'Light') {
+                    ctx.fillStyle = '#576b47';
+                } else {
+                    ctx.fillStyle = '#d2ebbe';
+                }
+                ctx.fillRect(canvas.width - sidebar + button.x, button.y, button.width, button.height);
+
+                ctx.fillStyle = '#222';
+                ctx.font = 'bold 14px Arial';
+                ctx.fillText(button.label, canvas.width - sidebar + button.x + 8, button.y + 25);
+            });
         }
 
         // Function to draw the grid and sprite data
@@ -79,22 +108,15 @@
 
                         ctx.fillRect((canvas.width - sidebar + 10) + x * 2, 10 + y * 2, 2, 2); // Draw small preview in sidebar (same color)
                         ctx.beginPath();
-                        ctx.fillStyle = spriteData[y][x] === 1 ? '#9ed474' : '#00b940';
+                        ctx.fillStyle = spriteData[y][x] === 1 ? '#417329' : '#e6ce37';
                         ctx.fillRect((canvas.width - sidebar + 10) + x * 2, 54 + y * 2, 2, 2); // Draw small preview in sidebar (picked color)
                     }
-                    ctx.strokeStyle = 'black'; // Grid line color
+                    ctx.strokeStyle = '#888'; // Grid line color
                     ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize); // Draw grid lines
                     ctx.beginPath();
                 }
             }
-            buttons.forEach(button => {
-                ctx.fillStyle = '#f7f8f3';
-                ctx.fillRect(canvas.width - sidebar + button.x, button.y, button.width, button.height);
-
-                ctx.fillStyle = '#222';
-                ctx.font = 'bold 14px Arial';
-                ctx.fillText(button.label, canvas.width - sidebar + button.x + 8, button.y + 25);
-            });
+            drawButtons();
         }
 
         function draw() {
@@ -105,7 +127,7 @@
             const mouseY = event.clientY - rect.top;
             const x = Math.floor((event.clientX - rect.left) / pixelSize);
             const y = Math.floor((event.clientY - rect.top) / pixelSize);
-            console.log(x * pixelSize);
+            //console.log(x * pixelSize);
 
             // Toggle between 0 (white) and 1 (black)
             if (x < gridSize) {
@@ -124,7 +146,7 @@
                 let offset = canvas.width - sidebar;
                 buttons.forEach(button => {
                     if (isInsideButton(offset, mouseX, mouseY, button)) {
-                        console.log(`${button.label} clicked!`);
+                        //console.log(`${button.label} clicked!`);
                         switch (button.label) {
                             case 'Dark':
                                 currentColor = 1;
@@ -132,9 +154,26 @@
                             case 'Light':
                                 currentColor = 0;
                                 break;
+                            case 'CLR':
+                                spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
+                                drawGrid();
+                                break;
+                            case 'Flip ↕':
+                                spriteData = spriteData
+                                    .reverse();
+                                drawGrid();
+                                break;
+                            case 'Flip ↔':
+                                for (var i = 0; i < spriteData.length; i++) {
+
+                                    spriteData[i].reverse();
+                                }
+                                drawGrid();
+                                break;
                         }
                     }
                 });
+                drawButtons();
             }
         }
 
@@ -160,6 +199,7 @@
         canvas.addEventListener('mousedown', handleCanvasClick);
         canvas.addEventListener('mouseup', () => { mouse.down = false; });
         canvas.addEventListener("mousemove", handleMouseMove);
+        canvas.addEventListener('mouseleave', () => { mouse.down = false; });
 
         // Initial draw
         drawGrid();
