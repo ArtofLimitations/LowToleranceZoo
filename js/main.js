@@ -9,9 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Canvas Configurations
     var displayWidth = 1474;
     var displayHeight = 800;
-
     const canvas = document.getElementById('tileCanvas');
-
     var scale = 1;
     canvas.style.width = displayWidth + 'px';
     canvas.style.height = displayHeight + 'px';
@@ -150,8 +148,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Handle events for keyboard, mouse, etc
     canvas.addEventListener('click', handleClick);        // canvas.removeEventListener('click', myFunction);
-    document.addEventListener('keydown', handleKeyboard);  // handles keypresses 
-
+    //canvas.addEventListener('mouseup', () => { mouse.down = false; });
+    //canvas.addEventListener("mousemove", handleMouseMove);
+    //canvas.addEventListener('mouseleave', () => { mouse.down = false; });
+    
+    // handles keypresses 
+    document.addEventListener('keydown', handleKeyboard); 
 
     // Initial canvas setup
     toolbar(toolBarSize);
