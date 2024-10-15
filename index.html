@@ -1,14 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Starter Project</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+
+<body oncontextmenu="return false;">
     <h1>☺</h1>
-    <canvas id="tileCanvas" tabindex='1'></canvas>
+
+    <div class="block" id="block">
+        <canvas class="tileCanvas" id="tileCanvas" tabindex='1'></canvas>
+        <div class="spriteContainer" id="spriteContainer">
+            <canvas class="spriteCanvas" id="spriteCanvas" width="584" height="520"></canvas>
+        </div>
+    </div>
     <script type="module" src="js/main.js"></script>
 </body>
 <!--  http-server ./ -c-1 -->

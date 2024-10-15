@@ -1,6 +1,7 @@
 // main.js
 import { toolbar, toolbarClicked } from './toolbar.js';
 import { drawSprite } from './sprite.js';
+import { editSprite } from './sprite-editor.js';
 //import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -33,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Draw the grid of tiles
     function drawBoard() {
         //ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.clearRect(0, 0, tilesX * tileSizeX, tilesY * tileSizeY);
+        ctx.clearRect(0, 0, tilesX * tileSizeX + 1, tilesY * tileSizeY);
         for (let y = 0; y < tilesY; y++) {
             for (let x = 0; x < tilesX; x++) {
                 drawTile(x, y);
@@ -142,6 +143,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 drawBoard(); // Refresh board
                 drawSprites();
                 break;
+            case 'c':
+                canvas.removeEventListener('click', handleClick);
+                editSprite();
+                break;
         }
         console.log(`key: cursor ${cursorX},${cursorY}`);
         drawBoard(); // Redraw the board and cursor
@@ -153,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     //canvas.addEventListener('mouseleave', () => { mouse.down = false; });
     
     // handles keypresses 
-    document.addEventListener('keydown', handleKeyboard); 
+    canvas.addEventListener('keydown', handleKeyboard);
 
     // Initial canvas setup
     toolbar(toolBarSize);

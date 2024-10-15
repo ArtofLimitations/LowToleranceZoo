@@ -1,7 +1,6 @@
 const canvas = document.getElementById('tileCanvas');
 const ctx = canvas.getContext('2d');
 
-
 const buttons = [
   { x: 10, y: 100, width: 80, height: 40, label: 'Button 1' },
   { x: 10, y: 150, width: 80, height: 40, label: 'Button 2' },

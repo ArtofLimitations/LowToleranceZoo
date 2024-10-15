@@ -1,25 +1,100 @@
 body {
-    font-family: Arial, sans-serif;
-    background-color: #171818;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    height: 100vh;
     margin: 0;
-    padding: 0;
+    background-color: #1a1a1a;
+    font-family: Arial, sans-serif;
+    
 }
 
 h1 {
     color: #303030;
     text-align: center;
-    margin-top: 50px;
-}
-
-canvas { 
-    display: block;
-    background-color: #131313;
-    margin: 10px auto;
-    /*padding: 5px;
-    border: 5px solid #f7f8f31a;*/
-    border-radius: 4px;
+    
 }
 
 h2 {
     color: rgb(255, 111, 94);
+}
+
+.block {
+    position: relative;
+    width: 1474px;
+    height: 800px;
+    
+  }
+  
+  .tileCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: auto;
+  }
+  
+  .spriteCanvas {
+    display: block;
+    /* position: absolute */
+    top: 0;
+    left: 0;
+    margin: auto;
+  }
+
+  .spriteContainer {
+    display: none; /* Hidden initially */
+    box-sizing: content-box;
+    position: absolute;
+    top: 0;
+    left: 219px;
+    margin: auto;
+    background-color: #222;
+    padding: 64px;
+  }
+
+/*
+.block {
+    
+    box-sizing: border-box;
+    width: 100%; 
+    border: 1px solid white;
+    margin-left: -100%;
+    padding-left: 124px;
+  
+}
+
+.spriteContainer {
+  
+    background-color: #222;
+    padding: 64px;
+    transform: translate(-400px,50px);
+    width: 600px;
+    margin: 0 auto;
+    
+}
+*/
+
+.tileCanvas {
+    
+    background-color: #131313;
+    /*margin: 10px auto;
+    /*padding: 5px;
+    border: 5px solid #f7f8f31a;*/
+    border-style: none;
+    border-radius: 4px;
+   
+}
+
+.spriteCanvas {
+
+    border: 1px solid black;
+    image-rendering: pixelated;
+    /* Makes the spriteCanvas appear pixelated */
+    /* background-color: #e5e5f7; */
+    /* background-image: linear-gradient(45deg, #eeeefd 50%, #e5e5f7 50%); */
+    background-color: #5f5f64;
+    background-image: linear-gradient(45deg, #b1b1b1 50%, #c0c0c5 50%);
+    background-size: 16px 16px;
+    
 }
