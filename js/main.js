@@ -5,7 +5,7 @@ import { editSprite } from './sprite-editor.js';
 //import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Z+');
+    console.log('Low Tolerance Zoo');
 
     // Canvas Configurations
     var displayWidth = 1474;
@@ -144,23 +144,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 drawSprites();
                 break;
             case 'c':
-                canvas.removeEventListener('click', handleClick);
+                removeMainEvents(); // Open the sprite editor from sprite-editor.js
                 editSprite();
                 break;
         }
         console.log(`key: cursor ${cursorX},${cursorY}`);
         drawBoard(); // Redraw the board and cursor
     }
-    // Handle events for keyboard, mouse, etc
-    canvas.addEventListener('click', handleClick);        // canvas.removeEventListener('click', myFunction);
-    //canvas.addEventListener('mouseup', () => { mouse.down = false; });
-    //canvas.addEventListener("mousemove", handleMouseMove);
-    //canvas.addEventListener('mouseleave', () => { mouse.down = false; });
-    
-    // handles keypresses 
-    canvas.addEventListener('keydown', handleKeyboard);
+
+    window.addMainEvents = function () {
+        // Handle events for keyboard, mouse, etc
+        canvas.addEventListener('click', handleClick);        // canvas.removeEventListener('click', myFunction);
+        //canvas.addEventListener('mouseup', () => { mouse.down = false; });
+        //canvas.addEventListener("mousemove", handleMouseMove);
+        //canvas.addEventListener('mouseleave', () => { mouse.down = false; });
+
+        // handles keypresses 
+        canvas.addEventListener('keydown', handleKeyboard);
+        //drawBoard();
+    }
+
+    function removeMainEvents () {
+        canvas.removeEventListener('click', handleClick);
+        canvas.removeEventListener('keydown', handleKeyboard);
+    }
 
     // Initial canvas setup
+    addMainEvents();
     toolbar(toolBarSize);
     drawBoard();
 });

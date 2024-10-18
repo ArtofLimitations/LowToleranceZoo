@@ -1,37 +1,18 @@
+import { updateSpriteImage } from './sprite.js';
 
 // Get the spriteCanvas element and context
 const spriteCanvas = document.getElementById('spriteCanvas');
 const spriteCtx = spriteCanvas.getContext('2d');
 const container = document.getElementById('spriteContainer');
 
-export function editSprite() {
-    //container.hidden = container.hidden === false ? true : false;
-    container.style.display = container.style.display === 'block' ? 'none' : 'block';
-
-    // Add events for sprite editor
-    // Event listeners for mouse click
-    spriteCanvas.addEventListener('mousedown', handlespriteCanvasClick);
-    spriteCanvas.addEventListener('mouseup', () => { mouse.down = false; });
-    spriteCanvas.addEventListener("mousemove", handleMouseMove);
-    spriteCanvas.addEventListener('mouseleave', () => { mouse.down = false; });
-    // Event listener for keyboard
-    document.addEventListener('keydown', handleKeyboard);
-    document.addEventListener('keyup', handleKeyboard);
-
-    // Initial draw
-    drawGrid();
-
-}
-
 // Set up the grid and colors
 // Grid width 520px
 const gridSize = 16;
 const sidebar = 64;
 const pixelSize = (spriteCanvas.width - sidebar) / gridSize;
-const colors = ['white', 'black']; // Only two colors: white and black
-let currentColor = 1;
-//let imageData = new Uint32Array(gridSize * gridSize);
-let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); // 32x32 grid, initially all white (0)
+const colors = ['white', 'black'];                                                 // Only two colors: white and black
+let currentColor = 1;                                                              // 0 = light | 1 = Dark | 2 = Alpha
+export let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); // 16x16 grid, initially all alpha (2)
 let [cursorX, cursorY] = [9, 4];
 let mouse = {
     x: 0,
@@ -45,6 +26,7 @@ let mouse = {
 const buttons = [
     { x: 8, y: 100, width: 48, height: 40, label: 'Dark' },
     { x: 8, y: 150, width: 48, height: 40, label: 'Light' },
+    //{ x: 8, y: 200, width: 48, height: 40, label: 'Alpha' },
     { x: 8, y: 350, width: 48, height: 40, label: 'FlipY' },
     { x: 8, y: 400, width: 48, height: 40, label: 'FlipX' },
     { x: 8, y: 450, width: 48, height: 40, label: 'CLR' }
@@ -79,7 +61,7 @@ function drawButtons() {
 // Function to draw the grid and sprite data
 function drawGrid() {
     spriteCtx.clearRect(0, 0, spriteCanvas.width, spriteCanvas.height); // clear
-    spriteCtx.beginPath();                                  // draw sidebar
+    spriteCtx.beginPath();                                              // draw sidebar
     spriteCtx.fillStyle = '#2c3d63';
     spriteCtx.fillRect(spriteCanvas.width - sidebar, 0, spriteCanvas.width, spriteCanvas.height);
     spriteCtx.beginPath();
@@ -88,10 +70,10 @@ function drawGrid() {
     if (mouse.mode === 'draw') spriteCtx.fillText("Draw", spriteCanvas.width - sidebar + 10, 300);
     if (mouse.mode === 'fill') spriteCtx.fillText("Fill", spriteCanvas.width - sidebar + 10, 300);
 
-    for (let y = 0; y < gridSize; y++) {             // draw grid
+    for (let y = 0; y < gridSize; y++) {                                                            // draw grid
         for (let x = 0; x < gridSize; x++) {
             if (spriteData[y][x] !== 2) {
-                spriteCtx.fillStyle = colors[spriteData[y][x]]; // Draw pixels to grid
+                spriteCtx.fillStyle = colors[spriteData[y][x]];                                    // Draw pixels to grid
                 spriteCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
 
                 spriteCtx.fillRect((spriteCanvas.width - sidebar + 10) + x * 2, 10 + y * 2, 2, 2); // Draw small preview in sidebar (same color)
@@ -99,15 +81,15 @@ function drawGrid() {
                 spriteCtx.fillStyle = spriteData[y][x] === 1 ? '#417329' : '#e6ce37';
                 spriteCtx.fillRect((spriteCanvas.width - sidebar + 10) + x * 2, 54 + y * 2, 2, 2); // Draw small preview in sidebar (picked color)
             }
-            spriteCtx.strokeStyle = '#888'; // Grid line color
-            spriteCtx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize); // Draw grid lines
+            spriteCtx.strokeStyle = '#888';                                                        // Grid line color
+            spriteCtx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);              // Draw grid lines
             spriteCtx.beginPath();
         }
     }
     drawButtons();
 }
 
-function draw() {
+function draw(event) {
     // code to draw
     //event.preventDefault()
     const rect = spriteCanvas.getBoundingClientRect();
@@ -194,7 +176,7 @@ function handlespriteCanvasClick(event) {
         if (targetColor !== currentColor) floodFill(x, y, targetColor, currentColor);
         mouse.down = false;
     }
-    draw();
+    draw(event);
 }
 
 function handleMouseMove(event) {
@@ -207,7 +189,7 @@ function handleMouseMove(event) {
             mouse.x = x;
             mouse.y = y;
             if (mouse.mode === 'draw' && mouse.x >= 0 && mouse.y >= 0 && mouse.x < gridSize && mouse.y < gridSize) {
-                draw();
+                draw(event);
             }
         }
     }
@@ -230,7 +212,48 @@ function handleKeyboard(event) {
             mouse.mode = 'draw';
             drawGrid();
             break;
+        case 'Escape':
+            removeSpriteEvents()
+            container.style.display = 'none';
+            addMainEvents();
+            updateSpriteImage(spriteData, gridSize);
         default:
             mouse.ctrl = false;
     }
+}
+
+function addSpriteEvents () {
+    // Add events for sprite editor
+    // Event listeners for mouse click
+    spriteCanvas.addEventListener('mousedown', handlespriteCanvasClick);
+    spriteCanvas.addEventListener('mouseup', () => { mouse.down = false; });
+    spriteCanvas.addEventListener('mousemove', handleMouseMove);
+    spriteCanvas.addEventListener('mouseleave', () => { mouse.down = false; });
+    // Event listener for keyboard
+    document.addEventListener('keydown', handleKeyboard);
+    document.addEventListener('keyup', handleKeyboard);
+}
+
+function removeSpriteEvents () {
+    // Add events for sprite editor
+    // Event listeners for mouse click
+    spriteCanvas.removeEventListener('mousedown', handlespriteCanvasClick);
+    spriteCanvas.removeEventListener('mouseup', () => {});
+    spriteCanvas.removeEventListener("mousemove", handleMouseMove);
+    spriteCanvas.removeEventListener('mouseleave', () => {});
+    // Event listener for keyboard
+    document.removeEventListener('keydown', handleKeyboard);
+    document.removeEventListener('keyup', handleKeyboard);
+}
+
+export function editSprite() {
+    //container.hidden = container.hidden === false ? true : false;
+    //container.style.display = container.style.display === 'block' ? 'none' : 'block';
+    container.style.display = 'block';
+
+    // add event listeners
+    addSpriteEvents();
+
+    // Initial draw
+    drawGrid();
 }
