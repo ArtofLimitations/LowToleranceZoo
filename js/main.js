@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tileSizeY = 32;
     const toolBarSize = 320;          // Right side toolbar sized in tiles
     const placedSprites = {};         // Store the positions of placed sprites (as key-value pairs)
-    const spriteSheet = {};
+    const spriteSheet = {};           // Store Sprites
     let tilesX = 36;                  // Board width and height
     let tilesY = 25;
     let currentSprite = 1;            // Sprite to draw. Default = 1
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
             delete placedSprites[tileKey];
         } else {
             // Place sprite
-            placedSprites[tileKey] = currentSprite;
+            placedSprites[tileKey] = currentSprite;       // current sprite UPDATE
         }
         drawBoard();
         drawSprites();
@@ -141,11 +141,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     placedSprites[tileKey] = currentSprite;
                 }
                 drawBoard(); // Refresh board
-                drawSprites();
+                //drawSprites();
                 break;
             case 'c':
                 removeMainEvents(); // Open the sprite editor from sprite-editor.js
-                editSprite();
+                editSprite(currentSprite);
                 break;
         }
         console.log(`key: cursor ${cursorX},${cursorY}`);
@@ -161,7 +161,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // handles keypresses 
         canvas.addEventListener('keydown', handleKeyboard);
-        //drawBoard();
+        drawBoard();
+        canvas.focus();
     }
 
     function removeMainEvents () {

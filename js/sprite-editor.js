@@ -1,4 +1,5 @@
 import { updateSpriteImage } from './sprite.js';
+import { addToSpriteSheet } from './sprite-sheet.js';
 
 // Get the spriteCanvas element and context
 const spriteCanvas = document.getElementById('spriteCanvas');
@@ -11,7 +12,8 @@ const gridSize = 16;
 const sidebar = 64;
 const pixelSize = (spriteCanvas.width - sidebar) / gridSize;
 const colors = ['white', 'black'];                                                 // Only two colors: white and black
-let currentColor = 1;                                                              // 0 = light | 1 = Dark | 2 = Alpha
+let currentColor = 1;
+let currentSprite = 1;
 export let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); // 16x16 grid, initially all alpha (2)
 let [cursorX, cursorY] = [9, 4];
 let mouse = {
@@ -215,14 +217,15 @@ function handleKeyboard(event) {
         case 'Escape':
             removeSpriteEvents()
             container.style.display = 'none';
-            addMainEvents();
             updateSpriteImage(spriteData, gridSize);
+            addToSpriteSheet(currentSprite, spriteData);
+            addMainEvents();
         default:
             mouse.ctrl = false;
     }
 }
 
-function addSpriteEvents () {
+function addSpriteEvents() {
     // Add events for sprite editor
     // Event listeners for mouse click
     spriteCanvas.addEventListener('mousedown', handlespriteCanvasClick);
@@ -234,22 +237,27 @@ function addSpriteEvents () {
     document.addEventListener('keyup', handleKeyboard);
 }
 
-function removeSpriteEvents () {
+function removeSpriteEvents() {
     // Add events for sprite editor
     // Event listeners for mouse click
     spriteCanvas.removeEventListener('mousedown', handlespriteCanvasClick);
-    spriteCanvas.removeEventListener('mouseup', () => {});
+    spriteCanvas.removeEventListener('mouseup', () => { });
     spriteCanvas.removeEventListener("mousemove", handleMouseMove);
-    spriteCanvas.removeEventListener('mouseleave', () => {});
+    spriteCanvas.removeEventListener('mouseleave', () => { });
     // Event listener for keyboard
     document.removeEventListener('keydown', handleKeyboard);
     document.removeEventListener('keyup', handleKeyboard);
 }
 
-export function editSprite() {
+export function updateSpriteData(data) {
+    spriteData = data;
+} 
+
+export function editSprite(current) {
     //container.hidden = container.hidden === false ? true : false;
     //container.style.display = container.style.display === 'block' ? 'none' : 'block';
     container.style.display = 'block';
+    currentSprite = current;
 
     // add event listeners
     addSpriteEvents();

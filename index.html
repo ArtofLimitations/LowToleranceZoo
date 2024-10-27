@@ -18,6 +18,17 @@
         </div>
     </div>
     <canvas id="exportedSpriteCanvas" width="32" height="32" style="margin-top: 20px;"></canvas>
+
+     <!-- Controls for switching between modes and managing the sprite sheet -->
+     <div id="controls">
+        <button id="convertToImageData">Convert to ImageData</button>
+        <button id="addToSpriteSheet">Add to Sprite Sheet</button>
+        <button id="saveSpriteSheet">Save Sprite Sheet</button>
+        <input type="file" id="loadSpriteSheet" accept=".json" style="display: none;">
+        <button id="loadSpriteSheetButton">Load Sprite Sheet</button>
+        <input type="number" id="spriteIndex" placeholder="Sprite Index" min="1" style="width: 100px;">
+        <button id="loadSpriteToGrid">Load Sprite to Grid</button>
+    </div>
     <script type="module" src="js/main.js"></script>
 </body>
 <!--  http-server ./ -c-1 -->

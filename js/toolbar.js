@@ -33,17 +33,6 @@ export function toolbar(size) {
     ctx.font = '16px Arial';
     ctx.fillText(button.label, leftSide + button.x + 10, button.y + 25);
   });
-
-  /*canvas.addEventListener('click', function(event) {
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-  
-    buttons.forEach(button => {
-      if (isInsideButton(x, y, button)) {
-        alert(`${button.label} clicked!`);
-      }
-    });*/
 }
 
 function isInsideButton(bX, x, y, button) {

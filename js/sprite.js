@@ -10,8 +10,29 @@ const exportedCtx = exportedCanvas.getContext('2d');
 
 //let spriteImage = new Image();
 //spriteImage.src = '../assets/log.png'; // Path to your sprite image for testing
-let imageData = 0;
+//export let spriteSheet = [];
+export let imageData = 0;
 let gridSize = 0;
+document.addEventListener('DOMContentLoaded', () => {
+let data = updateSpriteImage( // temporary measure to have default sprite
+    [[2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2],
+    [2, 2, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0, 2, 2],
+    [2, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+    [2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+    [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
+    [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 2],
+    [2, 2, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0, 2, 2],
+    [2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2]], 16);
+    console.log('array is: ' + imageData);
+});
 
 // Draw the sprite in the center of a specific tile
 export function drawSprite(x, y, tileSizeX, tileSizeY) {
@@ -23,26 +44,11 @@ export function drawSprite(x, y, tileSizeX, tileSizeY) {
 
 export function updateSpriteImage(data, size) {
     console.log('updated spriteImage');
+    console.log(data);
     gridSize = size;
     //imageData = spriteDataToImage(data);
     imageData = convertToImageData(data);
-}
-
-function spriteDataToImage(spriteData) {
-    //const spriteData = spriteData;
-    const imageData = exportedCtx.createImageData(gridSize, gridSize);
-    exportedCtx.scale(2, 2);
-    for (let y = 0; y < gridSize; y++) {
-        for (let x = 0; x < gridSize; x++) {
-            const color = spriteData[y][x] === 1 ? 0 : 255; // black (0) or white (255)
-            const index = (y * gridSize + x) * 4; // Each pixel has 4 values (RGBA)
-            imageData.data[index] = color;        // R
-            imageData.data[index + 1] = color;    // G
-            imageData.data[index + 2] = color;    // B
-            imageData.data[index + 3] = 255;      // A (opacity)
-        }
-    }
-    return imageData;
+    console.log('array is: ' + imageData);
 }
 
  // Function to convert spriteData to ImageData and scale it up
