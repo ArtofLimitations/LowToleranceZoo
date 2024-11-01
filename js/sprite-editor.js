@@ -1,5 +1,5 @@
 import { updateSpriteImage } from './sprite.js';
-import { addToSpriteSheet } from './sprite-sheet.js';
+import { addToSpriteSheet, getDataFromSheet } from './sprite-sheet.js';
 
 // Get the spriteCanvas element and context
 const spriteCanvas = document.getElementById('spriteCanvas');
@@ -24,6 +24,8 @@ let mouse = {
     mode: 'draw',
     ctrl: false,
 };
+
+let spriteSheet = {};
 
 const buttons = [
     { x: 8, y: 100, width: 48, height: 40, label: 'Dark' },
@@ -53,7 +55,6 @@ function drawButtons() {
             spriteCtx.fillStyle = '#d2ebbe';
         }
         spriteCtx.fillRect(spriteCanvas.width - sidebar + button.x, button.y, button.width, button.height);
-
         spriteCtx.fillStyle = '#222';
         spriteCtx.font = 'bold 14px Arial';
         spriteCtx.fillText(button.label, spriteCanvas.width - sidebar + button.x + 8, button.y + 25);
@@ -217,8 +218,8 @@ function handleKeyboard(event) {
         case 'Escape':
             removeSpriteEvents()
             container.style.display = 'none';
-            updateSpriteImage(spriteData, gridSize);
-            addToSpriteSheet(currentSprite, spriteData);
+            const imageData = updateSpriteImage(spriteData, gridSize);      // in sprite.js
+            addToSpriteSheet(currentSprite, spriteData, imageData);  // in sprite-sheet.js
             addMainEvents();
         default:
             mouse.ctrl = false;
@@ -250,8 +251,8 @@ function removeSpriteEvents() {
 }
 
 export function updateSpriteData(data) {
-    spriteData = data;
-} 
+    if (data !== undefined && data !== null) spriteData = data;
+}
 
 export function editSprite(current) {
     //container.hidden = container.hidden === false ? true : false;

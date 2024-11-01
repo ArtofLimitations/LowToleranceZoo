@@ -1,7 +1,7 @@
-// main.js
 import { toolbar, toolbarClicked } from './toolbar.js';
 import { drawSprite } from './sprite.js';
-import { editSprite } from './sprite-editor.js';
+import { editSprite, updateSpriteData } from './sprite-editor.js';
+import { getSpriteSheet } from './sprite-sheet.js';
 //import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -24,12 +24,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const tileSizeX = 32;             // Single tile size
     const tileSizeY = 32;
     const toolBarSize = 320;          // Right side toolbar sized in tiles
-    const placedSprites = {};         // Store the positions of placed sprites (as key-value pairs)
-    const spriteSheet = {};           // Store Sprites
+    const placedSprites = {}
+    /*const placedSprites = {         // Store the positions of placed sprites (as key-value pairs)
+        ceiling: {},
+        default: {},
+        floor:   {}
+    };       */                         
+    let spriteSheet = {};           // Store Sprites
     let tilesX = 36;                  // Board width and height
     let tilesY = 25;
     let currentSprite = 1;            // Sprite to draw. Default = 1
     let [cursorX, cursorY] = [9, 4];  // Keyboard cursor
+    let tileSetSize = 300;            // Size of tileset
 
     // Draw the grid of tiles
     function drawBoard() {
@@ -42,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         drawSprites();
         // Draw toolbar from toolbar.js
-        toolbar(toolBarSize);
+        toolbar(toolBarSize, currentSprite);
     }
 
     // Draw a single tile
@@ -66,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawSprites() {
         for (const key in placedSprites) {
             const [x, y] = key.split(',').map(Number);
-            if (x < tilesX && y < tilesY) drawSprite(x, y, tileSizeX, tileSizeY);
+            if (x < tilesX && y < tilesY) drawSprite(x, y, tileSizeX, tileSizeY, placedSprites[`${x},${y}`]); // draw the sprite image data from sprite.js
         }
     }
 
@@ -97,8 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         drawBoard();
         drawSprites();
-        console.log(tileKey);
-        console.log(placedSprites[tileKey]);
+        //console.log(tileKey);
+        //console.log(placedSprites[tileKey]);
     }
 
     function handleClick(event) {
@@ -147,6 +153,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 removeMainEvents(); // Open the sprite editor from sprite-editor.js
                 editSprite(currentSprite);
                 break;
+            case '=':
+                if (currentSprite < tileSetSize) currentSprite += 1;
+                console.log('current sprite: ' + currentSprite);
+                //updateSpriteData(currentSprite);
+                break;
+            case '-':
+                if (currentSprite > 1) currentSprite -= 1;
+                console.log('current sprite: ' + currentSprite);
+                //updateSpriteData(spriteSheet[currentSprite][0])
+                break;
         }
         console.log(`key: cursor ${cursorX},${cursorY}`);
         drawBoard(); // Redraw the board and cursor
@@ -172,6 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial canvas setup
     addMainEvents();
+    spriteSheet = getSpriteSheet();
     toolbar(toolBarSize);
     drawBoard();
 });

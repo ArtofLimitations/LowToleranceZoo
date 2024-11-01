@@ -8,7 +8,7 @@ const buttons = [
 ]
 
 // In toolbar.js
-export function toolbar(size) {
+export function toolbar(size, current) {
   //console.log('Function called from toolbar.js');
 
   const leftSide = canvas.width - size;
@@ -33,6 +33,12 @@ export function toolbar(size) {
     ctx.font = '16px Arial';
     ctx.fillText(button.label, leftSide + button.x + 10, button.y + 25);
   });
+
+  ctx.beginPath();
+  ctx.fillStyle = "#addcca";
+  ctx.font = "16px Helvetica, Arial, Sans-Serif";
+  ctx.fillText(current, leftSide + 10, 548);
+
 }
 
 function isInsideButton(bX, x, y, button) {

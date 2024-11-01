@@ -1,5 +1,5 @@
 // In sprites.js
-//console.log('Function called from sprite.js');
+import { getImageFromSheet } from './sprite-sheet.js';
 
 const canvas = document.getElementById('tileCanvas');
 const ctx = canvas.getContext('2d');
@@ -13,6 +13,7 @@ const exportedCtx = exportedCanvas.getContext('2d');
 //export let spriteSheet = [];
 export let imageData = 0;
 let gridSize = 0;
+let currentSprite = 1;
 document.addEventListener('DOMContentLoaded', () => {
 let data = updateSpriteImage( // temporary measure to have default sprite
     [[2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2],
@@ -35,20 +36,27 @@ let data = updateSpriteImage( // temporary measure to have default sprite
 });
 
 // Draw the sprite in the center of a specific tile
-export function drawSprite(x, y, tileSizeX, tileSizeY) {
-    //const posX = x * tileSizeX + (tileSizeX / 2) - (spriteImage.width / 2);
+export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber) {
+    //const posX = x * tileSizeX + (tileSizeX / 2) - (spriteImage.width / 2); 
     //const posY = y * tileSizeY + (tileSizeY / 2) - (spriteImage.height / 2);
     //ctx.drawImage(spriteImage, posX, posY);
-    ctx.putImageData(imageData, x * tileSizeX, y * tileSizeY);
+    let image = getImageFromSheet(spriteNumber);
+    //console.log('what r we now: '+image);
+    ctx.putImageData(image, x * tileSizeX, y * tileSizeY);
+    //ctx.putImageData(imageData, x * tileSizeX, y * tileSizeY);
 }
 
-export function updateSpriteImage(data, size) {
+export function updateSpriteImage(data, size, current) {
     console.log('updated spriteImage');
     console.log(data);
+
     gridSize = size;
-    //imageData = spriteDataToImage(data);
+    currentSprite = current;
+
     imageData = convertToImageData(data);
     console.log('array is: ' + imageData);
+
+    return imageData;
 }
 
  // Function to convert spriteData to ImageData and scale it up
