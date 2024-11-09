@@ -1,5 +1,6 @@
 import { spriteData, updateSpriteData } from './sprite-editor.js';
  
+let tileSetLength = 300;
 let spriteSheet = [];
 
 export function getSpriteSheet () {
@@ -13,14 +14,24 @@ export function addToSpriteSheet(currentSprite, spriteData, imageData) {
 
 export function getImageFromSheet(index) {
     //const obj = JSON.parse(JSON.stringify(spriteSheet[index][1]))
-    const obj = spriteSheet[index][1];
+    if (spriteSheet[index] !== undefined) {
+        return spriteSheet[index][1];
+    }
+    else {
+        return undefined;
+    }
     //console.log('sprite sheet at index: ' + spriteSheet[index][1]);
     //const array = Object.values(obj);
-    return obj;
 }
 
 export function getDataFromSheet(index) {
-    return spriteSheet[index][0];
+    if (spriteSheet[index] !== undefined) {
+        return spriteSheet[index][0];
+    }
+    else {
+        console.log(`No sprite at ${index} in array`);
+        return undefined;
+    }
 }
 
  // Save sprite sheet as a JSON file

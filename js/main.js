@@ -2,6 +2,7 @@ import { toolbar, toolbarClicked } from './toolbar.js';
 import { drawSprite } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getSpriteSheet } from './sprite-sheet.js';
+import { pickColor, currentColors } from './palette.js';
 //import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,7 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let tilesY = 25;
     let currentSprite = 1;            // Sprite to draw. Default = 1
     let [cursorX, cursorY] = [9, 4];  // Keyboard cursor
-    let tileSetSize = 300;            // Size of tileset
+    let tileSetLength = 300;            // Size of tileset
+    let colors = [];
 
     // Draw the grid of tiles
     function drawBoard() {
@@ -102,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             placedSprites[tileKey] = currentSprite;       // current sprite UPDATE
         }
         drawBoard();
-        drawSprites();
+        //drawSprites();
         //console.log(tileKey);
         //console.log(placedSprites[tileKey]);
     }
@@ -149,19 +151,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 drawBoard(); // Refresh board
                 //drawSprites();
                 break;
-            case 'c':
+            case 'e':
                 removeMainEvents(); // Open the sprite editor from sprite-editor.js
                 editSprite(currentSprite);
                 break;
+            case 'c':
+                removeMainEvents();
+                pickColor(); // Open color picker from palette.js
+                break;
             case '=':
-                if (currentSprite < tileSetSize) currentSprite += 1;
+                if (currentSprite < tileSetLength) currentSprite += 1;
                 console.log('current sprite: ' + currentSprite);
-                //updateSpriteData(currentSprite);
+                updateSpriteData(currentSprite);
                 break;
             case '-':
                 if (currentSprite > 1) currentSprite -= 1;
                 console.log('current sprite: ' + currentSprite);
-                //updateSpriteData(spriteSheet[currentSprite][0])
+                updateSpriteData(currentSprite);
                 break;
         }
         console.log(`key: cursor ${cursorX},${cursorY}`);
@@ -177,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // handles keypresses 
         canvas.addEventListener('keydown', handleKeyboard);
+        colors = currentColors;
         drawBoard();
         canvas.focus();
     }
@@ -189,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial canvas setup
     addMainEvents();
     spriteSheet = getSpriteSheet();
+    colors = currentColors;
     toolbar(toolBarSize);
     drawBoard();
 });

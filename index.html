@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Starter Project</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="js/modules/vanilla-picker.csp.css">
 </head>
 
 <body oncontextmenu="return false;">
@@ -14,13 +15,26 @@
     <div class="block" id="block">
         <canvas class="tileCanvas" id="tileCanvas" tabindex='1'></canvas>
         <div class="spriteContainer" id="spriteContainer">
+            <div class="spriteInfo" id="spriteInfo"><strong>Sprite Editor</strong> - F: fill | D: draw | esc: save and
+                close editor - <em><span class="spriteInfoMode">Mode:</span> <span id="spriteDrawMode">Draw</span></em>
+            </div>
             <canvas class="spriteCanvas" id="spriteCanvas" width="584" height="520"></canvas>
+        </div>
+        <div class="paletteContainer" id="paletteContainer">
+            <p><strong>Color Palette</strong></p>
+            <div class="paletteColorContainer">
+                <div class="paletteColorBox" id="colorDark"><span class="paletteLabel">Dark</span>
+                    
+                </div>
+                <div class="paletteColorBox" id="colorLight"><span class="paletteLabel">Light</span>
+                </div>
+            </div>
         </div>
     </div>
     <canvas id="exportedSpriteCanvas" width="32" height="32" style="margin-top: 20px;"></canvas>
 
-     <!-- Controls for switching between modes and managing the sprite sheet -->
-     <div id="controls">
+    <!-- Controls for switching between modes and managing the sprite sheet -->
+    <div id="controls">
         <button id="convertToImageData">Convert to ImageData</button>
         <button id="addToSpriteSheet">Add to Sprite Sheet</button>
         <button id="saveSpriteSheet">Save Sprite Sheet</button>

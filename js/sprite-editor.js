@@ -31,6 +31,8 @@ const buttons = [
     { x: 8, y: 100, width: 48, height: 40, label: 'Dark' },
     { x: 8, y: 150, width: 48, height: 40, label: 'Light' },
     //{ x: 8, y: 200, width: 48, height: 40, label: 'Alpha' },
+    { x: 8, y: 200, width: 48, height: 40, label: 'Copy' },
+    { x: 8, y: 250, width: 48, height: 40, label: 'Paste' },
     { x: 8, y: 350, width: 48, height: 40, label: 'FlipY' },
     { x: 8, y: 400, width: 48, height: 40, label: 'FlipX' },
     { x: 8, y: 450, width: 48, height: 40, label: 'CLR' }
@@ -52,7 +54,7 @@ function drawButtons() {
         } else if (currentColor === 0 && button.label === 'Light') {
             spriteCtx.fillStyle = '#576b47';
         } else {
-            spriteCtx.fillStyle = '#d2ebbe';
+            spriteCtx.fillStyle = '#fff';//'#d2ebbe';
         }
         spriteCtx.fillRect(spriteCanvas.width - sidebar + button.x, button.y, button.width, button.height);
         spriteCtx.fillStyle = '#222';
@@ -70,8 +72,10 @@ function drawGrid() {
     spriteCtx.beginPath();
     spriteCtx.fillStyle = "#addcca";
     spriteCtx.font = "12px Helvetica, Arial, Sans-Serif";
-    if (mouse.mode === 'draw') spriteCtx.fillText("Draw", spriteCanvas.width - sidebar + 10, 300);
-    if (mouse.mode === 'fill') spriteCtx.fillText("Fill", spriteCanvas.width - sidebar + 10, 300);
+    //if (mouse.mode === 'draw') spriteCtx.fillText("Draw", spriteCanvas.width - sidebar + 10, 300);
+    if (mouse.mode === 'draw') document.getElementById('spriteDrawMode').textContent = 'Draw';
+    //if (mouse.mode === 'fill') spriteCtx.fillText("Fill", spriteCanvas.width - sidebar + 10, 300);
+    if (mouse.mode === 'fill') document.getElementById('spriteDrawMode').textContent = 'Fill';
 
     for (let y = 0; y < gridSize; y++) {                                                            // draw grid
         for (let x = 0; x < gridSize; x++) {
@@ -250,8 +254,15 @@ function removeSpriteEvents() {
     document.removeEventListener('keyup', handleKeyboard);
 }
 
-export function updateSpriteData(data) {
-    if (data !== undefined && data !== null) spriteData = data;
+export function updateSpriteData(current) {
+    const data = getDataFromSheet(current);
+    if (data !== undefined && data !== null) { 
+        spriteData = data;
+    }
+    else {
+        console.log('creating new sprite')
+        spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
+    }
 }
 
 export function editSprite(current) {

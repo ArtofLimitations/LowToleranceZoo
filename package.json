@@ -6,8 +6,10 @@
   "scripts": {
     "start": "http-server ./ -c-1"
   },
-  
   "author": "Dustin Davidson",
   "license": "ISC",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "vanilla-picker": "^2.12.3"
+  }
 }

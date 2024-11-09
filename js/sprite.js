@@ -12,55 +12,58 @@ const exportedCtx = exportedCanvas.getContext('2d');
 //spriteImage.src = '../assets/log.png'; // Path to your sprite image for testing
 //export let spriteSheet = [];
 export let imageData = 0;
-let gridSize = 0;
+let gridSize = 16;
+let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); // 16x16 grid, initially all alpha (2)
 let currentSprite = 1;
-document.addEventListener('DOMContentLoaded', () => {
-let data = updateSpriteImage( // temporary measure to have default sprite
-    [[2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2],
-    [2, 2, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0, 2, 2],
-    [2, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-    [2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
-    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
-    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
-    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
-    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
-    [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
-    [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
-    [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 2],
-    [2, 2, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0, 2, 2],
-    [2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2]], 16);
-    console.log('array is: ' + imageData);
-});
 
 // Draw the sprite in the center of a specific tile
 export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber) {
     //const posX = x * tileSizeX + (tileSizeX / 2) - (spriteImage.width / 2); 
     //const posY = y * tileSizeY + (tileSizeY / 2) - (spriteImage.height / 2);
     //ctx.drawImage(spriteImage, posX, posY);
-    let image = getImageFromSheet(spriteNumber);
+    let image = undefined;
+    if (getImageFromSheet(spriteNumber) !== undefined) {
+        image = getImageFromSheet(spriteNumber);
+    }
+    else {
+        image = convertToImageData(Array(gridSize).fill().map(() => Array(gridSize).fill(2)));
+    }
     //console.log('what r we now: '+image);
     ctx.putImageData(image, x * tileSizeX, y * tileSizeY);
     //ctx.putImageData(imageData, x * tileSizeX, y * tileSizeY);
 }
 
-export function updateSpriteImage(data, size, current) {
+export function updateSpriteImage(data, size, current, light = [255, 255, 255, 255], dark = [0, 0, 0, 255]) {
     console.log('updated spriteImage');
     console.log(data);
+    spriteData = data;
 
     gridSize = size;
     currentSprite = current;
 
-    imageData = convertToImageData(data);
+    imageData = convertToImageData(data, dark, light);
     console.log('array is: ' + imageData);
 
     return imageData;
 }
 
+export function updateSpriteColor(dark, light) {
+    //const colorDark = rgbStringToArray(dark);
+    //const colorLight = rgbStringToArray(light);
+    imageData = convertToImageData(spriteData, dark, light);
+    return imageData;
+}
+
+function rgbStringToArray(rgbString) {
+    // Use a regular expression to extract the numerical values
+    const matches = rgbString.match(/\d+/g);
+  
+    // Convert the string values to numbers
+    return matches.map(Number);
+  }
+
  // Function to convert spriteData to ImageData and scale it up
- function convertToImageData(spriteData) {
+ function convertToImageData(spriteData, dark, light) {
     const imgData = exportedCtx.createImageData(32, 32); // Create a 32x32 ImageData object
 
     for (let y = 0; y < gridSize; y++) {
@@ -69,10 +72,10 @@ export function updateSpriteImage(data, size, current) {
             let color = [0, 0, 0, 0];
             switch (spriteData[y][x]) {
                 case 0:
-                    color = [255, 255, 255, 255];
+                    color = light;
                 break;
                 case 1:
-                    color = [0, 0, 0, 255];
+                    color = dark;
                 break;
                 case 2:
                     color = [0, 0, 0, 0];

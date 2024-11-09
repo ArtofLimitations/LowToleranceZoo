@@ -1,3 +1,5 @@
+import { getImageFromSheet } from './sprite-sheet.js';
+
 const canvas = document.getElementById('tileCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -38,6 +40,8 @@ export function toolbar(size, current) {
   ctx.fillStyle = "#addcca";
   ctx.font = "16px Helvetica, Arial, Sans-Serif";
   ctx.fillText(current, leftSide + 10, 548);
+  
+  if (getImageFromSheet(current) !== undefined) ctx.putImageData(getImageFromSheet(current), leftSide + 40, 548 - 16);
 
 }
 
