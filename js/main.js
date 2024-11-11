@@ -30,14 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ceiling: {},
         default: {},
         floor:   {}
-    };       */                         
-    let spriteSheet = {};           // Store Sprites
+    };       */
+    let spriteSheet = {};             // Store Sprites
     let tilesX = 36;                  // Board width and height
     let tilesY = 25;
     let currentSprite = 1;            // Sprite to draw. Default = 1
     let [cursorX, cursorY] = [9, 4];  // Keyboard cursor
-    let tileSetLength = 300;            // Size of tileset
-    let colors = [];
+    let tileSetLength = 300;          // Size of tileset
+    let colors = currentColors;       // colors selected from palette  
 
     // Draw the grid of tiles
     function drawBoard() {
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawSprites() {
         for (const key in placedSprites) {
             const [x, y] = key.split(',').map(Number);
-            if (x < tilesX && y < tilesY) drawSprite(x, y, tileSizeX, tileSizeY, placedSprites[`${x},${y}`]); // draw the sprite image data from sprite.js
+            if (x < tilesX && y < tilesY) drawSprite(x, y, tileSizeX, tileSizeY, placedSprites[`${x},${y}`].sprite, placedSprites[`${x},${y}`].color); // draw the sprite image data from sprite.js
         }
     }
 
@@ -101,7 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
             delete placedSprites[tileKey];
         } else {
             // Place sprite
-            placedSprites[tileKey] = currentSprite;       // current sprite UPDATE
+            placedSprites[tileKey] = {
+                sprite: currentSprite, // add current selected sprite (number)
+                layer: 'default',      // layer UPDATE
+                color: colors          // add current colors from palette (array)
+            };
         }
         drawBoard();
         //drawSprites();
@@ -124,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleKeyboard(event) {
+        const tileKey = `${cursorX},${cursorY}`;
 
         switch (event.key) {
 
@@ -140,14 +145,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (cursorX < tilesX - 1) cursorX += 1; // Move right
                 break;
             case ' ':
-                const tileKey = `${cursorX},${cursorY}`;
+                //const tileKey = `${cursorX},${cursorY}`;
                 if (placedSprites[tileKey]) {
                     // Remove sprite if it exists
                     delete placedSprites[tileKey];
                 } else {
                     // Place sprite
-                    placedSprites[tileKey] = currentSprite;
-                }
+                    placedSprites[tileKey] = {
+                        sprite: currentSprite, // add current selected sprite (number)
+                        layer: 'default',      // layer UPDATE
+                        color: colors          // add current colors from palette (array)
+                    };
+                };
                 drawBoard(); // Refresh board
                 //drawSprites();
                 break;
@@ -169,6 +178,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('current sprite: ' + currentSprite);
                 updateSpriteData(currentSprite);
                 break;
+            case 'Enter': // add layers later
+                //const tileKey = `${cursorX},${cursorY}`;
+                currentSprite = placedSprites[tileKey].sprite;
+                colors = placedSprites[tileKey].color;
+                break;
         }
         console.log(`key: cursor ${cursorX},${cursorY}`);
         drawBoard(); // Redraw the board and cursor
@@ -188,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.focus();
     }
 
-    function removeMainEvents () {
+    function removeMainEvents() {
         canvas.removeEventListener('click', handleClick);
         canvas.removeEventListener('keydown', handleKeyboard);
     }
@@ -196,7 +210,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial canvas setup
     addMainEvents();
     spriteSheet = getSpriteSheet();
-    colors = currentColors;
     toolbar(toolBarSize);
     drawBoard();
 });

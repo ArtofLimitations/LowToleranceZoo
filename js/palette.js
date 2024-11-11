@@ -1,5 +1,5 @@
 import Picker from './modules/vanilla-picker.js';
-import { updateSpriteColor } from './sprite.js';
+//import { updateSpriteColor } from './sprite.js';
 
 const container = document.getElementById('paletteContainer');
 
@@ -18,10 +18,12 @@ export let currentColors = [[0, 0, 0, 1],[255, 255, 255, 1]];
 pickerDark.onChange = function (color) {
     console.log(color.rgba);
     colorDark.style.background = color.rgbaString;
+    dark = color.rgba;
 };
 
 pickerLight.onChange = function (color) {
     colorLight.style.background = color.rgbaString;
+    light = color.rgba;
 };
 
 function handleKeyboard(event) {
@@ -30,7 +32,7 @@ function handleKeyboard(event) {
         case 'Escape':
             removePaletteEvents();
             container.style.display = 'none';
-            updateSpriteColor(dark, light);
+            //updateSpriteColor(dark, light);
             currentColors = [dark, light];
             addMainEvents();
             break;

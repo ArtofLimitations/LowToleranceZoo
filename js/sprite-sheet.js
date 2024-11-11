@@ -15,7 +15,7 @@ export function addToSpriteSheet(currentSprite, spriteData, imageData) {
 export function getImageFromSheet(index) {
     //const obj = JSON.parse(JSON.stringify(spriteSheet[index][1]))
     if (spriteSheet[index] !== undefined) {
-        return spriteSheet[index][1];
+        return spriteSheet[index][1]; // was 1
     }
     else {
         return undefined;
