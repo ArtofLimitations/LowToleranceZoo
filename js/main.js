@@ -2,7 +2,7 @@ import { toolbar, toolbarClicked } from './toolbar.js';
 import { drawSprite } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getSpriteSheet } from './sprite-sheet.js';
-import { pickColor, currentColors } from './palette.js';
+import { pickColor, currentColors, updateColor } from './palette.js';
 //import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -182,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 //const tileKey = `${cursorX},${cursorY}`;
                 currentSprite = placedSprites[tileKey].sprite;
                 colors = placedSprites[tileKey].color;
+                updateColor(colors);
                 break;
         }
         console.log(`key: cursor ${cursorX},${cursorY}`);

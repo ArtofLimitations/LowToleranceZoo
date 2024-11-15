@@ -8,8 +8,5 @@
   },
   "author": "Dustin Davidson",
   "license": "ISC",
-  "type": "module",
-  "dependencies": {
-    "vanilla-picker": "^2.12.3"
-  }
+  "type": "module"
 }

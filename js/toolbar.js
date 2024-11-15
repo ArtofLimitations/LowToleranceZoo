@@ -42,7 +42,6 @@ export function toolbar(size, current) {
   ctx.fillText(current, leftSide + 10, 548);
   
   if (getImageFromSheet(current) !== undefined) ctx.putImageData(getImageFromSheet(current), leftSide + 40, 548 - 16);
-
 }
 
 function isInsideButton(bX, x, y, button) {

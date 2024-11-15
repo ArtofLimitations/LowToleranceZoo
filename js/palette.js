@@ -7,24 +7,43 @@ let dark = [0, 0, 0, 1];
 let light = [255, 255, 255, 1];
 let colorDark = document.getElementById('colorDark');
 let colorLight = document.getElementById('colorLight');
-let pickerDark = new Picker(colorDark);
-let pickerLight = new Picker(colorLight);
+let recentColors = [];
+const recentLength = 5;
+
+let pickerDark = new Picker({ parent: colorDark, alpha: false, color: '#222222' });
+let pickerLight = new Picker({ parent: colorLight, alpha: false, color: 'pink' });
 
 export let currentColors = [[0, 0, 0, 1],[255, 255, 255, 1]];
 
-/*
-    You can do what you want with the chosen color using two callbacks: onChange and onDone.
-*/
+export function updateColor (color) {
+    pickerDark.setColor = color[0];
+    pickerLight.setColor = color[1];
+}
+
 pickerDark.onChange = function (color) {
     console.log(color.rgba);
     colorDark.style.background = color.rgbaString;
     dark = color.rgba;
 };
 
+pickerDark.onClose = function (color) {
+    recentColors.unshift([color.rgba, color.rgbaString]);
+    if (recentColors.length > recentLength) recentColors.length = recentLength;
+    updateRecentColors();
+}
+
 pickerLight.onChange = function (color) {
     colorLight.style.background = color.rgbaString;
     light = color.rgba;
 };
+
+function updateRecentColors () {
+    for (let index = 0; index < recentColors.length; index++) {
+        const element = recentColors[index][1];
+        let recent = document.getElementById(`color${index + 1}`);
+        recent.style.background = element;
+    }
+}
 
 function handleKeyboard(event) {
     switch (event.key) {

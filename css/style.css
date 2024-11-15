@@ -109,6 +109,11 @@ h3 {
   mix-blend-mode: difference;
 }
 
+.paletteRecent {
+  width: 32px;
+  height: 32px;
+}
+
 /*
 .block {
     
