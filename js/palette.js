@@ -21,7 +21,7 @@ export function updateColor (color) {
 }
 
 pickerDark.onChange = function (color) {
-    console.log(color.rgba);
+    //console.log(color.rgba);
     colorDark.style.background = color.rgbaString;
     dark = color.rgba;
 };

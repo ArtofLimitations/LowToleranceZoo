@@ -3,6 +3,7 @@ import { drawSprite } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
+import { saveSpriteSheet } from './save.js';
 //import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,13 +32,13 @@ document.addEventListener('DOMContentLoaded', () => {
         default: {},
         floor:   {}
     };       */
-    let spriteSheet = {};             // Store Sprites
-    let tilesX = 36;                  // Board width and height
+    let spriteSheet = getSpriteSheet();  // Store Sprites
+    let tilesX = 36;                     // Board width and height
     let tilesY = 25;
-    let currentSprite = 1;            // Sprite to draw. Default = 1
-    let [cursorX, cursorY] = [9, 4];  // Keyboard cursor
-    let tileSetLength = 300;          // Size of tileset
-    let colors = currentColors;       // colors selected from palette  
+    let currentSprite = 1;               // Sprite to draw. Default = 1
+    let [cursorX, cursorY] = [9, 4];     // Keyboard cursor
+    let tileSetLength = 300;             // Size of tileset
+    let colors = currentColors;          // colors selected from palette  
 
     // Draw the grid of tiles
     function drawBoard() {
@@ -181,7 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'Enter': // add layers later
                 //const tileKey = `${cursorX},${cursorY}`;
                 currentSprite = placedSprites[tileKey].sprite;
+                updateSpriteData(currentSprite);
                 colors = placedSprites[tileKey].color;
+                console.log(currentSprite);
                 updateColor(colors);
                 break;
         }
@@ -210,7 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial canvas setup
     addMainEvents();
-    spriteSheet = getSpriteSheet();
     toolbar(toolBarSize);
     drawBoard();
 });

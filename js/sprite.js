@@ -15,7 +15,7 @@ export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
     const data = getDataFromSheet(spriteNumber) ?? convertToImageData(Array(gridSize).fill().map(() => Array(gridSize).fill(2)));
     const dark = colors[0];
     const light = colors[1];
-    console.log(colors);
+    //console.log(colors);
     const image = convertToImageData(data, dark, light)
     ctx.putImageData(image, x * tileSizeX, y * tileSizeY);
 }

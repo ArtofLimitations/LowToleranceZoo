@@ -90,6 +90,7 @@ h3 {
 
 .paletteColorContainer {
   display: flex;
+  margin-bottom: 16px;
 }
 
 .paletteColorBox {
@@ -98,7 +99,7 @@ h3 {
   justify-content: center;
   align-items: center;
   height: 100px;
-  border: 1px solid #fff;
+  border: 2px solid #fff;
   min-width: 100px;
   margin: 0 10px;
   text-align: center;
@@ -109,9 +110,18 @@ h3 {
   mix-blend-mode: difference;
 }
 
+.paletteRecentContainer {
+  display: flex;
+  border: 2px solid #fff;
+}
+
 .paletteRecent {
-  width: 32px;
-  height: 32px;
+  display: flex;
+  flex: 1 1 200px;
+  justify-content: center;
+  align-items: center;
+  min-width: 32px;
+  min-height: 32px;
 }
 
 /*

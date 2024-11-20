@@ -24,26 +24,28 @@
             <p><strong>Color Palette</strong></p>
             <div class="paletteColorContainer">
                 <div class="paletteColorBox" id="colorDark"><span class="paletteLabel">Dark</span>
-                    
+
                 </div>
                 <div class="paletteColorBox" id="colorLight"><span class="paletteLabel">Light</span>
                 </div>
-                <p>Recent Colors</p>
             </div>
-            <div class="paletteRecent" id="color1"></div><div class="paletteRecent" id="color2"></div><div class="paletteRecent" id="color3"></div><div class="paletteRecent" id="color4"></div><div class="paletteRecent" id="color5"></div>
+            <p>Recent Colors</p>
+            <div class="paletteRecentContainer">
+                <div class="paletteRecent" id="color1"></div>
+                <div class="paletteRecent" id="color2"></div>
+                <div class="paletteRecent" id="color3"></div>
+                <div class="paletteRecent" id="color4"></div>
+                <div class="paletteRecent" id="color5"></div>
+            </div>
         </div>
     </div>
     <canvas id="exportedSpriteCanvas" width="32" height="32" style="margin-top: 20px;"></canvas>
 
     <!-- Controls for switching between modes and managing the sprite sheet -->
     <div id="controls">
-        <button id="convertToImageData">Convert to ImageData</button>
-        <button id="addToSpriteSheet">Add to Sprite Sheet</button>
         <button id="saveSpriteSheet">Save Sprite Sheet</button>
         <input type="file" id="loadSpriteSheet" accept=".json" style="display: none;">
         <button id="loadSpriteSheetButton">Load Sprite Sheet</button>
-        <input type="number" id="spriteIndex" placeholder="Sprite Index" min="1" style="width: 100px;">
-        <button id="loadSpriteToGrid">Load Sprite to Grid</button>
     </div>
     <script type="module" src="js/main.js"></script>
 </body>

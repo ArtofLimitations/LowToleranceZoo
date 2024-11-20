@@ -1,5 +1,5 @@
 {
-    "codegraphy.connectionType": "Interaction",
+    "codegraphy.connectionType": "Directory",
     "codegraphy.nodeSize": "Lines",
     "codegraphy.showNodeModules": false,
     "codegraphy.showOrphans": true,

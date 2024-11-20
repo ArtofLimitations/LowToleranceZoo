@@ -14,6 +14,7 @@ const pixelSize = (spriteCanvas.width - sidebar) / gridSize;
 const colors = ['white', 'black'];                                                 // Only two colors: white and black
 let currentColor = 1;
 let currentSprite = 1;
+let clipboard = [];
 export let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); // 16x16 grid, initially all alpha (2)
 let [cursorX, cursorY] = [9, 4];
 let mouse = {
@@ -118,11 +119,11 @@ function draw(event) {
         drawGrid();
     }
     else {
-        //alert('sidebar!');
         let offset = spriteCanvas.width - sidebar;
         buttons.forEach(button => {
             if (isInsideButton(offset, mouseX, mouseY, button)) {
                 //console.log(`${button.label} clicked!`);
+
                 switch (button.label) {
                     case 'Dark':
                         currentColor = 1;
@@ -141,10 +142,43 @@ function draw(event) {
                         break;
                     case 'FlipX':
                         for (var i = 0; i < spriteData.length; i++) {
-
                             spriteData[i].reverse();
                         }
                         drawGrid();
+                        break;
+                    case 'Copy':
+                        //console.log(spriteData.length);
+                        //clipboard = spriteData.slice();
+                        clipboard = structuredClone(spriteData);
+                        //clipboard = spriteData.map(item => item);
+                        //console.log(clipboard);
+                        //console.log('clipboard length: ' + clipboard.length);
+                        //console.log(`copied ${spriteData} to clipboard ${clipboard}`)
+                        break;
+                    case 'Paste':
+                        if (clipboard && clipboard.length) { // Check if clipboard contains data
+                            spriteData = structuredClone(clipboard); // Clone the clipboard content
+                            drawGrid();
+                        } else {
+                            console.log("Clipboard is empty. Copy data first.");
+                        }
+
+                        //console.log(spriteData);
+                        //console.log(spriteData.length);
+                        //spriteData = structuredClone(clipboard);
+                        //spriteData = clipboard.map(item => item);
+                        //spriteData = clipboard.slice();
+                        //spriteData = clipboard;
+                        /*setTimeout(() => {
+                            console.log(clipboard);
+                            console.log(clipboard.length);
+                            console.log(spriteData);
+                            console.log(spriteData.length);
+                          }, 2000);*/
+                        //console.log(spriteData);
+                        //console.log(clipboard.length);
+                        //console.log(spriteData.length);
+
                         break;
                 }
             }
@@ -216,6 +250,7 @@ function handleKeyboard(event) {
             break;
         case 'D':
         case 'd':
+            console.log(spriteData);
             mouse.mode = 'draw';
             drawGrid();
             break;
@@ -256,7 +291,7 @@ function removeSpriteEvents() {
 
 export function updateSpriteData(current) {
     const data = getDataFromSheet(current);
-    if (data !== undefined && data !== null) { 
+    if (data !== undefined && data !== null) {
         spriteData = data;
     }
     else {

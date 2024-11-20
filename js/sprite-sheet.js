@@ -1,6 +1,5 @@
 import { spriteData, updateSpriteData } from './sprite-editor.js';
  
-let tileSetLength = 300;
 let spriteSheet = [];
 
 export function getSpriteSheet () {
@@ -34,15 +33,11 @@ export function getDataFromSheet(index) {
     }
 }
 
- // Save sprite sheet as a JSON file
-document.getElementById('saveSpriteSheet').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(spriteSheet)], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'spriteSheet.json';
-    link.click();
-});
+export function replaceSpriteSheet(data) {
+    spriteSheet = structuredClone(data);
+}
 
+/*
 // Load sprite sheet from a JSON file
 document.getElementById('loadSpriteSheetButton').addEventListener('click', () => {
     document.getElementById('loadSpriteSheet').click();
@@ -75,4 +70,4 @@ document.getElementById('loadSpriteToGrid').addEventListener('click', () => {
     } else {
         console.error("Invalid sprite index.");
     }
-});
+});*/
