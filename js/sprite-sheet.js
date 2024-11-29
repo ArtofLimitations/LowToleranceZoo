@@ -34,40 +34,10 @@ export function getDataFromSheet(index) {
 }
 
 export function replaceSpriteSheet(data) {
+    //console.log ('replaced sprite sheet with: '+data);
+    /*let arrayData = data;
+    arrayData.forEach(element => {
+        arrayData[element][1] = new ImageData(arrayData[element][1], 32, 32);
+    });*/
     spriteSheet = structuredClone(data);
 }
-
-/*
-// Load sprite sheet from a JSON file
-document.getElementById('loadSpriteSheetButton').addEventListener('click', () => {
-    document.getElementById('loadSpriteSheet').click();
-});
-
-document.getElementById('loadSpriteSheet').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const loadedSpriteSheet = JSON.parse(e.target.result);
-            if (Array.isArray(loadedSpriteSheet)) {
-                spriteSheet = loadedSpriteSheet; // Update the spriteSheet array
-                console.log("Sprite sheet loaded:", spriteSheet);
-            } else {
-                console.error("Invalid sprite sheet file format.");
-            }
-        };
-        reader.readAsText(file);
-    }
-});
-
-// Load a specific sprite from the sprite sheet into the grid
-document.getElementById('loadSpriteToGrid').addEventListener('click', () => {
-    const index = parseInt(document.getElementById('spriteIndex').value);
-    if (index >= 0 && index < spriteSheet.length) {
-        updateSpriteData(JSON.parse(JSON.stringify(spriteSheet[index]))); // Clone selected sprite
-        //drawGrid(); // Update the canvas with the loaded sprite
-        console.log("Loaded sprite at index", index, "onto grid.");
-    } else {
-        console.error("Invalid sprite index.");
-    }
-});*/

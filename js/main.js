@@ -3,7 +3,7 @@ import { drawSprite } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
-import { saveSpriteSheet } from './save.js';
+import { saveBoard } from './file.js';
 //import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tileSizeX = 32;             // Single tile size
     const tileSizeY = 32;
     const toolBarSize = 320;          // Right side toolbar sized in tiles
-    const placedSprites = {}
+    const placedSprites = []
     /*const placedSprites = {         // Store the positions of placed sprites (as key-value pairs)
         ceiling: {},
         default: {},
@@ -187,6 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(currentSprite);
                 updateColor(colors);
                 break;
+            case 'B':
+                saveBoard(placedSprites);
+                break;
         }
         console.log(`key: cursor ${cursorX},${cursorY}`);
         drawBoard(); // Redraw the board and cursor
@@ -210,6 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.removeEventListener('click', handleClick);
         canvas.removeEventListener('keydown', handleKeyboard);
     }
+
+    //document.getElementById('saveBoard').addEventListener('click', saveBoard(placedSprites));
 
     // Initial canvas setup
     addMainEvents();

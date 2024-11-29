@@ -12,11 +12,15 @@ let currentSprite = 1;
 
 export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
     //const image = getImageFromSheet(spriteNumber) ?? convertToImageData(Array(gridSize).fill().map(() => Array(gridSize).fill(2)));
-    const data = getDataFromSheet(spriteNumber) ?? convertToImageData(Array(gridSize).fill().map(() => Array(gridSize).fill(2)));
+    const data = getDataFromSheet(spriteNumber) ?? Array(gridSize).fill().map(() => Array(gridSize).fill(2));
+    /*let data = [];
+    if (getDataFromSheet(spriteNumber)) {
+        data = getDataFromSheet(spriteNumber)
+    } else { data = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); }*/
     const dark = colors[0];
     const light = colors[1];
     //console.log(colors);
-    const image = convertToImageData(data, dark, light)
+    const image = convertToImageData(data, dark, light);
     ctx.putImageData(image, x * tileSizeX, y * tileSizeY);
 }
 
@@ -30,7 +34,7 @@ export function updateSpriteImage(data, size, current, light = [255, 255, 255, 2
     return imageData;
 }
 
-function convertToImageData(spriteData, dark, light) {
+export function convertToImageData(spriteData, dark, light) {
     const imgData = exportedCtx.createImageData(32, 32);
 
     for (let y = 0; y < gridSize; y++) {
@@ -63,3 +67,28 @@ function setPixel(imageData, x, y, [r, g, b, a]) {
     imageData.data[index + 2] = b;
     imageData.data[index + 3] = a * 255;
 }
+
+function adjustColor(rgba, factor) {
+    const [r, g, b, a] = rgba; // Decompose RGBA array
+    const lighten = factor > 0;
+
+    const adjust = (channel) => {
+        if (lighten) {
+            return Math.min(255, channel + (255 - channel) * factor);
+        } else {
+            return Math.max(0, channel - channel * -factor);
+        }
+    };
+
+    return [
+        adjust(r),
+        adjust(g),
+        adjust(b),
+        a // Alpha remains unchanged
+    ];
+}
+
+// Usage example:
+//const rgba = [100, 150, 200, 0.8]; // RGBa input
+//const lightened = adjustColor(rgba, 0.2); // Lighten by 20%
+//const darkened = adjustColor(rgba, -0.3); // Darken by 30%

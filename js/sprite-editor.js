@@ -250,7 +250,6 @@ function handleKeyboard(event) {
             break;
         case 'D':
         case 'd':
-            console.log(spriteData);
             mouse.mode = 'draw';
             drawGrid();
             break;

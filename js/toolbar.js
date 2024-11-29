@@ -22,8 +22,8 @@ export function toolbar(size, current) {
   ctx.fill();
   ctx.beginPath();
   ctx.fillStyle = "#addcca";
-  ctx.font = "48px Helvetica, Arial, Sans-Serif";
-  ctx.fillText("TOOLBAR", canvas.width - size, 48);
+  ctx.font = "32px Helvetica, Arial, Sans-Serif";
+  ctx.fillText("Low Tolerance Zoo", canvas.width - size + 10, 48);
 
   // Draw toolbar buttons
 

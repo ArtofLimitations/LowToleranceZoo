@@ -10,14 +10,26 @@ let colorLight = document.getElementById('colorLight');
 let recentColors = [];
 const recentLength = 5;
 
-let pickerDark = new Picker({ parent: colorDark, alpha: false, color: '#222222' });
-let pickerLight = new Picker({ parent: colorLight, alpha: false, color: 'pink' });
+//let pickerDark = new Picker({ parent: colorDark, alpha: false, color: '#222222' });
+//let pickerLight = new Picker({ parent: colorLight, alpha: false, color: 'pink' });
+let pickerDark = new Picker({ parent: colorDark, alpha: false, color: dark });
+let pickerLight = new Picker({ parent: colorLight, alpha: false, color: light });
 
 export let currentColors = [[0, 0, 0, 1],[255, 255, 255, 1]];
 
 export function updateColor (color) {
-    pickerDark.setColor = color[0];
-    pickerLight.setColor = color[1];
+    //pickerLight.setColor = color[1];
+    //window.pickerDark.setColor(color[0], true);
+    dark = color[0];
+    colorDark.style.background = `rgba(${dark})`;
+    pickerDark.setColor(color[0], true);
+    light = color[1];
+    colorLight.style.background = `rgba(${light})`;
+    pickerLight.setColor(color[1], true);
+}
+
+pickerDark.onOpen = function (color) {
+    
 }
 
 pickerDark.onChange = function (color) {
@@ -37,12 +49,19 @@ pickerLight.onChange = function (color) {
     light = color.rgba;
 };
 
+pickerLight.onClose = function (color) {
+    recentColors.unshift([color.rgba, color.rgbaString]);
+    if (recentColors.length > recentLength) recentColors.length = recentLength;
+    updateRecentColors();
+}
+
 function updateRecentColors () {
     for (let index = 0; index < recentColors.length; index++) {
         const element = recentColors[index][1];
         let recent = document.getElementById(`color${index + 1}`);
         recent.style.background = element;
     }
+    
 }
 
 function handleKeyboard(event) {
@@ -51,7 +70,6 @@ function handleKeyboard(event) {
         case 'Escape':
             removePaletteEvents();
             container.style.display = 'none';
-            //updateSpriteColor(dark, light);
             currentColors = [dark, light];
             addMainEvents();
             break;
@@ -60,10 +78,13 @@ function handleKeyboard(event) {
 
 function addPaletteEvents() {
     document.addEventListener('keydown', handleKeyboard);
+    console.log(pickerDark);
 }
 
 function removePaletteEvents() {
     document.removeEventListener('keydown', handleKeyboard);
+    //pickerDark = null;
+    //pickerLight = null;
 }
 
 export function pickColor() {

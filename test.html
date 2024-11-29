@@ -3,30 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Color Gradient</title>
+  <title>Code Editor Example</title>
+  <!-- Include CodeMirror CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+  <!-- Optional theme -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
 </head>
 <body>
-  <canvas id="colorPicker" width="300" height="150"></canvas>
+  <h1>Code Editor Example</h1>
+  <!-- Textarea for CodeMirror -->
+  <textarea id="editor" name="editor"></textarea>
+
+  <!-- Include CodeMirror JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <!-- Include CodeMirror mode for JavaScript -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+
   <script>
-const canvas = document.getElementById('colorPicker');
-const ctx = canvas.getContext('2d');
+    // Initialize CodeMirror
+    const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+      lineNumbers: true,          // Show line numbers
+      mode: 'javascript',         // Syntax highlighting mode
+      theme: 'dracula',           // Theme (optional)
+      matchBrackets: true,        // Highlight matching brackets
+      autoCloseBrackets: true,    // Auto-close brackets
+    });
 
-// Define the gradient
-const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-
-// Add color stops for a smooth transition
-gradient.addColorStop(0, "red");    // Start with red
-gradient.addColorStop(0.2, "orange");
-gradient.addColorStop(0.4, "yellow");
-gradient.addColorStop(0.6, "green");
-gradient.addColorStop(0.8, "blue");
-gradient.addColorStop(1, "purple"); // End with purple
-
-// Fill the canvas with the gradient
-ctx.fillStyle = gradient;
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-
+    // Set initial content
+    editor.setValue("// Write your JavaScript code here\nconsole.log('Hello, World!');");
   </script>
 </body>
 </html>
