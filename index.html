@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="js/modules/vanilla-picker.csp.css">
 </head>
 
-<body oncontextmenu="return false;">
+<body oncontextmenu="event.preventDefault();">
     <h1>☺</h1>
 
     <div class="block" id="block">
@@ -43,7 +43,6 @@
 
     <!-- Controls for switching between modes and managing the sprite sheet -->
     <div id="controls">
-        <button id="saveBoard">Save Board</button>
         <button id="saveSpriteSheet">Save Sprite Sheet</button>
         <input type="file" id="loadSpriteSheet" accept=".json" style="display: none;">
         <button id="loadSpriteSheetButton">Load Sprite Sheet</button>

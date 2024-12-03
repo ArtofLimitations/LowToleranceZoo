@@ -241,7 +241,7 @@ function handleKeyboard(event) {
     switch (event.key) {
 
         case 'ctrlKey':
-            mouse.ctrl = true;
+            //mouse.ctrl = true;
             break;
         case 'F':
         case 'f':

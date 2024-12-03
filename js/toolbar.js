@@ -10,7 +10,7 @@ const buttons = [
 ]
 
 // In toolbar.js
-export function toolbar(size, current) {
+export function toolbar(size, current, currentColors) {
   //console.log('Function called from toolbar.js');
 
   const leftSide = canvas.width - size;
@@ -42,6 +42,10 @@ export function toolbar(size, current) {
   ctx.fillText(current, leftSide + 10, 548);
   
   if (getImageFromSheet(current) !== undefined) ctx.putImageData(getImageFromSheet(current), leftSide + 40, 548 - 16);
+  ctx.beginPath();
+  ctx.rect(leftSide + 80, 548 - 16, 48, 32);
+  ctx.fillStyle = `rgba(${currentColors[0][0]},${currentColors[0][1]}, ${currentColors[0][2]}, ${currentColors[0][3]})`;
+  ctx.fill();
 }
 
 function isInsideButton(bX, x, y, button) {
