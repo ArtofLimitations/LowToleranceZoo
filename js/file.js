@@ -143,9 +143,6 @@ export function loadBoard(callback) {
 
 document.getElementById('saveSpriteSheet').addEventListener('click', saveSpriteSheet);
 
-document.getElementById('saveBoard').addEventListener('click', saveBoard);
-//document.getElementById('saveSpriteSheet').addEventListener('click', saveFile(getSpriteSheet(), "spritesheet", "txt"));
-
 document.getElementById('loadSpriteSheetButton').addEventListener('click', () => {
     document.getElementById('loadSpriteSheet').click();
 });

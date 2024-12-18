@@ -4,9 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Starter Project</title>
+    <title>LTZ</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="js/modules/vanilla-picker.csp.css">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
 </head>
 
 <body oncontextmenu="event.preventDefault();">
@@ -29,6 +30,7 @@
                 <div class="paletteColorBox" id="colorLight"><span class="paletteLabel">Light</span>
                 </div>
             </div>
+            <button class="swapColorButton material-symbols-outlined" id="swapColorButton" title="Swap colors">swap_horiz</button> 
             <p>Recent Colors</p>
             <div class="paletteRecentContainer">
                 <div class="paletteRecent" id="color1"></div>
@@ -36,6 +38,14 @@
                 <div class="paletteRecent" id="color3"></div>
                 <div class="paletteRecent" id="color4"></div>
                 <div class="paletteRecent" id="color5"></div>
+            </div>
+        </div>
+        <div class="editorContainer" id="editorContainer">
+            <p><strong>Script Editor</strong></p>
+            <div class="editorTextContainer" id="editorTextContainer">
+                <div class="fieldContainer"><input type="text" id="objectName" placeholder="Enter name"></div>
+                <div class="textEditorContainer"><textarea id="objectTextEditor" placeholder="Code here..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                </div>
             </div>
         </div>
     </div>

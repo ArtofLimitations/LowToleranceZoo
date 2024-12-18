@@ -3,34 +3,122 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Code Editor Example</title>
-  <!-- Include CodeMirror CSS -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
-  <!-- Optional theme -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+  <title>Sprite Board</title>
+  <style>
+    body {
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(5, 50px);
+  grid-template-rows: repeat(5, 50px);
+  gap: 2px;
+  margin-bottom: 20px;
+}
+
+.cell {
+  width: 50px;
+  height: 50px;
+  background-color: lightgray;
+  border: 1px solid #ccc;
+  position: relative;
+}
+
+.sprite {
+  width: 40px;
+  height: 40px;
+  background-color: blue;
+  border-radius: 50%;
+  position: absolute;
+  top: 5px;
+  left: 5px;
+}
+
+  </style>
 </head>
 <body>
-  <h1>Code Editor Example</h1>
-  <!-- Textarea for CodeMirror -->
-  <textarea id="editor" name="editor"></textarea>
-
-  <!-- Include CodeMirror JS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
-  <!-- Include CodeMirror mode for JavaScript -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+  <div id="board"></div>
+  <input type="text" id="command" placeholder="Enter command (e.g., move 0 up)">
+  <button id="execute">Execute</button>
 
   <script>
-    // Initialize CodeMirror
-    const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
-      lineNumbers: true,          // Show line numbers
-      mode: 'javascript',         // Syntax highlighting mode
-      theme: 'dracula',           // Theme (optional)
-      matchBrackets: true,        // Highlight matching brackets
-      autoCloseBrackets: true,    // Auto-close brackets
-    });
+    const boardSize = 5;
+const board = document.getElementById('board');
+const commandInput = document.getElementById('command');
+const executeButton = document.getElementById('execute');
 
-    // Set initial content
-    editor.setValue("// Write your JavaScript code here\nconsole.log('Hello, World!');");
+// Initialize board and sprites
+const sprites = [
+  { id: 0, x: 0, y: 0 }, // Sprite 0 starts at (0, 0)
+  { id: 1, x: 4, y: 4 }  // Sprite 1 starts at (4, 4)
+];
+
+// Create the grid
+for (let i = 0; i < boardSize * boardSize; i++) {
+  const cell = document.createElement('div');
+  cell.classList.add('cell');
+  cell.dataset.x = i % boardSize;
+  cell.dataset.y = Math.floor(i / boardSize);
+  board.appendChild(cell);
+}
+
+// Render sprites
+function renderSprites() {
+  document.querySelectorAll('.sprite').forEach(sprite => sprite.remove());
+  sprites.forEach(sprite => {
+    const cell = document.querySelector(`.cell[data-x='${sprite.x}'][data-y='${sprite.y}']`);
+    if (cell) {
+      const spriteElement = document.createElement('div');
+      spriteElement.classList.add('sprite');
+      spriteElement.dataset.id = sprite.id;
+      cell.appendChild(spriteElement);
+    }
+  });
+}
+renderSprites();
+
+// Handle commands
+function moveSprite(id, direction) {
+  const sprite = sprites.find(s => s.id === id);
+  if (!sprite) return;
+
+  let { x, y } = sprite;
+
+  switch (direction) {
+    case 'up': y = Math.max(0, y - 1); break;
+    case 'down': y = Math.min(boardSize - 1, y + 1); break;
+    case 'left': x = Math.max(0, x - 1); break;
+    case 'right': x = Math.min(boardSize - 1, x + 1); break;
+  }
+
+  // Check for collision
+  const collision = sprites.some(s => s.x === x && s.y === y && s.id !== id);
+  if (!collision) {
+    sprite.x = x;
+    sprite.y = y;
+  }
+}
+
+// Execute commands
+executeButton.addEventListener('click', () => {
+  const command = commandInput.value.trim();
+  const [action, idStr, direction] = command.split(' ');
+
+  if (action === 'move' && !isNaN(idStr) && ['up', 'down', 'left', 'right'].includes(direction)) {
+    moveSprite(Number(idStr), direction);
+    renderSprites();
+  } else {
+    alert('Invalid command. Use format: move [id] [direction]');
+  }
+
+  commandInput.value = '';
+});
+
   </script>
 </body>
 </html>

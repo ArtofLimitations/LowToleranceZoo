@@ -15,9 +15,9 @@ const recentLength = 5;
 let pickerDark = new Picker({ parent: colorDark, alpha: false, color: dark });
 let pickerLight = new Picker({ parent: colorLight, alpha: false, color: light });
 
-export let currentColors = [[0, 0, 0, 1],[255, 255, 255, 1]];
+export let currentColors = [[0, 0, 0, 1], [255, 255, 255, 1]];
 
-export function updateColor (color) {
+export function updateColor(color) {
     //pickerLight.setColor = color[1];
     //window.pickerDark.setColor(color[0], true);
     dark = color[0];
@@ -29,11 +29,11 @@ export function updateColor (color) {
 }
 
 pickerDark.onOpen = function (color) {
-    
+
 }
 
 pickerDark.onChange = function (color) {
-    //console.log(color.rgba);
+    console.log('color changed to: ', color.rgba);
     colorDark.style.background = color.rgbaString;
     dark = color.rgba;
 };
@@ -55,19 +55,25 @@ pickerLight.onClose = function (color) {
     updateRecentColors();
 }
 
-function updateRecentColors () {
+function updateRecentColors() {
     for (let index = 0; index < recentColors.length; index++) {
         const element = recentColors[index][1];
         let recent = document.getElementById(`color${index + 1}`);
         recent.style.background = element;
     }
-    
+}
+
+function swapColor () {
+    updateColor([[light], [dark]]);
 }
 
 function handleKeyboard(event) {
     switch (event.key) {
 
         case 'Escape':
+        case 'Enter':
+        //case 'c':
+        //case 'C':
             removePaletteEvents();
             container.style.display = 'none';
             currentColors = [dark, light];
@@ -78,13 +84,12 @@ function handleKeyboard(event) {
 
 function addPaletteEvents() {
     document.addEventListener('keydown', handleKeyboard);
-    console.log(pickerDark);
+    document.getElementById('swapColorButton').addEventListener('click', swapColor);
 }
 
 function removePaletteEvents() {
     document.removeEventListener('keydown', handleKeyboard);
-    //pickerDark = null;
-    //pickerLight = null;
+    document.getElementById('swapColorButton').removeEventListener('click', swapColor);
 }
 
 export function pickColor() {

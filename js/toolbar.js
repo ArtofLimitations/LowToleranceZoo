@@ -42,9 +42,11 @@ export function toolbar(size, current, currentColors) {
   ctx.fillText(current, leftSide + 10, 548);
   
   if (getImageFromSheet(current) !== undefined) ctx.putImageData(getImageFromSheet(current), leftSide + 40, 548 - 16);
+  let colors = currentColors || [[0, 0, 0, 1],[255, 255, 255, 1]];
   ctx.beginPath();
   ctx.rect(leftSide + 80, 548 - 16, 48, 32);
-  ctx.fillStyle = `rgba(${currentColors[0][0]},${currentColors[0][1]}, ${currentColors[0][2]}, ${currentColors[0][3]})`;
+  //ctx.fillStyle = `rgba(${currentColors[0][0]},${currentColors[0][1]}, ${currentColors[0][2]}, ${currentColors[0][3]})`;
+  ctx.fillStyle = `rgba(${colors[0][0]},${colors[0][1]}, ${colors[0][2]}, ${colors[0][3]})`;
   ctx.fill();
 }
 
