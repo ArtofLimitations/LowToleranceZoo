@@ -28,13 +28,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const tileSizeY = 32;
     const toolBarSize = 320;             // Right side toolbar sized in tiles
     let placedSprites = {};              // Store the positions of placed sprites (as key-value pairs)
-    let spriteSheet = getSpriteSheet();  // Store Sprites
+    //let spriteSheet = getSpriteSheet();  // Store Sprites
     let tilesX = 36;                     // Board width and height
     let tilesY = 25;
     let currentSprite = 1;               // Sprite to draw. Default = 1
     let [cursorX, cursorY] = [9, 4];     // Keyboard cursor
     let tileSetLength = 300;             // Size of tileset
-    let colors = currentColors;          // colors selected from palette  
+    let colors = currentColors;          // colors selected from palette
+    let key = {
+        ctrl: false,
+        shift: false,
+        alt: false
+    };
 
     // Draw the grid of tiles
     function drawBoard() {
@@ -94,11 +99,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // grab the sprite at cursor when Enter key or right click
     function grabSprite(tileKey) {
-        currentSprite = placedSprites[tileKey].sprite;
-        updateSpriteData(currentSprite);
-        colors = placedSprites[tileKey].color;
-        console.log(currentSprite);
-        updateColor(colors);
+        if (placedSprites[tileKey] !== undefined) {
+            if (!key.ctrl) { // If the ctrl key isn't pressed then grab the sprite and color else just color
+                currentSprite = placedSprites[tileKey].sprite;
+                updateSpriteData(currentSprite);
+            }
+            colors = placedSprites[tileKey].color;
+            console.log(currentSprite);
+            updateColor(colors);
+        }
     }
 
     // Handle placing/removing sprites
@@ -114,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
         switch (event.button) {
             case 2:
                 grabSprite(tileKey);
-
                 break;
             case 0:
                 if (placedSprites[tileKey]) {
@@ -150,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else {
             // handle toolbar clicks from toolbar.js
             toolbarClicked(x, y, toolBarSize);
+            colors = currentColors;
         }
     }
 
@@ -193,8 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         switch (event.key.toLowerCase()) {
             case 'e':
-                removeMainEvents(); // Open the sprite editor from sprite-editor.js
-                editSprite(currentSprite);
+                removeMainEvents();
+                editSprite(currentSprite); // Open the sprite editor from sprite-editor.js
                 break;
             case 'c':
                 removeMainEvents();
@@ -220,13 +229,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (event.ctrlKey || event.metaKey) {
             // Handle key combinations for both Windows/Linux (Ctrl) and Mac (Cmd)
+            key.ctrl = true;
             switch (event.key.toLowerCase()) { // Check the key
                 case "b": // Handle 'Ctrl + B'
                     loadBoard(handleLoadedBoard);
                     break;
             }
         }
-
         console.log(`key: cursor ${cursorX},${cursorY}`);
         drawBoard(); // Redraw the board and cursor
     }
@@ -238,15 +247,16 @@ document.addEventListener('DOMContentLoaded', () => {
         //canvas.addEventListener("mousemove", handleMouseMove);
         //canvas.addEventListener('mouseleave', () => { mouse.down = false; });
 
-        // handles keypresses 
+        // handles keypresses
         canvas.addEventListener('keydown', handleKeyboard);
+        canvas.addEventListener('keyup', () => { key = { ctrl: false, shift: false, alt: false } });
         colors = currentColors;
         drawBoard();
         canvas.focus();
     }
 
-    function removeMainEvents() {
-        canvas.removeEventListener('click', handleClick);
+    window.removeMainEvents = function () {
+        canvas.removeEventListener('mousedown', handleClick);
         canvas.removeEventListener('keydown', handleKeyboard);
     }
 

@@ -2,6 +2,7 @@ import Picker from './modules/vanilla-picker.js';
 //import { updateSpriteColor } from './sprite.js';
 
 const container = document.getElementById('paletteContainer');
+const canvas = document.getElementById('tileCanvas');
 
 let dark = [0, 0, 0, 1];
 let light = [255, 255, 255, 1];
@@ -33,7 +34,7 @@ pickerDark.onOpen = function (color) {
 }
 
 pickerDark.onChange = function (color) {
-    console.log('color changed to: ', color.rgba);
+    //console.log('color changed to: ', color.rgba);
     colorDark.style.background = color.rgbaString;
     dark = color.rgba;
 };
@@ -64,7 +65,21 @@ function updateRecentColors() {
 }
 
 function swapColor () {
-    updateColor([[light], [dark]]);
+    //updateColor([[light], [dark]]);
+    [dark, light] = [light, dark];
+    colorDark.style.background = `rgba(${dark})`;
+    colorLight.style.background = `rgba(${light})`;
+}
+
+export function toolbarSwapColor () {
+    console.log(dark, light);
+    [dark, light] = [light, dark];
+    console.log(dark, light);
+    colorDark.style.background = `rgba(${dark})`;
+    colorLight.style.background = `rgba(${light})`;
+    console.log(currentColors);
+    currentColors = [dark, light];
+    console.log(currentColors);
 }
 
 function handleKeyboard(event) {
@@ -77,6 +92,7 @@ function handleKeyboard(event) {
             removePaletteEvents();
             container.style.display = 'none';
             currentColors = [dark, light];
+            console.log([dark, light]);
             addMainEvents();
             break;
     }
