@@ -104,9 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentSprite = placedSprites[tileKey].sprite;
                 updateSpriteData(currentSprite);
             }
-            colors = placedSprites[tileKey].color;
+            colors = placedSprites[tileKey].color; // color grab
             console.log(currentSprite);
             updateColor(colors);
+            drawBoard();
         }
     }
 
