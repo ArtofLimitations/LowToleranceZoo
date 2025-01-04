@@ -21,7 +21,14 @@ export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
     const light = colors[1];
     //console.log(colors);
     const image = convertToImageData(data, dark, light);
-    ctx.putImageData(image, x * tileSizeX, y * tileSizeY);
+    exportedCtx.putImageData(image, 0,0);
+
+    ctx.save();
+    //ctx.globalCompositeOperation = 'source-over';
+    //ctx.putImageData(image, x * tileSizeX, y * tileSizeY);
+    //ctx.filter = "blur(1px)";
+    ctx.drawImage(exportedCanvas, x * tileSizeX, y * tileSizeY, 32, 32);
+    ctx.restore();
 }
 
 export function updateSpriteImage(data, size, current, light = [255, 255, 255, 255], dark = [0, 0, 0, 255]) {
@@ -57,6 +64,8 @@ export function convertToImageData(spriteData, dark, light) {
             setPixel(imgData, x * 2 + 1, y * 2 + 1, color);
         }
     }
+
+    //return createImageBitmap(imgData.data);
     return imgData;
 }
 

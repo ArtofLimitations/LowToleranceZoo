@@ -76,6 +76,7 @@ export function toolbarSwapColor () {
     colorDark.style.background = `rgba(${dark})`;
     colorLight.style.background = `rgba(${light})`;
     currentColors = [dark, light];
+    return currentColors;
 }
 
 function handleKeyboard(event) {

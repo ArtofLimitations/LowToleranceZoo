@@ -4,6 +4,10 @@ import { pickColor, toolbarSwapColor } from './palette.js';
 const canvas = document.getElementById('tileCanvas');
 const ctx = canvas.getContext('2d');
 
+const toolBarSize = 320; // Right side toolbar sized in tiles
+let colors = [[0, 0, 0, 1], [255, 255, 255, 1]];
+let mouseStatus = {};
+
 const buttons = [
   { x: 10, y: 100, width: 80, height: 40, type: 'text', label: 'Button 1' },
   { x: 10, y: 150, width: 80, height: 40, type: 'text', label: 'Button 2' },
@@ -13,14 +17,15 @@ const buttons = [
 ]
 
 // In toolbar.js
-export function toolbar(size, current, currentColors) {
+export function toolbar(current, currentColors, layer, mouse) {
   //console.log('Function called from toolbar.js');
-
-  const leftSide = canvas.width - size;
+  const leftSide = canvas.width - toolBarSize;
+  colors = currentColors || [[0, 0, 0, 1], [255, 255, 255, 1]];
+  mouseStatus = mouse;
 
   // Draw toolbar
   ctx.beginPath();
-  ctx.rect(canvas.width - size, 0, canvas.width, canvas.height);
+  ctx.rect(canvas.width - toolBarSize, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#2c3d63";
   ctx.fill();
 
@@ -28,7 +33,7 @@ export function toolbar(size, current, currentColors) {
   ctx.beginPath();
   ctx.fillStyle = "#addcca";
   ctx.font = "32px Helvetica, Arial, Sans-Serif";
-  ctx.fillText("Low Tolerance Zoo", canvas.width - size + 10, 48);
+  ctx.fillText("Low Tolerance Zoo", canvas.width - toolBarSize + 10, 48);
 
   // Draw sprite and color bar
   ctx.beginPath();
@@ -43,7 +48,7 @@ export function toolbar(size, current, currentColors) {
 
   // Draw current sprite
   if (getImageFromSheet(current) !== undefined) ctx.putImageData(getImageFromSheet(current), leftSide + 44, 548 - 16);
-  let colors = currentColors || [[0, 0, 0, 1], [255, 255, 255, 1]];
+  //let colors = currentColors || [[0, 0, 0, 1], [255, 255, 255, 1]];
 
   // Draw Dark Color
   ctx.beginPath();
@@ -56,6 +61,47 @@ export function toolbar(size, current, currentColors) {
   ctx.rect(leftSide + 152, 548 - 16, 32, 32);
   ctx.fillStyle = `rgba(${colors[1][0]},${colors[1][1]}, ${colors[1][2]}, ${colors[1][3]})`;
   ctx.fill();
+
+  // Draw layer number
+  ctx.beginPath();
+  ctx.fillStyle = '#222';
+  ctx.fillRect(leftSide, 632, 76, 32);
+
+  ctx.beginPath();
+  ctx.fillStyle = "#f7f8f3";
+  ctx.font = "16px Helvetica, Arial, Sans-Serif";
+  ctx.fillText('Layer:', leftSide + 10, 654);
+
+  ctx.beginPath();
+  ctx.fillStyle = "#addcca";
+  ctx.font = "16px Helvetica, Arial, Sans-Serif";
+  ctx.fillText(layer, leftSide + 58, 654);
+
+  // Status Bar
+  ctx.beginPath();
+  ctx.fillStyle = '#222';
+  ctx.fillRect(leftSide, canvas.height - 32, canvas.width, canvas.height);
+
+  ctx.beginPath();
+  ctx.fillStyle = "#f7f8f3";
+  ctx.font = "16px Helvetica, Arial, Sans-Serif";
+  ctx.fillText('Mode:', leftSide + 10, canvas.height - 11);
+
+  ctx.beginPath();
+  ctx.fillStyle = "#addcca";
+  ctx.font = "16px Helvetica, Arial, Sans-Serif";
+  ctx.fillText(mouseStatus.mode, leftSide + 58, canvas.height - 11);
+
+  ctx.beginPath();
+  ctx.fillStyle = "#f7f8f3";
+  ctx.font = "16px Helvetica, Arial, Sans-Serif";
+  ctx.fillText('x:     y:', leftSide + 110, canvas.height - 11);
+
+  ctx.beginPath();
+  ctx.fillStyle = "#addcca";
+  ctx.font = "16px Helvetica, Arial, Sans-Serif";
+  ctx.fillText(mouseStatus.x, leftSide + 124, canvas.height - 11);
+  ctx.fillText(mouseStatus.y, leftSide + 160, canvas.height - 11);
 
   // Draw buttons
   buttons.forEach(button => {
@@ -90,8 +136,8 @@ function isInsideButton(bX, x, y, button) {
   );
 }
 
-export function toolbarClicked(x, y, size) {
-  let offsetX = canvas.width - size;
+export function toolbarClicked(x, y) {
+  let offsetX = canvas.width - toolBarSize;
   buttons.forEach(button => {
     if (isInsideButton(offsetX, x, y, button)) {
       //alert(`${button.label} clicked!`);
@@ -101,7 +147,18 @@ export function toolbarClicked(x, y, size) {
           pickColor(); // pick a color from palette.js
           break;
         case 'swap_horiz':
-          toolbarSwapColor(); // swap colors from palette.js
+          colors = toolbarSwapColor(); // swap colors from palette.js
+          // Draw Dark Color
+          ctx.beginPath();
+          ctx.rect(offsetX + 80, 548 - 16, 32, 32);
+          ctx.fillStyle = `rgba(${colors[0][0]},${colors[0][1]}, ${colors[0][2]}, ${colors[0][3]})`;
+          ctx.fill();
+
+          // Draw Light Color
+          ctx.beginPath();
+          ctx.rect(offsetX + 152, 548 - 16, 32, 32);
+          ctx.fillStyle = `rgba(${colors[1][0]},${colors[1][1]}, ${colors[1][2]}, ${colors[1][3]})`;
+          ctx.fill();
           break;
       }
     }

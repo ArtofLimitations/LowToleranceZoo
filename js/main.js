@@ -26,12 +26,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Z+ Configurations
     const tileSizeX = 32;                // Single tile size
     const tileSizeY = 32;
-    const toolBarSize = 320;             // Right side toolbar sized in tiles
     let placedSprites = {};              // Store the positions of placed sprites (as key-value pairs)
     //let spriteSheet = getSpriteSheet();  // Store Sprites
     let tilesX = 36;                     // Board width and height
     let tilesY = 25;
     let currentSprite = 1;               // Sprite to draw. Default = 1
+    let currentLayer = 2;                // Layer to draw sprite on. 1 = floor 2 = default 3 = ceiling
     let [cursorX, cursorY] = [9, 4];     // Keyboard cursor
     let tileSetLength = 300;             // Size of tileset
     let colors = currentColors;          // colors selected from palette
@@ -40,6 +40,20 @@ document.addEventListener('DOMContentLoaded', () => {
         shift: false,
         alt: false
     };
+    let mouse = {
+        x: 0,
+        y: 0,
+        down: false,
+        button: 0,
+        mode: 'draw',
+        lastClick: 0,
+        clickDelay: 50
+    };
+    let player = {
+        x: 20,
+        y: 20,
+        layer: 2
+    }
 
     // Draw the grid of tiles
     function drawBoard() {
@@ -53,16 +67,16 @@ document.addEventListener('DOMContentLoaded', () => {
         drawSprites();
         drawCursor();
         // Draw toolbar from toolbar.js
-        toolbar(toolBarSize, currentSprite, colors);
+        toolbar(currentSprite, colors, currentLayer, mouse);
     }
 
-    // Draw a single tile
+    // Draw a single tile to create a grid
     function drawTile(x, y) {
         const posX = x * tileSizeX;
         const posY = y * tileSizeY;
         //console.log(`tile:${x},${y} cursor:${cursorX},${cursorY}`);
         ctx.lineWidth = 1;
-        if (x === cursorX && y === cursorY) { // Tile = red if cursor pos
+        if (x === cursorX && y === cursorY) { // Tile = red if cursor at pos
             ctx.beginPath();
             ctx.strokeStyle = 'rgba(255, 10, 10, 0.6)';
         } else {
@@ -74,10 +88,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Draw placed sprites to screen
-    function drawSprites() {
+    /*function drawSprites() {
         for (const key in placedSprites) {
             const [x, y] = key.split(',').map(Number);
             if (x < tilesX && y < tilesY) drawSprite(x, y, tileSizeX, tileSizeY, placedSprites[`${x},${y}`].sprite, placedSprites[`${x},${y}`].color); // draw the sprite image data from sprite.js
+        }
+    }*/
+
+    function drawSprites() {
+        // Collect keys and sort by layer (ascending)
+        const sortedKeys = Object.keys(placedSprites)
+            .map(key => key.split(',').map(Number)) // Convert to arrays of [l, x, y]
+            .sort(([l1], [l2]) => l1 - l2); // Sort by the layer (l1, l2)
+
+        for (const [l, x, y] of sortedKeys) {
+            if (x < tilesX && y < tilesY) {
+                const spriteInfo = placedSprites[`${l},${x},${y}`];
+                drawSprite(x, y, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+            }
         }
     }
 
@@ -107,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             colors = placedSprites[tileKey].color; // color grab
             console.log(currentSprite);
             updateColor(colors);
-            drawBoard();
+            toolbar(currentSprite, colors, currentLayer, mouse);
         }
     }
 
@@ -118,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const mouseY = event.clientY - rect.top;
 
         const { x, y } = getTileCoordinates(mouseX, mouseY);
-        const tileKey = `${x},${y}`;
+        const tileKey = `${currentLayer},${x},${y}`;
         [cursorX, cursorY] = [x, y];
         console.log(`mouse: cursor ${cursorX},${cursorY}`);
         switch (event.button) {
@@ -133,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Place sprite
                     placedSprites[tileKey] = {
                         sprite: currentSprite, // add current selected sprite (number)
-                        layer: 'default',      // layer UPDATE
+                        image: null,
                         color: colors          // add current colors from palette (array)
                     };
                 }
@@ -152,19 +180,50 @@ document.addEventListener('DOMContentLoaded', () => {
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
+        mouse.x = Math.floor(x / tileSizeX);
+        mouse.y = Math.floor(y / tileSizeY);
+        mouse.down = true;
+        mouse.button = event.button;
 
         if (x <= tilesX * tileSizeX) { // UPDATE
             handleTileClick(event);
         }
         else {
             // handle toolbar clicks from toolbar.js
-            toolbarClicked(x, y, toolBarSize);
+            toolbarClicked(x, y);
             colors = currentColors;
         }
     }
 
+    function handleMouseMove(event) {
+        // detect possible changes in mouse position
+        if (mouse.down) {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((event.clientX - rect.left) / tileSizeX);
+            const y = Math.floor((event.clientY - rect.top) / tileSizeY);
+
+            if (mouse.x != x || mouse.y != y) {
+                mouse.x = x;
+                mouse.y = y;
+
+                const now = Date.now(); // Current time in milliseconds
+
+                //handleTileClick(event);
+                if (mouse.mode === 'draw' && // if mouse mode is draw and click is within drawing area and click delay is long enough
+                    mouse.x >= 0 && 
+                    mouse.y >= 0 && 
+                    mouse.x < tilesX && 
+                    mouse.y < tilesY &&
+                    now - mouse.lastClick > mouse.clickDelay) {
+                    handleTileClick(event);
+                    mouse.lastClick = now; // Update the last click time
+                }
+            }
+        }
+    }
+
     function handleKeyboard(event) {
-        const tileKey = `${cursorX},${cursorY}`;
+        const tileKey = `${currentLayer},${cursorX},${cursorY}`;
 
         switch (event.key) {
 
@@ -226,6 +285,15 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'o':
                 editObject();
                 break;
+            case '1':
+                currentLayer = 1;
+                break;
+            case '2':
+                currentLayer = 2;
+                break;
+            case '3':
+                currentLayer = 3;
+                break;
         }
 
         if (event.ctrlKey || event.metaKey) {
@@ -238,14 +306,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         console.log(`key: cursor ${cursorX},${cursorY}`);
+        console.log('layer: ', currentLayer);
         drawBoard(); // Redraw the board and cursor
     }
 
     window.addMainEvents = function () {
         // Handle events for keyboard, mouse, etc
         canvas.addEventListener('mousedown', handleClick);
-        //canvas.addEventListener('mouseup', () => { mouse.down = false; });
-        //canvas.addEventListener("mousemove", handleMouseMove);
+        canvas.addEventListener('mouseup', () => { mouse.down = false; });
+        canvas.addEventListener("mousemove", handleMouseMove);
         //canvas.addEventListener('mouseleave', () => { mouse.down = false; });
 
         // handles keypresses
@@ -258,13 +327,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.removeMainEvents = function () {
         canvas.removeEventListener('mousedown', handleClick);
+        canvas.removeEventListener('mouseup', () => { });
+        canvas.removeEventListener("mousemove", handleMouseMove);
+
         canvas.removeEventListener('keydown', handleKeyboard);
+        canvas.removeEventListener('keyup', () => { });
     }
 
     //document.getElementById('saveBoard').addEventListener('click', saveBoard(placedSprites));
 
     // Initial canvas setup
     addMainEvents();
-    toolbar(toolBarSize);
+    toolbar(currentSprite, colors, currentLayer, mouse);
     drawBoard();
 });

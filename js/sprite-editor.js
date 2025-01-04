@@ -78,7 +78,7 @@ function drawGrid() {
     //if (mouse.mode === 'fill') spriteCtx.fillText("Fill", spriteCanvas.width - sidebar + 10, 300);
     if (mouse.mode === 'fill') document.getElementById('spriteDrawMode').textContent = 'Fill';
 
-    for (let y = 0; y < gridSize; y++) {                                                            // draw grid
+    for (let y = 0; y < gridSize; y++) {                                                           // draw grid
         for (let x = 0; x < gridSize; x++) {
             if (spriteData[y][x] !== 2) {
                 spriteCtx.fillStyle = colors[spriteData[y][x]];                                    // Draw pixels to grid
@@ -107,18 +107,17 @@ function draw(event) {
     const y = Math.floor((event.clientY - rect.top) / pixelSize);
     //console.log(x * pixelSize);
 
-    if (x < gridSize) {
+    if (x < gridSize && y < gridSize) {                             // draw data to spriteData array if clicked inside grid
         switch (mouse.button) {
             case 0:
-                //spriteData[y][x] = spriteData[y][x] === 1 ? 0 : 1;
-                spriteData[y][x] = currentColor;
+                spriteData[y][x] = currentColor;    // either draw the current color (black or white)
                 break;
             case 2:
-                spriteData[y][x] = 2;
+                spriteData[y][x] = 2;               // or draw transparent black
         }
         drawGrid();
     }
-    else {
+    else {                                          // deal with sidebar / button click
         let offset = spriteCanvas.width - sidebar;
         buttons.forEach(button => {
             if (isInsideButton(offset, mouseX, mouseY, button)) {
@@ -162,23 +161,6 @@ function draw(event) {
                         } else {
                             console.log("Clipboard is empty. Copy data first.");
                         }
-
-                        //console.log(spriteData);
-                        //console.log(spriteData.length);
-                        //spriteData = structuredClone(clipboard);
-                        //spriteData = clipboard.map(item => item);
-                        //spriteData = clipboard.slice();
-                        //spriteData = clipboard;
-                        /*setTimeout(() => {
-                            console.log(clipboard);
-                            console.log(clipboard.length);
-                            console.log(spriteData);
-                            console.log(spriteData.length);
-                          }, 2000);*/
-                        //console.log(spriteData);
-                        //console.log(clipboard.length);
-                        //console.log(spriteData.length);
-
                         break;
                 }
             }
