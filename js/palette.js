@@ -64,11 +64,36 @@ function updateRecentColors() {
     }
 }
 
+function blendColors(color1, color2, alpha = 0.5) {
+    const blendedColor = color1.map((channel, index) => 
+        Math.round(channel * alpha + color2[index] * (1 - alpha))
+    );
+    return blendedColor;
+    //return [...blendedColor, 1]; // Add alpha channel with value 1
+}
+
+function blendColor() {
+    const newColor = blendColors(dark, light);
+    //if (dir == 'right') {
+        light = newColor;
+        console.log('new color: ', light)
+        colorLight.style.background = `rgba(${light})`;
+        currentColors = [dark, light];
+    //}
+}
+// Example usage:
+//const color1 = [120, 200, 50];
+//const color2 = [50, 255, 170];
+//const blendedColor = blendColors(color1, color2, 0.5);
+
+//console.log(blendedColor); // Output: [85, 228, 110]
+
 function swapColor () {
     //updateColor([[light], [dark]]);
     [dark, light] = [light, dark];
-    colorDark.style.background = `rgba(${dark})`;
-    colorLight.style.background = `rgba(${light})`;
+    updateColor([dark, light]);
+    //colorDark.style.background = `rgba(${dark})`;
+    //colorLight.style.background = `rgba(${light})`;
 }
 
 export function toolbarSwapColor () {
@@ -98,11 +123,13 @@ function handleKeyboard(event) {
 function addPaletteEvents() {
     document.addEventListener('keydown', handleKeyboard);
     document.getElementById('swapColorButton').addEventListener('click', swapColor);
+    document.getElementById('blendRightButton').addEventListener('click', blendColor);
 }
 
 function removePaletteEvents() {
     document.removeEventListener('keydown', handleKeyboard);
     document.getElementById('swapColorButton').removeEventListener('click', swapColor);
+    document.getElementById('blendRightButton').removeEventListener('click', blendColor);
 }
 
 export function pickColor() {

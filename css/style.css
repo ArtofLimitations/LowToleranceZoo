@@ -119,8 +119,16 @@ h3 {
   mix-blend-mode: difference;
 }
 
-.swapColorButton {
+.paletteButton {
   margin-bottom: 16px;
+}
+
+.paletteButton-right {
+  margin-left: 16px;
+}
+
+.paletteButton-left {
+  margin-left: 16px;
 }
 
 .paletteRecentContainer {

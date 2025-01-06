@@ -5,7 +5,7 @@ const ctx = canvas.getContext('2d');
 const exportedCanvas = document.getElementById('exportedSpriteCanvas');
 const exportedCtx = exportedCanvas.getContext('2d');
 
-export let imageData = 0;
+let imageData = 0;
 let gridSize = 16;
 let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
 let currentSprite = 1;
@@ -21,7 +21,7 @@ export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
     const light = colors[1];
     //console.log(colors);
     const image = convertToImageData(data, dark, light);
-    exportedCtx.putImageData(image, 0,0);
+    exportedCtx.putImageData(image, 0, 0);
 
     ctx.save();
     //ctx.globalCompositeOperation = 'source-over';
@@ -31,11 +31,16 @@ export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
     ctx.restore();
 }
 
-export function updateSpriteImage(data, size, current, light = [255, 255, 255, 255], dark = [0, 0, 0, 255]) {
+export function drawSpriteImage(x, y, tileSizeX, tileSizeY, image) {
+    const imageData = new ImageData(image, 32, 32);
+    exportedCtx.putImageData(imageData, 0, 0);
+    ctx.drawImage(exportedCanvas, x * tileSizeX, y * tileSizeY, 32, 32);
+}
+
+export function updateSpriteImage(data, current, light = [255, 255, 255, 255], dark = [0, 0, 0, 255]) {
     console.log('updated spriteImage');
     //console.log(data);
     spriteData = data;
-    gridSize = size;
     currentSprite = current;
     imageData = convertToImageData(data, dark, light);
     return imageData;

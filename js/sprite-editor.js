@@ -238,7 +238,7 @@ function handleKeyboard(event) {
         case 'Escape':
             removeSpriteEvents()
             container.style.display = 'none';
-            const imageData = updateSpriteImage(spriteData, gridSize);      // in sprite.js
+            const imageData = updateSpriteImage(spriteData);      // in sprite.js
             addToSpriteSheet(currentSprite, spriteData, imageData);  // in sprite-sheet.js
             addMainEvents();
         default:
