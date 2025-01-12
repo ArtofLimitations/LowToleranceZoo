@@ -131,8 +131,14 @@ function draw(event) {
                         currentColor = 0;
                         break;
                     case 'CLR':
-                        spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
-                        drawGrid();
+                        if (confirm('Are you sure you want clear?')) {
+                            spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
+                            drawGrid();
+                            console.log('Cleared sprite');
+                        } else {
+                            console.log('Canceled')
+                        }
+                        mouse.down = false;
                         break;
                     case 'FlipY':
                         spriteData = spriteData
@@ -198,8 +204,16 @@ function handlespriteCanvasClick(event) {
 
         if (targetColor !== currentColor) floodFill(x, y, targetColor, currentColor);
         mouse.down = false;
+        mouse.mode = 'draw';
+        drawGrid();
     }
     draw(event);
+}
+
+// Replace all occurrences of 0 with 1
+function invertColor() {
+    console.log('inverted');
+    return spriteData.map(row => row.map(value => value === 0 ? 1 : value === 1 ? 0 : value));
 }
 
 function handleMouseMove(event) {
@@ -223,7 +237,7 @@ function handleKeyboard(event) {
     switch (event.key) {
 
         case 'ctrlKey':
-            //mouse.ctrl = true;
+            mouse.ctrl = true;
             break;
         case 'F':
         case 'f':
@@ -235,14 +249,34 @@ function handleKeyboard(event) {
             mouse.mode = 'draw';
             drawGrid();
             break;
+        case '1':
+            currentColor = 1;
+            drawButtons();
+            break;
+        case '2':
+            currentColor = 0;
+            drawButtons();
+            break;
+        case "!": // delete all back
+            spriteData = spriteData.map(row => row.map(value => value === 1 ? 2 : value));
+            drawGrid();
+            break;
+        case "@": // delete all white
+            spriteData = spriteData.map(row => row.map(value => value === 0 ? 2 : value));
+            drawGrid();
+            break;
+        case 'I':
+        case 'i':
+            console.log(invertColor());
+            spriteData = invertColor();
+            drawGrid();
+            break;
         case 'Escape':
             removeSpriteEvents()
             container.style.display = 'none';
-            const imageData = updateSpriteImage(spriteData);      // in sprite.js
+            const imageData = updateSpriteImage(spriteData);         // in sprite.js
             addToSpriteSheet(currentSprite, spriteData, imageData);  // in sprite-sheet.js
             addMainEvents();
-        default:
-            mouse.ctrl = false;
     }
 }
 
@@ -255,7 +289,7 @@ function addSpriteEvents() {
     spriteCanvas.addEventListener('mouseleave', () => { mouse.down = false; });
     // Event listener for keyboard
     document.addEventListener('keydown', handleKeyboard);
-    document.addEventListener('keyup', handleKeyboard);
+    document.addEventListener('keyup', () => { mouse.ctrl = false; });
 }
 
 function removeSpriteEvents() {

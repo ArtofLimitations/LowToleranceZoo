@@ -1,10 +1,11 @@
 import { toolbar, toolbarClicked } from './toolbar.js';
-import { drawSprite, convertToImageData, drawSpriteImage } from './sprite.js';
+import { drawSprite, convertToImageData, drawSpriteImage, createDataURL, drawDataURL } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
 import { saveBoard, loadBoard } from './file.js';
 import { editObject } from './object-editor.js';
+import { animate } from './player.js';
 //import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -25,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Low Tolerance Zoo editor Configurations
     const tileSizeX = 32;                // Single tile size
     const tileSizeY = 32;
+    const hiddenLayers = new Set();      // Set to hold hidden layers
     let placedSprites = {};              // Store the positions of placed sprites (as key-value pairs)
     let tilesX = 36;                     // Board width and height
     let tilesY = 25;
@@ -33,22 +35,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let [cursorX, cursorY] = [9, 4];     // Keyboard cursor
     let tileSetLength = 300;             // Size of tileset
     let colors = currentColors;          // colors selected from palette
-    let key = {ctrl: false, shift: false, alt: false};
-    let mouse = {       // mouse status object
-        x: 0,
-        y: 0,
-        down: false,
-        button: 0,
-        mode: 'draw',
-        lastClick: 0,   // click delay. see handleMouseMove function
-        clickDelay: 50  // ms
-    };
-    let player = {x: 20, y: 20, oldX: 20, oldY: 20, layer: 2} // basic stats for player
+    let key = { ctrl: false, shift: false, alt: false, lastClick: 0, clickDelay: 100 }; // keyboard status object. click delay in ms
+    let mouse = { x: 0, y: 0, down: false, button: 0, mode: 'draw', lastClick: 0, clickDelay: 50 }; // mouse status object. click delay. see handleMouseMove function. click delay in ms
+    let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2 } // basic stats for player
 
     function getSpriteImage() {
-        const data = getDataFromSheet(currentSprite);
-        const image = convertToImageData(data, colors[0], colors[1])
-        return image.data;
+        const data = getDataFromSheet(currentSprite); // from sprite-sheet.js
+        //const image = convertToImageData(data, colors[0], colors[1]) // from sprite.js
+        //const imageData = new ImageData(image, 32, 32);
+        //exportedCtx.putImageData(imageData, 0, 0);
+        return createDataURL(data, colors[0], colors[1]);
     }
 
     // Draw the grid of tiles
@@ -83,14 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeRect(posX, posY, tileSizeX, tileSizeY);
     }
 
-    // Draw placed sprites to screen
-    /*function drawSprites() {
-        for (const key in placedSprites) {
-            const [x, y] = key.split(',').map(Number);
-            if (x < tilesX && y < tilesY) drawSprite(x, y, tileSizeX, tileSizeY, placedSprites[`${x},${y}`].sprite, placedSprites[`${x},${y}`].color); // draw the sprite image data from sprite.js
-        }
-    }*/
-
     function drawSprites() {
         // Collect keys and sort by layer (ascending)
         const sortedKeys = Object.keys(placedSprites)
@@ -98,20 +86,26 @@ document.addEventListener('DOMContentLoaded', () => {
             .sort(([l1], [l2]) => l1 - l2); // Sort by the layer (l1, l2)
 
         for (const [l, x, y] of sortedKeys) {
+            // Skip the layer if it is in the hiddenLayers set
+            if (hiddenLayers.has(l)) continue;
+
             if (x < tilesX && y < tilesY) {
                 const spriteInfo = placedSprites[`${l},${x},${y}`];
+                //console.log(spriteInfo);
                 drawSprite(x, y, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color); // draw sprite from sprite.js with array data
                 //drawSpriteImage(x, y, tileSizeX, tileSizeY, spriteInfo.image);
+                //drawDataURL(x, y, tileSizeX, tileSizeY, spriteInfo.image);
             }
         }
     }
 
+    // draw the top red cursor
     function drawCursor() {
         const posX = cursorX * tileSizeX;
         const posY = cursorY * tileSizeY;
         ctx.beginPath();
         ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(255, 10, 10, 0.6)';
+        ctx.strokeStyle = 'rgba(255, 10, 10, 0.8)';
         ctx.strokeRect(posX, posY, tileSizeX, tileSizeY);
     }
 
@@ -130,10 +124,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateSpriteData(currentSprite);   // from sprite-editor.js
             }
             colors = placedSprites[tileKey].color; // color grab
-            console.log(currentSprite);
+            //console.log(currentSprite);
             updateColor(colors);
             toolbar(currentSprite, colors, currentLayer, mouse);
         }
+    }
+
+    // Function to hide a layer
+    function hideLayer(layer) {
+        hiddenLayers.add(layer);
+    }
+
+    // Function to show a layer
+    function showLayer(layer) {
+        hiddenLayers.delete(layer);
     }
 
     // Handle placing/removing sprites
@@ -157,12 +161,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     // Place sprite
                     placedSprites[tileKey] = {
-                        sprite: currentSprite,  // add current selected sprite (number)
-                        image: getSpriteImage(),  // add the sprite image
-                        color: colors,          // add current colors from palette (array)
+                        sprite: currentSprite,    // add current selected sprite (number)
+                        image: getSpriteImage(),   // add sprite data (2D array)
+                        //image: image,             // add the sprite image (unsure)
+                        color: colors,            // add current colors from palette (array)
                         type: 'wall'
                     };
-                    console.log(placedSprites);
+                    //console.log(placedSprites);
                 }
         }
         drawBoard();
@@ -208,9 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 //handleTileClick(event);
                 if (mouse.mode === 'draw' && // if mouse mode is draw and click is within drawing area and click delay is long enough
-                    mouse.x >= 0 && 
-                    mouse.y >= 0 && 
-                    mouse.x < tilesX && 
+                    mouse.x >= 0 &&
+                    mouse.y >= 0 &&
+                    mouse.x < tilesX &&
                     mouse.y < tilesY &&
                     now - mouse.lastClick > mouse.clickDelay) {
                     handleTileClick(event);
@@ -222,11 +227,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleKeyboard(event) {
         const tileKey = `${currentLayer},${cursorX},${cursorY}`;
+        console.log(event.key);
 
         switch (event.key) {
 
             case 'ArrowUp':
                 if (cursorY > 0) cursorY -= 1; // Move up
+                console.log('UP');
                 break;
             case 'ArrowDown':
                 if (cursorY < tilesY - 1) cursorY += 1; // Move down
@@ -239,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case ' ':
                 if (placedSprites[tileKey]) {
-                    
+
                     if (placedSprites[tileKey].type != 'player') delete placedSprites[tileKey]; // Remove sprite if it exists
                 } else {
                     // Place sprite
@@ -250,11 +257,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         type: 'wall'              // default type is wall
                     };
                 };
-                drawBoard(); // Refresh board
+                //drawBoard(); // Refresh board
                 //drawSprites();
                 break;
             case 'Enter': // add layers later
                 grabSprite(tileKey);
+                if (event.repeat) { return }
                 break;
         }
 
@@ -262,10 +270,12 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'e':
                 removeMainEvents();
                 editSprite(currentSprite); // Open the sprite editor from sprite-editor.js
+                if (event.repeat) { return }
                 break;
             case 'c':
                 removeMainEvents();
                 pickColor(); // Open color picker from palette.js
+                if (event.repeat) { return }
                 break;
             case '=':
                 if (currentSprite < tileSetLength) currentSprite += 1; // iterate through sprite sheet
@@ -279,19 +289,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'b':
                 if (!event.ctrlKey) saveBoard(placedSprites); // save board (not sprite sheet)
+                if (event.repeat) { return }
                 break;
             case 'o':
                 editObject(); // open object script editor from object-editor.js
+                if (event.repeat) { return }
                 break;
             case '1':
                 currentLayer = 1; // change layer for placing sprites
+                if (event.repeat) { return }
                 break;
             case '2':
                 currentLayer = 2;
+                if (event.repeat) { return }
                 break;
             case '3':
                 currentLayer = 3;
+                if (event.repeat) { return }
                 break;
+            case 'h':
+                if (hiddenLayers.has(currentLayer)) {
+                    showLayer(currentLayer);
+                    console.log('showing layer: ', currentLayer);
+                }
+                else {
+                    hideLayer(currentLayer);
+                    console.log('hiding layer: ', currentLayer);
+                }
+                if (event.repeat) { return }
         }
 
         if (event.ctrlKey || event.metaKey) {
@@ -300,11 +325,11 @@ document.addEventListener('DOMContentLoaded', () => {
             switch (event.key.toLowerCase()) { // Check the key
                 case "b": // Handle 'Ctrl + B' to load board (no sprite sheet)
                     loadBoard(handleLoadedBoard);
+                    if (event.repeat) { return }
                     break;
             }
         }
-        console.log(`key: cursor ${cursorX},${cursorY}`);
-        console.log('layer: ', currentLayer);
+        //console.log(`key: cursor ${cursorX},${cursorY}`);
         drawBoard(); // Redraw the board and cursor
     }
 
@@ -313,11 +338,12 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.addEventListener('mousedown', handleClick);
         canvas.addEventListener('mouseup', () => { mouse.down = false; });
         canvas.addEventListener("mousemove", handleMouseMove);
-        //canvas.addEventListener('mouseleave', () => { mouse.down = false; });
+        canvas.addEventListener('mouseleave', () => { mouse.down = false; });
+        //canvas.addEventListener("mouseenter", () => { mouse.down = true; });
 
         // handles keypresses
         canvas.addEventListener('keydown', handleKeyboard);
-        canvas.addEventListener('keyup', () => { key = { ctrl: false, shift: false, alt: false } });
+        canvas.addEventListener('keyup', () => { Object.assign(key, { ctrl: false, shift: false, alt: false }); });
         colors = currentColors;
         drawBoard();
         canvas.focus();
@@ -337,13 +363,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial player setup
     placedSprites[`${player.layer},${player.x},${player.y}`] = {
         sprite: 1,
-        color: [[0, 0, 255, .5],[255, 255, 255, 1]],
-        image: null,
-        type: 'player'       
+        image: getSpriteImage(),
+        color: [[0, 0, 255, .5], [255, 255, 255, 1]],
+        type: 'player'
     };
 
     // Initial canvas setup
     addMainEvents();
     toolbar(currentSprite, colors, currentLayer, mouse);
     drawBoard();
+    // Start the animation
+    //requestAnimationFrame(animate);
 });

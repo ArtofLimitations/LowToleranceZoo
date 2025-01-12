@@ -13,7 +13,8 @@ const buttons = [
   { x: 10, y: 150, width: 80, height: 40, type: 'text', label: 'Button 2' },
   { x: 10, y: 200, width: 80, height: 40, type: 'text', label: 'Button 3' },
   { x: 116, y: 533, width: 32, height: 30, type: 'icon', label: 'swap_horiz' },
-  { x: 188, y: 533, width: 32, height: 30, type: 'icon', label: 'palette' }
+  { x: 188, y: 533, width: 32, height: 30, type: 'icon', label: 'palette' },
+  { x: 80, y: 633, width: 32, height: 30, type: 'icon', label: 'visibility' }
 ]
 
 // In toolbar.js
@@ -117,9 +118,15 @@ export function toolbar(current, currentColors, layer, mouse) {
         break;
       case 'icon':
         // Draw toolbar ICON buttons
-        ctx.fillStyle = '#888';
+        ctx.beginPath();
+        ctx.filter = "blur(8px)";
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.filter = "none";
+        ctx.fillRect(leftSide + button.x, button.y, button.width, button.height + 2);
+        ctx.fillStyle = '#555';
         ctx.fillRect(leftSide + button.x, button.y, button.width, button.height);
-
+        
         ctx.fillStyle = '#eee';
         //ctx.font = '16px Arial';
         ctx.font = '16px Material Symbols Outlined';

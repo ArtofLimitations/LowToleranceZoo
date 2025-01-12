@@ -23,18 +23,33 @@ export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
     const image = convertToImageData(data, dark, light);
     exportedCtx.putImageData(image, 0, 0);
 
-    ctx.save();
+    //ctx.save();
     //ctx.globalCompositeOperation = 'source-over';
     //ctx.putImageData(image, x * tileSizeX, y * tileSizeY);
     //ctx.filter = "blur(1px)";
     ctx.drawImage(exportedCanvas, x * tileSizeX, y * tileSizeY, 32, 32);
-    ctx.restore();
+    //ctx.restore();
 }
 
 export function drawSpriteImage(x, y, tileSizeX, tileSizeY, image) {
     const imageData = new ImageData(image, 32, 32);
     exportedCtx.putImageData(imageData, 0, 0);
     ctx.drawImage(exportedCanvas, x * tileSizeX, y * tileSizeY, 32, 32);
+}
+
+export function drawDataURL(x, y, tileSizeX, tileSizeY, dataURL) {
+    const img = new Image();
+    img.onload = () =>  ctx.drawImage(img, x * tileSizeX, y * tileSizeY, 32, 32);
+    img.src = dataURL;
+}
+
+export function createDataURL (data, dark, light) {
+    const image = convertToImageData(data ?? Array(gridSize).fill().map(() => Array(gridSize).fill(2)), dark, light)
+   
+    exportedCtx.putImageData(image, 0, 0);
+    
+    const dataURL = exportedCanvas.toDataURL('image/png'); // Convert the canvas to a Data URL
+    return dataURL
 }
 
 export function updateSpriteImage(data, current, light = [255, 255, 255, 255], dark = [0, 0, 0, 255]) {
