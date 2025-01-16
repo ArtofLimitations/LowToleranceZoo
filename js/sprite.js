@@ -1,6 +1,6 @@
 import { getImageFromSheet, getDataFromSheet } from './sprite-sheet.js';
 
-const canvas = document.getElementById('tileCanvas');
+const canvas = document.getElementById('lowToleranceCanvas');
 const ctx = canvas.getContext('2d');
 const exportedCanvas = document.getElementById('exportedSpriteCanvas');
 const exportedCtx = exportedCanvas.getContext('2d');
@@ -22,7 +22,6 @@ export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
     //console.log(colors);
     const image = convertToImageData(data, dark, light);
     exportedCtx.putImageData(image, 0, 0);
-
     //ctx.save();
     //ctx.globalCompositeOperation = 'source-over';
     //ctx.putImageData(image, x * tileSizeX, y * tileSizeY);
@@ -45,9 +44,7 @@ export function drawDataURL(x, y, tileSizeX, tileSizeY, dataURL) {
 
 export function createDataURL (data, dark, light) {
     const image = convertToImageData(data ?? Array(gridSize).fill().map(() => Array(gridSize).fill(2)), dark, light)
-   
     exportedCtx.putImageData(image, 0, 0);
-    
     const dataURL = exportedCanvas.toDataURL('image/png'); // Convert the canvas to a Data URL
     return dataURL
 }

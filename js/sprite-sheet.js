@@ -1,11 +1,12 @@
-import { spriteData, updateSpriteData } from './sprite-editor.js';
- 
+//import { spriteData, updateSpriteData } from './sprite-editor.js';
+import { convertToImageData } from './sprite.js';
+
 let spriteSheet = [];
 
-export function getSpriteSheet () {
+export function getSpriteSheet() {
     return spriteSheet;
- }
- 
+}
+
 export function addToSpriteSheet(currentSprite, spriteData, imageData) {
     spriteSheet[currentSprite] = [spriteData, imageData]; // Clone spriteData and add to spriteSheet
     console.log("Sprite added to sprite sheet.");
@@ -34,10 +35,11 @@ export function getDataFromSheet(index) {
 }
 
 export function replaceSpriteSheet(data) {
-    //console.log ('replaced sprite sheet with: '+data);
-    /*let arrayData = data;
-    arrayData.forEach(element => {
-        arrayData[element][1] = new ImageData(arrayData[element][1], 32, 32);
-    });*/
     spriteSheet = structuredClone(data);
+}
+
+export function rebuildSpriteSheet(data) {
+    let spriteSheet = [0];
+    spriteSheet.splice(1, 0, ...data.slice(1).map(element => [element, convertToImageData(element, [0, 0, 0, 255], [255, 255, 255, 255])]));
+    return spriteSheet;
 }

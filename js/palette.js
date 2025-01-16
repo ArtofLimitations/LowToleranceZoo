@@ -2,39 +2,32 @@ import Picker from './modules/vanilla-picker.js';
 //import { updateSpriteColor } from './sprite.js';
 
 const container = document.getElementById('paletteContainer');
-const canvas = document.getElementById('tileCanvas');
 
+const recentLength = 5;
 let dark = [0, 0, 0, 1];
 let light = [255, 255, 255, 1];
 let colorDark = document.getElementById('colorDark');
 let colorLight = document.getElementById('colorLight');
 let recentColors = [];
-const recentLength = 5;
-
-//let pickerDark = new Picker({ parent: colorDark, alpha: false, color: '#222222' });
-//let pickerLight = new Picker({ parent: colorLight, alpha: false, color: 'pink' });
 let pickerDark = new Picker({ parent: colorDark, alpha: false, color: dark });
 let pickerLight = new Picker({ parent: colorLight, alpha: false, color: light });
 
 export let currentColors = [[0, 0, 0, 1], [255, 255, 255, 1]];
 
 export function updateColor(color) {
-    //pickerLight.setColor = color[1];
-    //window.pickerDark.setColor(color[0], true);
     dark = color[0];
     colorDark.style.background = `rgba(${dark})`;
     pickerDark.setColor(color[0], true);
     light = color[1];
     colorLight.style.background = `rgba(${light})`;
     pickerLight.setColor(color[1], true);
+    currentColors = [dark, light];
 }
 
 pickerDark.onOpen = function (color) {
-
 }
 
 pickerDark.onChange = function (color) {
-    //console.log('color changed to: ', color.rgba);
     colorDark.style.background = color.rgbaString;
     dark = color.rgba;
 };
@@ -86,14 +79,9 @@ function blendColor() {
 //const color2 = [50, 255, 170];
 //const blendedColor = blendColors(color1, color2, 0.5);
 
-//console.log(blendedColor); // Output: [85, 228, 110]
-
 function swapColor () {
-    //updateColor([[light], [dark]]);
     [dark, light] = [light, dark];
     updateColor([dark, light]);
-    //colorDark.style.background = `rgba(${dark})`;
-    //colorLight.style.background = `rgba(${light})`;
 }
 
 export function toolbarSwapColor () {
@@ -133,7 +121,6 @@ function removePaletteEvents() {
 }
 
 export function pickColor() {
-
     container.style.display = 'block';
     if (!colorDark.style.background) colorDark.style.background = '#000';
     if (!colorLight.style.background) colorLight.style.background = '#fff';

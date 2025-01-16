@@ -39,11 +39,16 @@ h3 {
   height: 800px;
 }
 
-.tileCanvas {
+.lowToleranceCanvas, .playCanvas {
   position: absolute;
   top: 0;
   left: 0;
   margin: auto;
+}
+
+.playCanvas {
+  background-color: #000;
+  
 }
 
 .spriteCanvas {
@@ -213,7 +218,7 @@ h3 {
 }
 */
 
-.tileCanvas {
+.lowToleranceCanvas {
 
   background-color: #131313;
   /*margin: 10px auto;

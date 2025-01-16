@@ -4,9 +4,15 @@
   "description": "a zzt like sprite based game maker and player",
   "main": "/js/main.js",
   "scripts": {
-    "start": "http-server ./ -c-1"
+    "start": "http-server ./ -c-1",
+    "start-player": "http-server ./ -c-1 -o player.html"
   },
   "author": "Dustin Davidson",
   "license": "ISC",
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "html-webpack-plugin": "^5.6.3",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1"
+  }
 }

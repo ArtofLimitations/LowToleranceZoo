@@ -1,25 +1,11 @@
-import { getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
+import { getSpriteSheet, replaceSpriteSheet, rebuildSpriteSheet } from './sprite-sheet.js';
 import { convertToImageData } from './sprite.js';
-const canvas = document.getElementById('tileCanvas');
+const canvas = document.getElementById('lowToleranceCanvas');
 const ctx = canvas.getContext('2d');
-
-/*/ Data to save (EXAMPLE) 
-const arrayData = [1, 2, 3, 4, 5];
-const variableData = "This is some text content.";
-const objectData = { name: "John", age: 30, job: "Developer" };
-const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height); */
-
-//Combine all the data into one Blob
-//const allData = {
-//array: arrayData,
-//text: variableData,
-//object: objectData,
-//imageData: Array.from(imageData.data), // Convert Uint8ClampedArray to regular array for serialization
-//};
 
 // ################ Save Functions
 
-export function saveSpriteSheet() {
+export function saveSpriteSheet() { // Save Sprite Sheet only to JSON 
 
     const spriteSheet = getSpriteSheet();
     let dataToSave = spriteSheet.map(element => element[0]);
@@ -41,7 +27,7 @@ export function saveSpriteSheet() {
     document.body.removeChild(link);
 }
 
-export function saveBoard(data, fileName = 'board') {
+export function saveBoard(data, fileName = 'board') { // Save board only to JSON
     const fileExtension = 'json';
     let dataToSave = {};
     //console.log(data, Array.isArray(data));
@@ -53,8 +39,6 @@ export function saveBoard(data, fileName = 'board') {
 
     // Convert the data to JSON
     const jsonData = JSON.stringify(dataToSave, null, 2);
-
-    // Create a Blob from the JSON data
     const blob = new Blob([jsonData], { type: 'application/json' });
 
     // Create a download link
@@ -68,9 +52,32 @@ export function saveBoard(data, fileName = 'board') {
     document.body.removeChild(link);
 }
 
+export function saveCombinedData(spritesheet, board, fileName = 'gameData') { // Save Combined Game Data (Board, SpriteSheet)
+    let dataToSave = spritesheet.map(element => element[0]);
+    const fileExtension = 'json';
+    const combinedData = {
+        spritesheet: dataToSave,
+        board: board
+    };
+
+    // Create a Blob from the JSON data
+    const jsonData = JSON.stringify(combinedData);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+
+    // Create a download link
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${fileName}.${fileExtension}`;
+
+    // Append the link to the DOM, click it to start download, and remove it afterward
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 // ################ Load Functions
 
-export async function loadSpriteSheet(fileInput) {
+export async function loadSpriteSheet(fileInput) { // Load Sprite Sheet
     try {
         // Get the selected file from the input element
         const file = fileInput.files[0];
@@ -104,7 +111,7 @@ export async function loadSpriteSheet(fileInput) {
     }
 }
 
-export function loadBoard(callback) {
+export function loadBoard(callback) { // Load Board file
     // Create an input element for file selection
     const input = document.createElement('input');
     input.type = 'file';
@@ -141,6 +148,50 @@ export function loadBoard(callback) {
     input.click();
 }
 
+export function loadCombinedData(callback) { // Load Combined Game Data (Board, SpriteSheet)
+    // Create an input element for file selection
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+
+    // Trigger the file picker
+    input.addEventListener('change', (event) => {
+        const file = event.target.files[0]; // Get the selected file
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        // Read the file contents
+        reader.onload = (e) => {
+            try {
+                // Parse the JSON data
+                const combinedData = JSON.parse(e.target.result);
+                let spritesheet = combinedData.spritesheet;
+                const board = combinedData.board;
+
+                spritesheet = rebuildSpriteSheet(spritesheet);
+
+                // Pass the data to the provided callback function
+                if (callback && typeof callback === 'function') {
+                    callback(spritesheet, board);
+                }
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+                alert('Invalid JSON file. Please upload a valid board file.');
+            }
+        };
+
+        reader.readAsText(file); // Read the file as text
+    });
+
+    // Simulate a click to open the file dialog
+    input.click();
+}
+
+
+//saveCombinedData(spritesheet, board, 'gameData');
+
+// Buttons for testing
 document.getElementById('saveSpriteSheet').addEventListener('click', saveSpriteSheet);
 
 document.getElementById('loadSpriteSheetButton').addEventListener('click', () => {
@@ -151,5 +202,16 @@ document.getElementById('loadSpriteSheet').addEventListener('change', (event) =>
     loadSpriteSheet(event.target).then(data => {
         console.log('Sprite sheet array or object:', data);
         replaceSpriteSheet(data);
+    });
+});
+
+document.getElementById('loadFileButton').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', function () {
+    loadCombinedData(this, (spritesheet, board) => {
+        console.log('Loaded Spritesheet:', spritesheet);
+        console.log('Loaded Board:', board);
     });
 });

@@ -14,7 +14,9 @@
     <h1>☺</h1>
 
     <div class="block" id="block">
-        <canvas class="tileCanvas" id="tileCanvas" tabindex='1'></canvas>
+        <!-- Main Canvas -->
+        <canvas class="lowToleranceCanvas" id="lowToleranceCanvas" tabindex='1'></canvas>
+        <!----------------->
         <div class="spriteContainer" id="spriteContainer">
             <div class="spriteInfo" id="spriteInfo"><strong>Sprite Editor</strong> - F: fill | D: draw | esc: save and
                 close editor - <em><span class="spriteInfoMode">Mode:</span> <span id="spriteDrawMode">Draw</span></em>
@@ -56,6 +58,8 @@
         <button id="saveSpriteSheet">Save Sprite Sheet</button>
         <input type="file" id="loadSpriteSheet" accept=".json" style="display: none;">
         <button id="loadSpriteSheetButton">Load Sprite Sheet</button>
+        <input type="file" id="fileInput"/>
+        <button id="loadFileButton">Load File</button>
     </div>
     <script type="module" src="js/main.js"></script>
 </body>

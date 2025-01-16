@@ -1,7 +1,7 @@
 import { getImageFromSheet } from './sprite-sheet.js';
 import { pickColor, toolbarSwapColor } from './palette.js';
 
-const canvas = document.getElementById('tileCanvas');
+const canvas = document.getElementById('lowToleranceCanvas');
 const ctx = canvas.getContext('2d');
 
 const toolBarSize = 320; // Right side toolbar sized in tiles

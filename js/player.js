@@ -1,9 +1,27 @@
-const canvas = document.getElementById('tileCanvas');
-const ctx = canvas.getContext('2d');
+import { loadCombinedData } from './file.js';
 
-let lastTime = 0;
+// Canvas Configurations
+var displayWidth = 1474;
+var displayHeight = 800;
+const canvas = document.getElementById('lowToleranceCanvas');
+var scale = 1;
+canvas.style.width = displayWidth + 'px';
+canvas.style.height = displayHeight + 'px';
+canvas.width = displayWidth * scale;
+canvas.height = displayHeight * scale;
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false
+
+let filename = ''; // ############ File to load ###############
+
+let lastTime = 0;  // Timing variables
 const speed = 0.5; // Speed control: lower is slower, higher is faster
 let position = 0;  // Position of the animated object
+
+// board variables
+let board = {};
+let spritesheet = [];
+
 
 export function animate(currentTime) {
     const deltaTime = currentTime - lastTime;
@@ -25,6 +43,39 @@ export function animate(currentTime) {
     requestAnimationFrame(animate);
 }
 
+function handleLoadedBoard (spriteSheetData, boardData) {
+    board = boardData;
+    spritesheet = spriteSheetData;
+    console.log('Loaded Board');
+}
+
+function handleKeyboard(event) {
+    const tileKey = `${currentLayer},${cursorX},${cursorY}`;
+    console.log(event.key);
+
+    switch (event.key) {
+
+        case 'ArrowUp':
+            if (player.y > 0) player.y -= 1; // Move up
+            break;
+        case 'ArrowDown':
+            if (player.y < tilesY - 1) player.y += 1; // Move down
+            break;
+        case 'ArrowLeft':
+            if (player.x > 0) player.x -= 1; // Move left
+            break;
+        case 'ArrowRight':
+            if (player.x < tilesX - 1) player.x += 1; // Move right
+            break;
+    }
+
+    switch (event.key.toLowerCase()) {
+        case 'l':
+            loadCombinedData(handleLoadedBoard);
+            break;
+    }
+}
+
 canvas.addEventListener('mousedown', (event) => { 
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor((event.clientX - rect.left)); 
@@ -33,4 +84,4 @@ canvas.addEventListener('mousedown', (event) => {
 });
 
 // Start the animation
-//requestAnimationFrame(animate);
+requestAnimationFrame(animate);

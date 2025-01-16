@@ -1,11 +1,11 @@
 import { toolbar, toolbarClicked } from './toolbar.js';
 import { drawSprite, convertToImageData, drawSpriteImage, createDataURL, drawDataURL } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
-import { getDataFromSheet, getSpriteSheet } from './sprite-sheet.js';
+import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
-import { saveBoard, loadBoard } from './file.js';
+import { saveBoard, loadBoard, saveCombinedData, loadCombinedData } from './file.js';
 import { editObject } from './object-editor.js';
-import { animate } from './player.js';
+//import { animate } from './player.js';
 //import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Canvas Configurations
     var displayWidth = 1474;
     var displayHeight = 800;
-    const canvas = document.getElementById('tileCanvas');
+    const canvas = document.getElementById('lowToleranceCanvas');
     var scale = 1;
     canvas.style.width = displayWidth + 'px';
     canvas.style.height = displayHeight + 'px';
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             colors = placedSprites[tileKey].color; // color grab
             //console.log(currentSprite);
-            updateColor(colors);
+            updateColor(colors); // from palette.js
             toolbar(currentSprite, colors, currentLayer, mouse);
         }
     }
@@ -176,6 +176,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleLoadedBoard(data) {
         console.log("Data loaded into application:", data);
         placedSprites = data;
+        drawBoard();
+    }
+
+    function handleLoadedGame (spriteSheetData, boardData) {
+        placedSprites = boardData;
+        replaceSpriteSheet(spriteSheetData);
+        console.log('Loaded Board');
         drawBoard();
     }
 
@@ -233,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             case 'ArrowUp':
                 if (cursorY > 0) cursorY -= 1; // Move up
-                console.log('UP');
                 break;
             case 'ArrowDown':
                 if (cursorY < tilesY - 1) cursorY += 1; // Move down
@@ -317,6 +323,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('hiding layer: ', currentLayer);
                 }
                 if (event.repeat) { return }
+                break;
+            case 's': // Save board & sprite sheet
+                saveCombinedData(getSpriteSheet(), placedSprites);
+                break;
+            case 'l': // load board & sprite sheet
+                loadCombinedData(handleLoadedGame);
+                break;
         }
 
         if (event.ctrlKey || event.metaKey) {
