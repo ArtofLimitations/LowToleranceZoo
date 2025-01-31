@@ -152,13 +152,7 @@ function draw(event) {
                         drawGrid();
                         break;
                     case 'Copy':
-                        //console.log(spriteData.length);
-                        //clipboard = spriteData.slice();
                         clipboard = structuredClone(spriteData);
-                        //clipboard = spriteData.map(item => item);
-                        //console.log(clipboard);
-                        //console.log('clipboard length: ' + clipboard.length);
-                        //console.log(`copied ${spriteData} to clipboard ${clipboard}`)
                         break;
                     case 'Paste':
                         if (clipboard && clipboard.length) { // Check if clipboard contains data
@@ -214,6 +208,43 @@ function handlespriteCanvasClick(event) {
 function invertColor() {
     console.log('inverted');
     return spriteData.map(row => row.map(value => value === 0 ? 1 : value === 1 ? 0 : value));
+}
+ 
+// Nudges the sprite data in the specified direction.
+function nudgeSprite(spriteData, direction) {
+    const size = gridSize; // Assuming a 16x16 array
+    const newData = Array.from({ length: size }, () => Array(size).fill(0));
+
+    if (direction === "up") {
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                newData[y][x] = spriteData[(y + 1) % size][x]; // Wrap around to the bottom
+            }
+        }
+    } else if (direction === "down") {
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                newData[y][x] = spriteData[(y - 1 + size) % size][x]; // Wrap around to the top
+            }
+        }
+    } else if (direction === "left") {
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                newData[y][x] = spriteData[y][(x + 1) % size]; // Wrap around to the right
+            }
+        }
+    } else if (direction === "right") {
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                newData[y][x] = spriteData[y][(x - 1 + size) % size]; // Wrap around to the left
+            }
+        }
+    } else {
+        console.error("Invalid direction. Use 'up', 'down', 'left', or 'right'.");
+        return spriteData;
+    }
+
+    return newData;
 }
 
 function handleMouseMove(event) {
@@ -277,6 +308,24 @@ function handleKeyboard(event) {
             const imageData = updateSpriteImage(spriteData);         // in sprite.js
             addToSpriteSheet(currentSprite, spriteData, imageData);  // in sprite-sheet.js
             addMainEvents();
+    }
+
+    switch (event.code) { // Handles numpad keys
+        case 'Numpad8':
+            spriteData = nudgeSprite(spriteData, "up");
+            drawGrid();
+            break;
+        case 'Numpad2':
+            spriteData = nudgeSprite(spriteData, "down");
+            drawGrid();
+            break;
+        case 'Numpad4':
+            spriteData = nudgeSprite(spriteData, "left");
+            drawGrid();
+            break;
+        case 'Numpad6':
+            spriteData = nudgeSprite(spriteData, "right");
+            drawGrid();
     }
 }
 

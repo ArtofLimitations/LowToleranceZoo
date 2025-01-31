@@ -44,6 +44,34 @@ h3 {
   top: 0;
   left: 0;
   margin: auto;
+  border: 1px dashed #969977 !important;
+  outline: none;
+}
+
+.dashed-grid-paper {
+
+  --grid-size: 32px;
+  --grid-strength: 1px;
+  --grid-dash: 16px;
+  --grid-gap: 4px;
+  --grid-color: #353a55;
+  --paper-color: #131313;
+
+background-color: var(--paper-color);
+background-size: var(--grid-dash) var(--grid-dash), var(--grid-size) var(--grid-size);
+background-image:
+  linear-gradient(to bottom, transparent var(--grid-gap), var(--paper-color) var(--grid-gap)), 
+  linear-gradient(to right, var(--grid-color) var(--grid-strength), transparent var(--grid-strength)),
+  linear-gradient(to right, transparent var(--grid-gap), var(--paper-color) var(--grid-gap)),
+  linear-gradient(to bottom, var(--grid-color) var(--grid-strength), transparent var(--grid-strength));
+}
+
+.lowToleranceCanvas:focus-visible,
+.lowToleranceCanvas:focus,
+.lowToleranceCanvas:active
+{
+  border: 1px dashed #bdd109 !important;
+  outline: none;
 }
 
 .playCanvas {
@@ -220,11 +248,11 @@ h3 {
 
 .lowToleranceCanvas {
 
-  background-color: #131313;
+  /*background-color: #131313;
   /*margin: 10px auto;
     /*padding: 5px;
-    border: 5px solid #f7f8f31a;*/
-  border-style: none;
+    border: 5px solid #f7f8f31a;
+  border-style: none;*/
   border-radius: 4px;
 
 }

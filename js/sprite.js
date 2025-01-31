@@ -2,7 +2,8 @@ import { getImageFromSheet, getDataFromSheet } from './sprite-sheet.js';
 
 const canvas = document.getElementById('lowToleranceCanvas');
 const ctx = canvas.getContext('2d');
-const exportedCanvas = document.getElementById('exportedSpriteCanvas');
+//const exportedCanvas = document.getElementById('exportedSpriteCanvas');
+const exportedCanvas = new OffscreenCanvas(32, 32);
 const exportedCtx = exportedCanvas.getContext('2d');
 
 let imageData = 0;
@@ -11,15 +12,9 @@ let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
 let currentSprite = 1;
 
 export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
-    //const image = getImageFromSheet(spriteNumber) ?? convertToImageData(Array(gridSize).fill().map(() => Array(gridSize).fill(2)));
     const data = getDataFromSheet(spriteNumber) ?? Array(gridSize).fill().map(() => Array(gridSize).fill(2));
-    /*let data = [];
-    if (getDataFromSheet(spriteNumber)) {
-        data = getDataFromSheet(spriteNumber)
-    } else { data = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); }*/
     const dark = colors[0];
     const light = colors[1];
-    //console.log(colors);
     const image = convertToImageData(data, dark, light);
     exportedCtx.putImageData(image, 0, 0);
     //ctx.save();
@@ -36,7 +31,7 @@ export function drawSpriteImage(x, y, tileSizeX, tileSizeY, image) {
     ctx.drawImage(exportedCanvas, x * tileSizeX, y * tileSizeY, 32, 32);
 }
 
-export function drawDataURL(x, y, tileSizeX, tileSizeY, dataURL) {
+/*export function drawDataURL(x, y, tileSizeX, tileSizeY, dataURL) {
     const img = new Image();
     img.onload = () =>  ctx.drawImage(img, x * tileSizeX, y * tileSizeY, 32, 32);
     img.src = dataURL;
@@ -47,7 +42,7 @@ export function createDataURL (data, dark, light) {
     exportedCtx.putImageData(image, 0, 0);
     const dataURL = exportedCanvas.toDataURL('image/png'); // Convert the canvas to a Data URL
     return dataURL
-}
+}*/
 
 export function updateSpriteImage(data, current, light = [255, 255, 255, 255], dark = [0, 0, 0, 255]) {
     console.log('updated spriteImage');
@@ -94,7 +89,7 @@ function setPixel(imageData, x, y, [r, g, b, a]) {
     imageData.data[index + 3] = a * 255;
 }
 
-function adjustColor(rgba, factor) {
+export function adjustColor(rgba, factor) {
     const [r, g, b, a] = rgba; // Decompose RGBA array
     const lighten = factor > 0;
 

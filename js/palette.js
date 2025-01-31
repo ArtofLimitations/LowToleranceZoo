@@ -69,7 +69,7 @@ function blendColor() {
     const newColor = blendColors(dark, light);
     //if (dir == 'right') {
         light = newColor;
-        console.log('new color: ', light)
+        console.log('new color: ', light);
         colorLight.style.background = `rgba(${light})`;
         currentColors = [dark, light];
     //}
