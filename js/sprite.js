@@ -25,6 +25,15 @@ export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
     //ctx.restore();
 }
 
+export function drawPlayerSprite (x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
+    const data = getDataFromSheet(spriteNumber) ?? Array(gridSize).fill().map(() => Array(gridSize).fill(2));
+    const dark = colors[0];
+    const light = colors[1];
+    const image = convertToImageData(data, dark, light);
+    exportedCtx.putImageData(image, 0, 0)
+    ctx.drawImage(exportedCanvas, x, y, 32, 32);
+}
+
 export function drawSpriteImage(x, y, tileSizeX, tileSizeY, image) {
     const imageData = new ImageData(image, 32, 32);
     exportedCtx.putImageData(imageData, 0, 0);
