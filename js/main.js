@@ -431,7 +431,8 @@ document.addEventListener('DOMContentLoaded', () => {
         sprite: 1,
         image: getSpriteImage(),
         color: [[0, 0, 255, .5], [255, 255, 255, 1]],
-        type: 'player'
+        type: 'player',
+        direction: 'down'
     };
 
     // Initial canvas setup

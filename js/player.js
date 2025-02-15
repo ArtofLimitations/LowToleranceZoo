@@ -76,20 +76,6 @@ function findPlayerSprite() {
     return null; // Return null if no player is found
 }
 
-function getOverlappingTiles(x, y) {
-    let leftTile = Math.floor(x / 32);
-    let topTile = Math.floor(y / 32);
-    let rightTile = Math.floor((x + 31) / 32);
-    let bottomTile = Math.floor((y + 31) / 32);
-    
-    return [
-        { x: leftTile, y: topTile },
-        { x: rightTile, y: topTile },
-        { x: leftTile, y: bottomTile },
-        { x: rightTile, y: bottomTile }
-    ];
-}
-
 // Draw the grid of tiles
 function drawBoard() {
     //console.log('drawing whole board');
@@ -101,7 +87,8 @@ function drawSpritesAt(x = null, y = null) {
     // Collect and sort all placed sprite keys by layer (ascending)
     const sortedKeys = Object.keys(placedSprites)
         .map(key => key.split(',').map(Number)) // Convert "l,x,y" to [l, x, y]
-        .sort(([l1], [l2]) => l1 - l2); // Sort by layer (ascending)
+        //.sort(([l1], [l2]) => l1 - l2); // Sort by layer (ascending)
+        .sort(([l1, , y1], [l2, , y2]) => l1 - l2 || y1 - y2); // Sort by layer, then by Y-position
 
     for (const [l, sx, sy] of sortedKeys) {
         // Skip hidden layers
@@ -112,41 +99,139 @@ function drawSpritesAt(x = null, y = null) {
 
         const spriteInfo = placedSprites[`${l},${sx},${sy}`];
         if (spriteInfo) {
-            if (spriteInfo.type !== 'player') drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
-            else drawPlayerSprite(sx * 32, sy * 32, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+            if (spriteInfo.type === 'player') {
+                // Use player's actual position instead of tile position
+                drawPlayerSprite(player.x * tileSizeX, player.y * tileSizeY, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+            } else {
+                drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+            }
+            //if (spriteInfo.type === 'player') drawPlayerSprite(sx * 32, sy * 32, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+            //if (spriteInfo.type !== 'player') drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+            /*if (spriteInfo.type === 'player') {
+                if (l === currentLayer) {
+                    drawPlayerSprite(sx * 32, sy * 32, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+                }
+            } else {
+                drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+            }*/
         }
     }
 }
 
-function redrawTiles(tiles) {
-    for (let tile of tiles) {
-        let tileX = tile.x * 32;
-        let tileY = tile.y * 32;
-        drawSpritesAt(tile.x, tile.y, tileX, tileY); // Function to re-draw tile
+function drawSpritesAtTiles(tileCoordsArray) {
+    // Collect all matching placedSprites keys and organize by layers
+    const spritesByLayer = {};
+
+    Object.keys(placedSprites)
+        .map(key => {
+            const [l, sx, sy] = key.split(',').map(Number);
+            return { l, x: sx, y: sy, ...placedSprites[key] }; // Convert key to an object
+        })
+        .filter(sprite => tileCoordsArray.some(coord => coord.x === sprite.x && coord.y === sprite.y)) // Keep only matching tiles
+        .forEach(sprite => {
+            if (!spritesByLayer[sprite.l]) spritesByLayer[sprite.l] = [];
+            spritesByLayer[sprite.l].push(sprite); // Group by layer
+        });
+
+    // Sort layer keys in ascending order
+    const sortedLayers = Object.keys(spritesByLayer).map(Number).sort((a, b) => a - b);
+
+    // Draw all sprites layer by layer
+    for (const layer of sortedLayers) {
+        if (hiddenLayers.has(layer)) continue; // Skip hidden layers
+
+        let playerSprite = null;
+
+        for (const sprite of spritesByLayer[layer]) {
+            if (sprite.type === 'player') {
+                playerSprite = sprite; // Store player sprite to draw later
+            } else {
+                drawSprite(sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
+            }
+        }
+
+        // Draw player after all other sprites on its layer
+        if (playerSprite) {
+            drawPlayerSprite(player.x * 32, player.y * 32, tileSizeX, tileSizeY, playerSprite.sprite, playerSprite.color);
+        }
     }
+}
+
+function getOverlappingTiles(x, y) {
+    let leftTile = Math.floor(x / 32);
+    let topTile = Math.floor(y / 32);
+    let rightTile = Math.floor((x + 31) / 32);
+    let bottomTile = Math.floor((y + 31) / 32);
+
+    return [
+        { x: leftTile, y: topTile },
+        { x: rightTile, y: topTile },
+        { x: leftTile, y: bottomTile },
+        { x: rightTile, y: bottomTile }
+    ];
+}
+
+function redrawTiles(tiles) {
+    
+    for (let tile of tiles) {
+        //let tileX = tile.x * 32;
+        //let tileY = tile.y * 32;
+        clearTile(tile.x, tile.y); // Function to clear tile
+        //drawSpritesAt(tile.x, tile.y, tileX, tileY); // Function to re-draw tile
+    }
+    drawSpritesAtTiles(tiles);
 }
 
 function clearTile(x, y) {
     ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
-    const key = `${player.layer},${x},${y}`;
+    //const key = `${player.layer},${x},${y}`;
     /*if (placedSprites[key]) {
         drawSpritesAt(x, y);
     }*/
 }
 
-function canMoveTo(x, y) {
-    return !placedSprites[`${player.layer},${x},${y}`] || placedSprites[`${player.layer},${x},${y}`].type !== "wall";
+function checkTiles(x, y, direction) {
+    let leftTile = Math.floor(x / 32);
+    let topTile = Math.floor(y / 32);
+    let rightTile = Math.floor((x + 31) / 32);
+    let bottomTile = Math.floor((y + 31) / 32);
+
+    switch (direction) {
+        case 'up':
+            return [{ x: leftTile, y: topTile },
+            { x: rightTile, y: topTile },];
+        case 'down':
+            return [{ x: leftTile, y: bottomTile },
+            { x: rightTile, y: bottomTile },];
+        case 'left':
+            return [{ x: leftTile, y: topTile },
+            { x: leftTile, y: bottomTile },];
+        case 'right':
+            return [{ x: rightTile, y: topTile },
+            { x: rightTile, y: bottomTile },];
+    }
 }
 
-// Load board and replace spritesheet
-function handleLoadedGame(spriteSheetData, boardData) {
-    placedSprites = boardData;
-    replaceSpriteSheet(spriteSheetData);
-    console.log('Loaded Board', placedSprites);
-    loaded = true;
-    player = findPlayerSprite();
-    console.log(player);
-    drawBoard(); //<------------------------------------- Draw function for entire board
+function canMoveTo(x, y) {
+    //return !placedSprites[`${player.layer},${x},${y}`] || placedSprites[`${player.layer},${x},${y}`].type !== "wall";
+    //let tiles = getOverlappingTiles(x * 32, y * 32);
+    let tiles = checkTiles(x * 32, y * 32, player.direction);
+
+    console.log(tiles);
+
+    for (let tile of tiles) {
+        let tileKey = `${player.layer},${tile.x},${tile.y}`;
+
+        if (tile.x < 0 || tile.y < 0 || tile.y >= tilesY || tile.x >= tilesX) {
+            return false; // Out of bounds = collision
+        }
+        if (placedSprites[tileKey]) {
+            if (placedSprites[tileKey].type === 'wall') {
+                return false; // Collision detected
+            }
+        }
+    }
+    return true;
 }
 
 function updatePlayer(deltaTime) {
@@ -157,19 +242,19 @@ function updatePlayer(deltaTime) {
     let oldTiles = getOverlappingTiles(player.x * 32, player.y * 32);
     let newX = player.x;
     let newY = player.y;
-   // old x and y?
+    // old x and y?
 
     switch (true) {
-        case keys["ArrowUp"] && canMoveTo(player.x, player.y - 1):
+        case keys['ArrowUp'] && canMoveTo(player.x, player.y - 1):
             newY -= .5;
             break;
-        case keys["ArrowDown"] && canMoveTo(player.x, player.y + 1):
+        case keys['ArrowDown'] && canMoveTo(player.x, player.y + 1):
             newY += .5;
             break;
-        case keys["ArrowLeft"] && canMoveTo(player.x - 1, player.y):
+        case keys['ArrowLeft'] && canMoveTo(player.x - 1, player.y):
             newX -= .5;
             break;
-        case keys["ArrowRight"] && canMoveTo(player.x + 1, player.y):
+        case keys['ArrowRight'] && canMoveTo(player.x + 1, player.y):
             newX += .5;
             break;
     }
@@ -189,11 +274,27 @@ function updatePlayer(deltaTime) {
         player.y = newY;
 
         redrawTiles(uniqueTiles);
-        drawSpritesAt(player.x, player.y);
-        
+        //drawSpritesAt(player.x, player.y);
+
         console.log('player: ', player.x, player.y);
         console.log('oldkey: ', oldKey);
+        console.log(player.direction);
     }
+}
+
+// Load board and replace spritesheet
+function handleLoadedGame(spriteSheetData, boardData) {
+    placedSprites = boardData;
+    replaceSpriteSheet(spriteSheetData);
+
+    console.log('Loaded Board', placedSprites);
+
+    loaded = true;
+    player = findPlayerSprite();
+
+    console.log(player);
+
+    drawBoard(); //<------------------------------------- Draw function for entire board
 }
 
 canvas.addEventListener('mousedown', (event) => {
@@ -203,14 +304,29 @@ canvas.addEventListener('mousedown', (event) => {
     position = x;
 });
 
-document.addEventListener("keydown", (e) => {
-    keys[e.key] = true;
-    if (e.key === "l") {
+document.addEventListener("keydown", (event) => {
+    keys[event.key] = true;
+    if (event.key === "l") {
         loadCombinedData(handleLoadedGame);
     }
+
+    switch (event.key) {
+        case 'ArrowUp':
+            player.direction = 'up';
+            break;
+        case 'ArrowDown':
+            player.direction = 'down';
+            break;
+        case 'ArrowLeft':
+            player.direction = 'left';
+            break;
+        case 'ArrowRight':
+            player.direction = 'right';
+            break;
+    }
 });
-document.addEventListener("keyup", (e) => {
-    keys[e.key] = false;
+document.addEventListener("keyup", (event) => {
+    keys[event.key] = false;
 });
 
 //canvas.addEventListener('keydown', handleKeyboard);
