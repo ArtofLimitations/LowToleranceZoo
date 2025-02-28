@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="js/modules/vanilla-picker.csp.css">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -16,6 +19,13 @@
     <div class="block" id="block">
         <!-- Main Canvas -->
         <canvas class="lowToleranceCanvas dashed-grid-paper" id="lowToleranceCanvas" tabindex='1' oncontextmenu="event.preventDefault();"></canvas>
+        <div class="lowToleranceToolbar" id="lowToleranceToolbar"><span class="title"><span class="shades">┤</span> <span style="color:#b61717;">Low</span> Tolerance <span style="color:#1c6db9;">Zoo</span> <span class="shades">├</span></span>
+            <div class="buttons">
+            <button class="material-symbols-outlined" id="spriteButton" title="Sprite Editor">edit</button>
+            <button class="material-symbols-outlined" id="paletteButton" title="Color Palette">palette</button>
+            <span class="valueBox" id="currentSprite">1</span>
+        </div>
+        </div>
         <!----------------->
         <div class="spriteContainer" id="spriteContainer">
             <div class="spriteInfo" id="spriteInfo"><strong>Sprite Editor</strong> - F: fill | D: draw | esc: save and

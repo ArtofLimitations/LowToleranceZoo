@@ -3,6 +3,7 @@ import { pickColor, toolbarSwapColor } from './palette.js';
 
 const canvas = document.getElementById('lowToleranceCanvas');
 const ctx = canvas.getContext('2d');
+const spriteValue = document.getElementById('currentSprite');
 
 const toolBarSize = 320; // Right side toolbar sized in tiles
 let colors = [[0, 0, 0, 1], [255, 255, 255, 1]];
@@ -23,6 +24,7 @@ export function toolbar(current, currentColors, layer, mouse) {
   const leftSide = canvas.width - toolBarSize;
   colors = currentColors || [[0, 0, 0, 1], [255, 255, 255, 1]];
   mouseStatus = mouse;
+  spriteValue.innerHTML = current;
 
   // Draw toolbar
   ctx.beginPath();

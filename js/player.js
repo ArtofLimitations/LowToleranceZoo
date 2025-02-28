@@ -34,9 +34,17 @@ let player = {
     x: 10,
     y: 10,
     oldX: 10,
-    oldY: 10
+    oldY: 10,
+    layer: 2,
 };
-const stepSize = 0.25;
+
+const stepSize = 0.5; // Step size for player movement
+
+let stats = {
+    coins: 0,
+    score: 0,
+    lives: 3,
+};
 
 // File info
 export let filename = ''; // ############ File to load ###############
@@ -120,7 +128,8 @@ function drawSpritesAt(x = null, y = null) {
 
 function drawSpritesAtTiles(tileCoordsArray) {
     // Collect all matching placedSprites keys and organize by layers
-    const spritesByLayer = {};
+    //const spritesByLayer = {};
+    const spritesByLayer = { 1: [], 2: [], 3: [] }; // Ensure all layers exist
 
     Object.keys(placedSprites)
         .map(key => {
@@ -129,7 +138,7 @@ function drawSpritesAtTiles(tileCoordsArray) {
         })
         .filter(sprite => tileCoordsArray.some(coord => coord.x === sprite.x && coord.y === sprite.y)) // Keep only matching tiles
         .forEach(sprite => {
-            if (!spritesByLayer[sprite.l]) spritesByLayer[sprite.l] = [];
+            //if (!spritesByLayer[sprite.l]) spritesByLayer[sprite.l] = [];
             spritesByLayer[sprite.l].push(sprite); // Group by layer
         });
 
@@ -140,19 +149,13 @@ function drawSpritesAtTiles(tileCoordsArray) {
     for (const layer of sortedLayers) {
         if (hiddenLayers.has(layer)) continue; // Skip hidden layers
 
-        let playerSprite = null;
-
         for (const sprite of spritesByLayer[layer]) {
-            if (sprite.type === 'player') {
-                playerSprite = sprite; // Store player sprite to draw later
-            } else {
-                drawSprite(sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
-            }
+            drawSprite(sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
         }
 
         // Draw player after all other sprites on its layer
-        if (playerSprite) {
-            drawPlayerSprite(player.x * 32, player.y * 32, tileSizeX, tileSizeY, playerSprite.sprite, playerSprite.color);
+        if (layer === player.layer) {
+            drawPlayerSprite(player.x * 32, player.y * 32, tileSizeX, tileSizeY, player.sprite, player.color);
         }
     }
 }
@@ -172,12 +175,15 @@ function getOverlappingTiles(x, y) {
 }
 
 function redrawTiles(tiles) {
-    
+
     for (let tile of tiles) {
         //let tileX = tile.x * 32;
         //let tileY = tile.y * 32;
         clearTile(tile.x, tile.y); // Function to clear tile
         //drawSpritesAt(tile.x, tile.y, tileX, tileY); // Function to re-draw tile
+        //ctx.beginPath();
+        //ctx.fillStyle = 'rgba(146, 27, 27, 0.8)';
+        //ctx.fillRect(tile.x * 32, tile.y * 32, 32, 32);
     }
     drawSpritesAtTiles(tiles);
 }
@@ -191,33 +197,33 @@ function clearTile(x, y) {
 }
 
 function checkTiles(x, y, direction) {
-    let leftTile = Math.floor(x / 32);
-    let topTile = Math.floor(y / 32);
-    let rightTile = Math.floor((x + 31) / 32);
-    let bottomTile = Math.floor((y + 31) / 32);
+    let leftTile = Math.floor(x / tileSizeX);
+    let topTile = Math.floor(y / tileSizeY);
+    let rightTile = Math.ceil((x + tileSizeX - 1) / tileSizeX) - 1;
+    let bottomTile = Math.ceil((y + tileSizeY - 1) / tileSizeY) - 1;
 
     switch (direction) {
         case 'up':
             return [{ x: leftTile, y: topTile },
-            { x: rightTile, y: topTile },];
+                    { x: rightTile, y: topTile },];
         case 'down':
             return [{ x: leftTile, y: bottomTile },
-            { x: rightTile, y: bottomTile },];
+                    { x: rightTile, y: bottomTile },];
         case 'left':
             return [{ x: leftTile, y: topTile },
-            { x: leftTile, y: bottomTile },];
+                    { x: leftTile, y: bottomTile },];
         case 'right':
             return [{ x: rightTile, y: topTile },
-            { x: rightTile, y: bottomTile },];
+                    { x: rightTile, y: bottomTile },];
     }
 }
 
 function canMoveTo(x, y) {
     //return !placedSprites[`${player.layer},${x},${y}`] || placedSprites[`${player.layer},${x},${y}`].type !== "wall";
     //let tiles = getOverlappingTiles(x * 32, y * 32);
-    let tiles = checkTiles(x * 32, y * 32, player.direction);
+    let tiles = checkTiles(x * tileSizeX, y * tileSizeY, player.direction);
 
-    console.log(tiles);
+    //console.log(tiles);
 
     for (let tile of tiles) {
         let tileKey = `${player.layer},${tile.x},${tile.y}`;
@@ -226,8 +232,14 @@ function canMoveTo(x, y) {
             return false; // Out of bounds = collision
         }
         if (placedSprites[tileKey]) {
-            if (placedSprites[tileKey].type === 'wall') {
+            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'wall') {
                 return false; // Collision detected
+            }
+            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'coin') {
+                stats.coins++;
+                console.log('coins: ', stats.coins);
+                delete placedSprites[tileKey];
+                return true; 
             }
         }
     }
@@ -236,7 +248,7 @@ function canMoveTo(x, y) {
 
 function updatePlayer(deltaTime) {
     accumulatedTime += deltaTime;
-    if (accumulatedTime < moveSpeed) return;
+    if (accumulatedTime < moveSpeed) return; // Wait for the next frame
     accumulatedTime = 0;
 
     let oldTiles = getOverlappingTiles(player.x * 32, player.y * 32);
@@ -245,17 +257,17 @@ function updatePlayer(deltaTime) {
     // old x and y?
 
     switch (true) {
-        case keys['ArrowUp'] && canMoveTo(player.x, player.y - 1):
-            newY -= .5;
+        case keys['ArrowUp'] && canMoveTo(player.x, player.y - stepSize):
+            newY -= stepSize;
             break;
-        case keys['ArrowDown'] && canMoveTo(player.x, player.y + 1):
-            newY += .5;
+        case keys['ArrowDown'] && canMoveTo(player.x, player.y + stepSize):
+            newY += stepSize;
             break;
-        case keys['ArrowLeft'] && canMoveTo(player.x - 1, player.y):
-            newX -= .5;
+        case keys['ArrowLeft'] && canMoveTo(player.x - stepSize, player.y):
+            newX -= stepSize;
             break;
-        case keys['ArrowRight'] && canMoveTo(player.x + 1, player.y):
-            newX += .5;
+        case keys['ArrowRight'] && canMoveTo(player.x + stepSize, player.y):
+            newX += stepSize;
             break;
     }
 
@@ -263,22 +275,24 @@ function updatePlayer(deltaTime) {
         const oldKey = `${player.layer},${player.x},${player.y}`;
         const newKey = `${player.layer},${newX},${newY}`;
 
+        player.x = newX;
+        player.y = newY;
+
         let newTiles = getOverlappingTiles(player.x * 32, player.y * 32);
 
         let uniqueTiles = [...new Set([...oldTiles, ...newTiles])];
+        //let uniqueTiles = [...new Set([...oldTiles])];
 
         placedSprites[newKey] = placedSprites[oldKey];
         delete placedSprites[oldKey];
 
-        player.x = newX;
-        player.y = newY;
-
+        //console.log(uniqueTiles);
         redrawTiles(uniqueTiles);
         //drawSpritesAt(player.x, player.y);
 
-        console.log('player: ', player.x, player.y);
-        console.log('oldkey: ', oldKey);
-        console.log(player.direction);
+        //console.log('player: ', player.x, player.y);
+        //console.log('oldkey: ', oldKey);
+        //console.log(player.direction);
     }
 }
 
@@ -291,6 +305,11 @@ function handleLoadedGame(spriteSheetData, boardData) {
 
     loaded = true;
     player = findPlayerSprite();
+    stats = {
+        coins: 0,
+        score: 0,
+        lives: 3 
+    };
 
     console.log(player);
 
@@ -323,13 +342,15 @@ document.addEventListener("keydown", (event) => {
         case 'ArrowRight':
             player.direction = 'right';
             break;
+        case '1':
+            currentLayer = 1;
+            break;
     }
+
 });
 document.addEventListener("keyup", (event) => {
     keys[event.key] = false;
 });
-
-//canvas.addEventListener('keydown', handleKeyboard);
 
 // Initiate
 

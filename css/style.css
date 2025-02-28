@@ -33,6 +33,11 @@ h3 {
   'opsz' 24
 }
 
+@font-face {
+  font-family: "zzt";
+  src: url("../assets/Web437_IBM_VGA_8x16.woff");
+}
+
 .block {
   position: relative;
   width: 1474px;
@@ -57,9 +62,9 @@ h3 {
   --grid-color: #353a55;
   --paper-color: #131313;
 
-background-color: var(--paper-color);
-background-size: var(--grid-dash) var(--grid-dash), var(--grid-size) var(--grid-size);
-background-image:
+  background-color: var(--paper-color);
+  background-size: var(--grid-dash) var(--grid-dash), var(--grid-size) var(--grid-size);
+  background-image:
   linear-gradient(to bottom, transparent var(--grid-gap), var(--paper-color) var(--grid-gap)), 
   linear-gradient(to right, var(--grid-color) var(--grid-strength), transparent var(--grid-strength)),
   linear-gradient(to right, transparent var(--grid-gap), var(--paper-color) var(--grid-gap)),
@@ -72,6 +77,49 @@ background-image:
 {
   border: 1px dashed #bdd109 !important;
   outline: none;
+}
+
+.lowToleranceToolbar {
+  background-color: #0e2a68;
+  color: #ffc800;
+  font-family: "Fira Code", serif;
+  font-optical-sizing: auto;
+  font-weight: 300;
+  font-style: normal;
+  position: absolute;
+  right: 0;
+  width: 320px;
+  height: 800px;
+}
+
+.lowToleranceToolbar span.shades {
+  font-size: 16px;
+}
+
+.lowToleranceToolbar span.title {
+  display: block;
+  font-family: "zzt";
+  font-size: 16px;
+  background: #131313;
+  padding: 8px;
+  margin: 8px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.lowToleranceToolbar .buttons {
+  margin: 8px;
+}
+
+.lowToleranceToolbar .valueBox {
+  display: block;
+  background-color: #131313;
+  width: 24px;
+  height: 32px;
+  margin: 8px 0;
+  padding: 0 8px;
+  text-align: center;
+  line-height: 2;
 }
 
 .playCanvas {

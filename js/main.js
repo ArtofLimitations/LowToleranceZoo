@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button: 0, mode: 'draw', lastClick: 0, clickDelay: 50
     };                                                                                      // mouse status object. click delay. see handleMouseMove function. click delay in ms
     let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2 }                             // basic stats for player
+    let type = 'wall';                                                                      // default type for placed sprites
 
     function getSpriteImage() {
         const data = getDataFromSheet(currentSprite); // from sprite-sheet.js
@@ -85,14 +86,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortedKeys = Object.keys(placedSprites)
             .map(key => key.split(',').map(Number)) // Convert "l,x,y" to [l, x, y]
             .sort(([l1], [l2]) => l1 - l2); // Sort by layer (ascending)
-    
+
         for (const [l, sx, sy] of sortedKeys) {
             // Skip hidden layers
             if (hiddenLayers.has(l)) continue;
-    
+
             // If x and y are provided, only draw the sprite(s) at (x, y)
             if (x !== null && y !== null && (sx !== x || sy !== y)) continue;
-    
+
             const spriteInfo = placedSprites[`${l},${sx},${sy}`];
             if (spriteInfo) {
                 drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
@@ -192,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         sprite: currentSprite,    // add current selected sprite (number)
                         image: getSpriteImage(),   // add sprite data (2D array)
                         color: colors,            // add current colors from palette (array)
-                        type: 'wall'
+                        type: type
                     };
                     //console.log(placedSprites);
                 }
@@ -204,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         adjustColor(placedSprites[tileKey].color[1], .1)
                     ];
                     placedSprites[tileKey].color = color;
-                        
+
                 }
         }
         drawBoard(); //<------------------------------------- Draw function for entire board
@@ -307,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         sprite: currentSprite,    // add current selected sprite (number)
                         color: colors,            // add current colors from palette (array)
                         image: getSpriteImage(),  // add sprite image data
-                        type: 'wall'              // default type is wall
+                        type: type                // default type is wall
                     };
                 };
                 //drawBoard(); // Refresh board
@@ -317,6 +318,22 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'Enter': // add layers later
                 grabSprite(tileKey);
                 if (event.repeat) { return }
+                break;
+            case 'PageUp':
+                if (scale < 2) scale += 0.1;
+                canvas.width = displayWidth * scale;
+                canvas.height = displayHeight * scale;
+                console.log('scale: ', scale);
+                break;
+            case 'PageDown':
+                if (scale > 0.5) scale -= 0.1;
+                canvas.width = displayWidth * scale;
+                canvas.height = displayHeight * scale;
+                console.log('scale: ', scale);
+                break;
+            case 'Insert':
+                type = type === 'wall' ? 'coin' : 'wall';
+                console.log('type: ', type);
                 break;
         }
 
@@ -379,6 +396,16 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'l': // load board & sprite sheet
                 loadCombinedData(handleLoadedGame);
                 break;
+            case 'r': // reset board
+                if (confirm('Are you sure you want reset board?')) {
+                    placedSprites = {};
+                    console.log('Board reset');
+                    drawBoard(); //<------------------------------------- Draw function for entire board
+                } else {
+                    console.log('Board not reset');
+                }
+                break;
+
         }
 
         if (event.ctrlKey || event.metaKey) {
@@ -389,7 +416,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     loadBoard(handleLoadedBoard);
                     if (event.repeat) { return }
                     return;
-                    break;
             }
         }
         //console.log(`key: cursor ${cursorX},${cursorY}`);
@@ -432,7 +458,8 @@ document.addEventListener('DOMContentLoaded', () => {
         image: getSpriteImage(),
         color: [[0, 0, 255, .5], [255, 255, 255, 1]],
         type: 'player',
-        direction: 'down'
+        direction: 'down',
+        layer: 2
     };
 
     // Initial canvas setup
