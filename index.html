@@ -18,13 +18,28 @@
 
     <div class="block" id="block">
         <!-- Main Canvas -->
-        <canvas class="lowToleranceCanvas dashed-grid-paper" id="lowToleranceCanvas" tabindex='1' oncontextmenu="event.preventDefault();"></canvas>
-        <div class="lowToleranceToolbar" id="lowToleranceToolbar"><span class="title"><span class="shades">┤</span> <span style="color:#b61717;">Low</span> Tolerance <span style="color:#1c6db9;">Zoo</span> <span class="shades">├</span></span>
-            <div class="buttons">
-            <button class="material-symbols-outlined" id="spriteButton" title="Sprite Editor">edit</button>
-            <button class="material-symbols-outlined" id="paletteButton" title="Color Palette">palette</button>
-            <span class="valueBox" id="currentSprite">1</span>
-        </div>
+        <canvas class="lowToleranceCanvas dashed-grid-paper" id="lowToleranceCanvas" tabindex='1'
+            oncontextmenu="event.preventDefault();"></canvas>
+        <div class="lowToleranceToolbar" id="lowToleranceToolbar"><span class="title"><span class="shades">┤</span>
+                <span style="color:#b61717;">Low</span> Tolerance <span style="color:#1c6db9;">Zoo</span> <span
+                    class="shades">├</span></span>
+            <div class="fieldContainer">
+                <div class="fieldRow">
+                    <button class="material-symbols-outlined" id="spriteButton" title="Sprite Editor">edit</button><span class="fieldText">Sprite<br> Editor</span>&nbsp;
+                    <button class="material-symbols-outlined" id="paletteButton" title="Color Palette">palette</button><span class="fieldText">Color</span>
+                </div>
+                <div class="fieldRow"><span class="valueBox" id="currentSprite">1</span><span class="imageBox"
+                        id="currentSpriteImage"> </span><span class="fieldText">Current<br> Sprite</span></div>
+                <div class="fieldRow"><span class="colorBox" id="colorBoxDark">D </span><button
+                        class="material-symbols-outlined" id="swapButton" title="Swap colors">swap_horiz</button> <span
+                        class="colorBox" id="colorBoxLight">L </span></div>
+                <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
+                <div class="fieldRow"><button class="material-symbols-outlined" id="layer3Button" title="Layer 3">visibility</button><span class="layerBox" id="layer3">Layer 3</span> </div>
+
+                <div class="fieldRow"><button class="material-symbols-outlined" id="layer2Button" title="Layer 2">visibility</button><span class="layerBox" id="layer2">Layer 2</span> </div>
+
+                <div class="fieldRow"><button class="material-symbols-outlined" id="layer1Button" title="Layer 1">visibility</button><span class="layerBox" id="layer1">Layer 1</span> </div>
+            </div>
         </div>
         <!----------------->
         <div class="spriteContainer" id="spriteContainer">
@@ -42,7 +57,10 @@
                 <div class="paletteColorBox" id="colorLight"><span class="paletteLabel">Light</span>
                 </div>
             </div>
-            <button class="paletteButton material-symbols-outlined" id="swapColorButton" title="Swap colors">swap_horiz</button><button class="paletteButton paletteButton-right material-symbols-outlined" id="blendRightButton" title="Blend right">join_right</button> 
+            <button class="paletteButton material-symbols-outlined" id="swapColorButton"
+                title="Swap colors">swap_horiz</button><button
+                class="paletteButton paletteButton-right material-symbols-outlined" id="blendRightButton"
+                title="Blend right">join_right</button>
             <p>Recent Colors</p>
             <div class="paletteRecentContainer">
                 <div class="paletteRecent" id="color1"></div>
@@ -56,7 +74,8 @@
             <p><strong>Script Editor</strong></p>
             <div class="editorTextContainer" id="editorTextContainer">
                 <div class="fieldContainer"><input type="text" id="objectName" placeholder="Enter name"></div>
-                <div class="textEditorContainer"><textarea id="objectTextEditor" placeholder="Code here..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                <div class="textEditorContainer"><textarea id="objectTextEditor" placeholder="Code here..."
+                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
                 </div>
             </div>
         </div>
@@ -68,7 +87,7 @@
         <button id="saveSpriteSheet">Save Sprite Sheet</button>
         <input type="file" id="loadSpriteSheet" accept=".json" style="display: none;">
         <button id="loadSpriteSheetButton">Load Sprite Sheet</button>
-        <input type="file" id="fileInput"/>
+        <input type="file" id="fileInput" />
         <button id="loadFileButton">Load File</button>
     </div>
     <script type="module" src="js/main.js"></script>

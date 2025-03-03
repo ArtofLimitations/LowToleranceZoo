@@ -6,9 +6,17 @@ body {
   height: 100vh;
   margin: 0;
   background-color: #1a1a1a;
-  font-family: Arial, sans-serif;
+  font-family: "Fira Code", serif;
+  font-optical-sizing: auto;
+  font-weight: 300;
+  font-style: normal;
   user-select: none;
   -webkit-user-select: none;
+}
+
+button {
+  background-color: #f0f0f0;
+  border-color: #16316d
 }
 
 h1 {
@@ -107,24 +115,69 @@ h3 {
   cursor: pointer;
 }
 
-.lowToleranceToolbar .buttons {
+.lowToleranceToolbar span.divider {
+  font-family: "zzt";
+  font-size: 16px;
+  color: #fff;
+}
+
+.lowToleranceToolbar .fieldContainer {
   margin: 8px;
 }
 
+.lowToleranceToolbar .fieldContainer button {
+  margin-right: 8px;
+}
+
+.lowToleranceToolbar .fieldContainer span {
+  position: relative;
+}
+
+.lowToleranceToolbar .fieldRow {
+  display: flex;
+  justify-content: flex-start;
+  margin: 8px 0;
+}
+
 .lowToleranceToolbar .valueBox {
-  display: block;
   background-color: #131313;
   width: 24px;
   height: 32px;
-  margin: 8px 0;
+  margin-right: 8px;
   padding: 0 8px;
   text-align: center;
   line-height: 2;
 }
 
+.lowToleranceToolbar .imageBox {
+  background-color: #131313;
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+}
+
+.lowToleranceToolbar .layerBox {
+  background-color: #131313;
+  height: 32px;
+  margin-right: 8px;
+  padding: 0 8px;
+  line-height: 2;
+}
+
+.lowToleranceToolbar .fieldText {
+  color: #fff;
+  font-size: 12px;
+}
+
+.lowToleranceToolbar .colorBox {
+  background-color: #131313;
+  width: 41px;
+  height: 32px;
+  margin-right: 8px;
+}
+
 .playCanvas {
   background-color: #000;
-  
 }
 
 .spriteCanvas {

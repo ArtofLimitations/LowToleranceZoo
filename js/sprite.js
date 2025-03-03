@@ -44,14 +44,22 @@ export function drawSpriteImage(x, y, tileSizeX, tileSizeY, image) {
     const img = new Image();
     img.onload = () =>  ctx.drawImage(img, x * tileSizeX, y * tileSizeY, 32, 32);
     img.src = dataURL;
-}
+}*/
 
-export function createDataURL (data, dark, light) {
+export async function createDataURL (data, dark, light) {
+    const img = document.createElement('img');
+
     const image = convertToImageData(data ?? Array(gridSize).fill().map(() => Array(gridSize).fill(2)), dark, light)
     exportedCtx.putImageData(image, 0, 0);
-    const dataURL = exportedCanvas.toDataURL('image/png'); // Convert the canvas to a Data URL
-    return dataURL
-}*/
+    //const dataURL = exportedCanvas.toDataURL('image/png'); // Convert the canvas to a Data URL
+    //const dataURL = exportedCanvas.convertToBlob; // Convert the canvas to a Data URL
+    const blob = await exportedCanvas.convertToBlob({ type: 'image/png' });
+    img.src = URL.createObjectURL(blob);
+    img.width = 32; 
+    img.height = 32;
+    //return URL.createObjectURL(blob); // Return the Data URL
+    return img;
+}
 
 export function updateSpriteImage(data, current, light = [255, 255, 255, 255], dark = [0, 0, 0, 255]) {
     console.log('updated spriteImage');

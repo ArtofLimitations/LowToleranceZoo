@@ -1,5 +1,5 @@
-import { toolbar, toolbarClicked } from './toolbar.js';
-import { drawSprite, adjustColor, convertToImageData, drawSpriteImage } from './sprite.js';
+import { toolbar } from './toolbar.js';
+import { drawSprite, adjustColor, createDataURL, convertToImageData } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
@@ -23,10 +23,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false
 
+    const editorToolbar = document.getElementById('lowToleranceToolbar');
+
     // Low Tolerance Zoo editor Configurations
     const tileSizeX = 32;                // Single tile size
     const tileSizeY = 32;
-    const hiddenLayers = new Set();      // Set to hold hidden layers
+    let hiddenLayers = new Set();        // Set to hold hidden layers
     let placedSprites = {};              // Store the positions of placed sprites (as key-value pairs)
     let tilesX = 36;                     // Board width and height
     let tilesY = 25;
@@ -210,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         drawBoard(); //<------------------------------------- Draw function for entire board
         //DrawSingleTile(); // <---------------------------------------------------- Draw Tile Function 1/2
-        toolbar(currentSprite, colors, currentLayer, mouse);
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
 
     }
 
@@ -226,6 +228,14 @@ document.addEventListener('DOMContentLoaded', () => {
         placedSprites = boardData;
         replaceSpriteSheet(spriteSheetData);
         console.log('Loaded Board');
+        drawBoard(); //<------------------------------------- Draw function for entire board
+    }
+
+    function handleToolbarClick(layer = currentLayer, hidden) {
+        currentLayer = layer;
+        hiddenLayers = hidden;
+        console.log('current layer: ', currentLayer);
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
         drawBoard(); //<------------------------------------- Draw function for entire board
     }
 
@@ -246,8 +256,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         else {
             // handle toolbar clicks from toolbar.js
-            toolbarClicked(x, y);
+            //toolbarClicked(x, y);
             colors = currentColors;
+            console.log('toolbar clicked');
+            
         }
     }
 
@@ -422,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
         //drawBoard(); // Redraw the board and cursor
         DrawSingleTile(cursorX, cursorY); // <---------------------------------------------------- Draw Tile Function 2/2
         [mouse.oldX, mouse.oldY] = [cursorX, cursorY];
-        toolbar(currentSprite, colors, currentLayer, mouse);
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
     }
 
     window.addMainEvents = function () {
@@ -450,6 +462,12 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.removeEventListener('keyup', () => { });
     }
 
+    editorToolbar.onclick = () => {
+        colors = currentColors;
+        canvas.focus();
+        console.log('toolbar clicked');
+    }
+
     //document.getElementById('saveBoard').addEventListener('click', saveBoard(placedSprites));
 
     // Initial player setup
@@ -464,6 +482,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial canvas setup
     addMainEvents();
-    toolbar(currentSprite, colors, currentLayer, mouse);
+    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
     drawBoard(); //<------------------------------------- Draw function for entire board
 });

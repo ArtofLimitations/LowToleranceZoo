@@ -1,58 +1,111 @@
-import { getImageFromSheet } from './sprite-sheet.js';
+import { getImageFromSheet, getDataFromSheet } from './sprite-sheet.js';
+import { createDataURL } from './sprite.js';
 import { pickColor, toolbarSwapColor } from './palette.js';
+import { editSprite } from './sprite-editor.js';
 
-const canvas = document.getElementById('lowToleranceCanvas');
-const ctx = canvas.getContext('2d');
+//const canvas = document.getElementById('lowToleranceCanvas');
+//const ctx = canvas.getContext('2d');
 const spriteValue = document.getElementById('currentSprite');
+const spriteImage = document.getElementById('currentSpriteImage');
+const darkColor = document.getElementById('colorBoxDark');
+const lightColor = document.getElementById('colorBoxLight');
+const swapColor = document.getElementById('swapButton');
+const paletteButton = document.getElementById('paletteButton');
+const spriteButton = document.getElementById('spriteButton');
+const layerButtons = [null, document.getElementById('layer1Button'), document.getElementById('layer2Button'), document.getElementById('layer3Button')];
+const boardLayers = [null, document.getElementById('layer1'), document.getElementById('layer2'), document.getElementById('layer3')];
 
-const toolBarSize = 320; // Right side toolbar sized in tiles
+//const toolBarSize = 320; // Right side toolbar sized in tiles
 let colors = [[0, 0, 0, 1], [255, 255, 255, 1]];
 let mouseStatus = {};
+let oldData = [];
+let hidden = new Set();
+let callbackFunction = () => { };
 
-const buttons = [
-  { x: 10, y: 100, width: 80, height: 40, type: 'text', label: 'Button 1' },
-  { x: 10, y: 150, width: 80, height: 40, type: 'text', label: 'Button 2' },
-  { x: 10, y: 200, width: 80, height: 40, type: 'text', label: 'Button 3' },
-  { x: 116, y: 533, width: 32, height: 30, type: 'icon', label: 'swap_horiz' },
-  { x: 188, y: 533, width: 32, height: 30, type: 'icon', label: 'palette' },
-  { x: 80, y: 633, width: 32, height: 30, type: 'icon', label: 'visibility' }
-]
+swapColor.onclick = () => {
+  colors = toolbarSwapColor();
+  darkColor.style.background = `rgba(${colors[0][0]},${colors[0][1]}, ${colors[0][2]}, ${colors[0][3]})`;
+  lightColor.style.background = `rgba(${colors[1][0]},${colors[1][1]}, ${colors[1][2]}, ${colors[1][3]})`;
+}
+
+paletteButton.onclick = () => {
+  removeMainEvents(); // remove main.js canvas events
+  pickColor();
+}
+
+spriteButton.onclick = () => {
+  removeMainEvents(); // remove main.js canvas events
+  editSprite(newCurrent);
+}
+
+boardLayers.forEach((element, index) => {
+  if (index > 0) {
+    element.onclick = () => {
+      callbackFunction(index, hidden);
+    }
+  }
+});
+
+layerButtons.forEach((element, index) => {
+  if (index > 0) {
+    element.onclick = () => {
+      if (hidden.has(index)) {
+        hidden.delete(index);
+      } else {
+        hidden.add(index);
+      }
+      callbackFunction( undefined, hidden);
+    }
+  }
+});
 
 // In toolbar.js
-export function toolbar(current, currentColors, layer, mouse) {
+export function toolbar(current, currentColors, layer, mouse, hiddenLayers, callback) {
   //console.log('Function called from toolbar.js');
-  const leftSide = canvas.width - toolBarSize;
+  //const leftSide = canvas.width - toolBarSize;
   colors = currentColors || [[0, 0, 0, 1], [255, 255, 255, 1]];
   mouseStatus = mouse;
+  hidden = hiddenLayers;
+  callbackFunction = callback;
+
   spriteValue.innerHTML = current;
+  let spriteData = getDataFromSheet(current);
 
-  // Draw toolbar
-  ctx.beginPath();
-  ctx.rect(canvas.width - toolBarSize, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#2c3d63";
-  ctx.fill();
+  if (spriteData !== oldData) { // fix for image not updating
+    // Handle the promise
+    createDataURL(spriteData, colors[0], colors[1]).then((img) => {
+      console.log('Image created:', img);
 
-  // Draw title
-  ctx.beginPath();
-  ctx.fillStyle = "#addcca";
-  ctx.font = "32px Helvetica, Arial, Sans-Serif";
-  ctx.fillText("Low Tolerance Zoo", canvas.width - toolBarSize + 10, 48);
+      // Clear previous image and append new one
+      spriteImage.innerHTML = ''; // Clears previous content
+      spriteImage.appendChild(img);
+    }).catch((error) => {
+      console.error('Error creating image:', error);
+    });
+  }
 
-  // Draw sprite and color bar
-  ctx.beginPath();
-  ctx.fillStyle = '#222';
-  ctx.fillRect(leftSide, 532, 76, 32);
+  oldData = spriteData; // fix for image not updating
+  // if (getImageFromSheet(current) !== undefined) spriteImage.appendChild = dataURL;
 
-  // Draw sprite number
-  ctx.beginPath();
-  ctx.fillStyle = "#addcca";
-  ctx.font = "16px Helvetica, Arial, Sans-Serif";
-  ctx.fillText(current, leftSide + 10, 554);
+  darkColor.style.background = `rgba(${colors[0][0]},${colors[0][1]}, ${colors[0][2]}, ${colors[0][3]})`;
+  lightColor.style.background = `rgba(${colors[1][0]},${colors[1][1]}, ${colors[1][2]}, ${colors[1][3]})`;
 
-  // Draw current sprite
-  if (getImageFromSheet(current) !== undefined) ctx.putImageData(getImageFromSheet(current), leftSide + 44, 548 - 16);
-  //let colors = currentColors || [[0, 0, 0, 1], [255, 255, 255, 1]];
+  // Draw layer number
+  boardLayers.forEach((element, index) => {
+    if (index > 0) { 
+      element.style.background = index === layer ? '#555' : '#131313';
+    }
+  });
+  // Visibility buttons visibility_off
+  layerButtons.forEach((element, index) => { 
+    if (index > 0) {
+      element.style.background = index === layer ? '#f0f0f0' : '#888';
+      element.innerText = !hidden.has(index) ? 'visibility' : 'visibility_off';
+    }
+  });
 
+}
+/*
   // Draw Dark Color
   ctx.beginPath();
   ctx.rect(leftSide + 80, 548 - 16, 32, 32);
@@ -128,7 +181,7 @@ export function toolbar(current, currentColors, layer, mouse) {
         ctx.fillRect(leftSide + button.x, button.y, button.width, button.height + 2);
         ctx.fillStyle = '#555';
         ctx.fillRect(leftSide + button.x, button.y, button.width, button.height);
-        
+
         ctx.fillStyle = '#eee';
         //ctx.font = '16px Arial';
         ctx.font = '16px Material Symbols Outlined';
@@ -172,4 +225,4 @@ export function toolbarClicked(x, y) {
       }
     }
   });
-}
+}*/
