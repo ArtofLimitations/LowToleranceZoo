@@ -2,6 +2,7 @@ import Picker from './modules/vanilla-picker.js';
 //import { updateSpriteColor } from './sprite.js';
 
 const container = document.getElementById('paletteContainer');
+const overlay = document.getElementById('overlay');
 
 const recentLength = 5;
 let dark = [0, 0, 0, 1];
@@ -103,6 +104,7 @@ function handleKeyboard(event) {
             container.style.display = 'none';
             currentColors = [dark, light];
             console.log([dark, light]);
+            overlay.style.display = 'none';
             addMainEvents();
             break;
     }

@@ -1,12 +1,10 @@
-import { toolbar } from './toolbar.js';
+import { toolbar, updateType } from './toolbar.js';
 import { drawSprite, adjustColor, createDataURL, convertToImageData } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
 import { saveBoard, loadBoard, saveCombinedData, loadCombinedData } from './file.js';
 import { editObject } from './object-editor.js';
-//import { animate } from './player.js';
-//import { handleTileClick } from './tiles.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Low Tolerance Zoo');
@@ -152,7 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (placedSprites[tileKey] !== undefined) {
             if (!key.ctrl) { // If the ctrl key isn't pressed then grab the sprite and color else just color
                 currentSprite = placedSprites[tileKey].sprite;
+                type = placedSprites[tileKey].type;
                 updateSpriteData(currentSprite);   // from sprite-editor.js
+                updateType(type);                  // from toolbar.js
             }
             colors = placedSprites[tileKey].color; // color grab
             updateColor(colors); // from palette.js
@@ -160,22 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Function to hide a layer
-    function hideLayer(layer) {
-        hiddenLayers.add(layer);
-    }
-
-    // Function to show a layer
-    function showLayer(layer) {
-        hiddenLayers.delete(layer);
-    }
-
     // Handle placing/removing sprites
     function handleTileClick(event) {
-        //const rect = canvas.getBoundingClientRect();
-        //const mouseX = event.clientX - rect.left;
-        //const mouseY = event.clientY - rect.top;
-        //const { x, y } = getTileCoordinates(mouseX, mouseY);
 
         const [x, y] = [mouse.x, mouse.y]
         const tileKey = `${currentLayer},${x},${y}`;
@@ -227,14 +213,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleLoadedGame(spriteSheetData, boardData) {
         placedSprites = boardData;
         replaceSpriteSheet(spriteSheetData);
+        hiddenLayers = new Set();
         console.log('Loaded Board');
         drawBoard(); //<------------------------------------- Draw function for entire board
     }
 
-    function handleToolbarClick(layer = currentLayer, hidden) {
+    function handleToolbarClick(layer = currentLayer, hidden = hiddenLayers, spriteType = type) {
         currentLayer = layer;
         hiddenLayers = hidden;
+        type = spriteType;
         console.log('current layer: ', currentLayer);
+        console.log('hidden layers: ', hiddenLayers);
+        console.log('sprite type: ', type);
         toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
         drawBoard(); //<------------------------------------- Draw function for entire board
     }
@@ -344,7 +334,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('scale: ', scale);
                 break;
             case 'Insert':
-                type = type === 'wall' ? 'coin' : 'wall';
+                type = type === 'wall' ? 'item' : 'wall';
+                updateType(type);
                 console.log('type: ', type);
                 break;
         }
@@ -392,11 +383,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'h': // for hiding or showing layers
                 if (hiddenLayers.has(currentLayer)) {
-                    showLayer(currentLayer);
+                    //showLayer(currentLayer);
+                    hiddenLayers.delete(currentLayer);
                     console.log('showing layer: ', currentLayer);
                 }
                 else {
-                    hideLayer(currentLayer);
+                    //hideLayer(currentLayer);
+                    hiddenLayers.add(currentLayer);
                     console.log('hiding layer: ', currentLayer);
                 }
                 if (event.repeat) { return }
@@ -417,7 +410,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('Board not reset');
                 }
                 break;
-
         }
 
         if (event.ctrlKey || event.metaKey) {
@@ -430,6 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
             }
         }
+        console.log('main hidden:', hiddenLayers);
         //console.log(`key: cursor ${cursorX},${cursorY}`);
         //drawBoard(); // Redraw the board and cursor
         DrawSingleTile(cursorX, cursorY); // <---------------------------------------------------- Draw Tile Function 2/2
@@ -464,8 +457,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     editorToolbar.onclick = () => {
         colors = currentColors;
-        canvas.focus();
+        //canvas.focus();
         console.log('toolbar clicked');
+    }
+
+    editorToolbar.onmouseup = () => {
+        canvas.focus();
     }
 
     //document.getElementById('saveBoard').addEventListener('click', saveBoard(placedSprites));

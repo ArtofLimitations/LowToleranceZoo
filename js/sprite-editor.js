@@ -5,6 +5,7 @@ import { addToSpriteSheet, getDataFromSheet } from './sprite-sheet.js';
 const spriteCanvas = document.getElementById('spriteCanvas');
 const spriteCtx = spriteCanvas.getContext('2d');
 const container = document.getElementById('spriteContainer');
+const overlay = document.getElementById('overlay');
 
 // Set up the grid and colors
 // Grid width 520px
@@ -307,6 +308,7 @@ function handleKeyboard(event) {
             container.style.display = 'none';
             const imageData = updateSpriteImage(spriteData);         // in sprite.js
             addToSpriteSheet(currentSprite, spriteData, imageData);  // in sprite-sheet.js
+            overlay.style.display = 'none';
             addMainEvents();
     }
 

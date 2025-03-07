@@ -1,6 +1,7 @@
 import { loadCombinedData } from './file.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { drawSprite, drawPlayerSprite, drawSpriteImage } from './sprite.js';
+import { createBullet } from './weapons.js';
 
 // Canvas Configurations
 const displayWidth = 1474;
@@ -40,6 +41,8 @@ let player = {
 
 const stepSize = 0.5; // Step size for player movement
 
+let bulletArray = [];
+
 let stats = {
     coins: 0,
     score: 0,
@@ -57,6 +60,7 @@ let position = 0;  // Position of the animated object
 const moveSpeed = 100; // Pixels per second
 let accumulatedTime = 0;
 
+// ############ Main animation function ############ 
 export function animateGame(currentTime) {
     const deltaTime = currentTime - lastTime;
 
@@ -67,11 +71,13 @@ export function animateGame(currentTime) {
         lastTime = currentTime;
     }
 
+    updateWeapon(deltaTime);
     updatePlayer(deltaTime);
 
     // Loop the animation
     requestAnimationFrame(animateGame);
 }
+// ############ End of main animation function ############ 
 
 function findPlayerSprite() {
     for (const key in placedSprites) {
@@ -84,9 +90,48 @@ function findPlayerSprite() {
     return null; // Return null if no player is found
 }
 
+function removeDuplicatesFromSet(objSet) {
+    const uniqueSet = new Set();
+    const uniqueArray = [];
+
+    for (let obj of objSet) {
+        const key = `${obj.x},${obj.y}`; // Create a unique string key
+        if (!uniqueSet.has(key)) {
+            uniqueSet.add(key);
+            uniqueArray.push(obj); // Add to final unique array
+        }
+    }
+
+    //return new Set(uniqueArray); // Convert back to Set (optional)
+    return uniqueArray;
+}
+
+function updateWeapon(deltaTime) {
+    bulletArray.forEach((bullet, index) => {
+        //console.log('bullet: ', bullet.x / 32, bullet.y / 32);
+        let oldTiles = getOverlappingTiles(bullet.x, bullet.y); // Get tiles before update
+        bullet.update();
+        let newTiles = getOverlappingTiles(bullet.x, bullet.y); // Get tiles after update
+
+        let affectedTiles = [...new Set([...oldTiles, ...newTiles])]; // Combine old and new tiles
+
+        //let reducedTiles = removeDuplicatesFromSet(affectedTiles); // Remove duplicates
+
+        redrawTiles(affectedTiles); // Redraw the affected tiles
+
+        //console.log('old: ', bullet.oldX, bullet.oldY);
+        //bullet.draw();
+
+        // Remove bullets that are inactive
+        if (!bullet.active) {
+            bulletArray.splice(index, 1);
+        }
+    });
+    bulletArray = bulletArray.filter(bullet => bullet.active);
+}
+
 // Draw the grid of tiles
 function drawBoard() {
-    //console.log('drawing whole board');
     ctx.clearRect(0, 0, tilesX * tileSizeX + 1, tilesY * tileSizeY); // +1 to get rid of the line next to toolbar
     drawSpritesAt();
 }
@@ -129,6 +174,7 @@ function drawSpritesAt(x = null, y = null) {
 function drawSpritesAtTiles(tileCoordsArray) {
     // Collect all matching placedSprites keys and organize by layers
     //const spritesByLayer = {};
+    //console.log('tiles:', tileCoordsArray);
     const spritesByLayer = { 1: [], 2: [], 3: [] }; // Ensure all layers exist
 
     Object.keys(placedSprites)
@@ -155,6 +201,18 @@ function drawSpritesAtTiles(tileCoordsArray) {
 
         // Draw player after all other sprites on its layer
         if (layer === player.layer) {
+
+            // Draw bullets after layer 2 but before layer 3
+            bulletArray.forEach(bullet => {
+                //let bulletTiles = getOverlappingTiles(bullet.x, bullet.y);
+                //if (bullet.active && bullet.origin === 'player') {
+                    //bulletTiles.forEach(tile => {
+                        //if (tile.y < tilesY && tile.x < tilesX) { // Ensure it's within bounds
+                            bullet.draw();
+                        //}
+                    //});
+                //}
+            });
             drawPlayerSprite(player.x * 32, player.y * 32, tileSizeX, tileSizeY, player.sprite, player.color);
         }
     }
@@ -174,7 +232,7 @@ function getOverlappingTiles(x, y) {
     ];
 }
 
-function redrawTiles(tiles) {
+/*function redrawTiles(tiles) {
 
     for (let tile of tiles) {
         //let tileX = tile.x * 32;
@@ -185,6 +243,15 @@ function redrawTiles(tiles) {
         //ctx.fillStyle = 'rgba(146, 27, 27, 0.8)';
         //ctx.fillRect(tile.x * 32, tile.y * 32, 32, 32);
     }
+    drawSpritesAtTiles(tiles);
+}*/
+
+function redrawTiles(tiles) {
+    // Clear each tile first
+    for (let tile of tiles) {
+        clearTile(tile.x, tile.y);
+    }
+
     drawSpritesAtTiles(tiles);
 }
 
@@ -205,16 +272,16 @@ function checkTiles(x, y, direction) {
     switch (direction) {
         case 'up':
             return [{ x: leftTile, y: topTile },
-                    { x: rightTile, y: topTile },];
+            { x: rightTile, y: topTile },];
         case 'down':
             return [{ x: leftTile, y: bottomTile },
-                    { x: rightTile, y: bottomTile },];
+            { x: rightTile, y: bottomTile },];
         case 'left':
             return [{ x: leftTile, y: topTile },
-                    { x: leftTile, y: bottomTile },];
+            { x: leftTile, y: bottomTile },];
         case 'right':
             return [{ x: rightTile, y: topTile },
-                    { x: rightTile, y: bottomTile },];
+            { x: rightTile, y: bottomTile },];
     }
 }
 
@@ -235,11 +302,11 @@ function canMoveTo(x, y) {
             if (placedSprites[tileKey] && placedSprites[tileKey].type === 'wall') {
                 return false; // Collision detected
             }
-            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'coin') {
-                stats.coins++;
+            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'item') {
+                stats.coins++; // for testing
                 console.log('coins: ', stats.coins);
                 delete placedSprites[tileKey];
-                return true; 
+                return true;
             }
         }
     }
@@ -308,7 +375,7 @@ function handleLoadedGame(spriteSheetData, boardData) {
     stats = {
         coins: 0,
         score: 0,
-        lives: 3 
+        lives: 3
     };
 
     console.log(player);
@@ -342,8 +409,10 @@ document.addEventListener("keydown", (event) => {
         case 'ArrowRight':
             player.direction = 'right';
             break;
-        case '1':
-            currentLayer = 1;
+        case ' ':
+            // Shoot a bullet
+            bulletArray.push(createBullet(player.x + .5, player.y + .5, player.direction, 16, '#f48d55', 'player'));
+            //bulletArray.push(createBullet(player.x, player.y, player.direction));
             break;
     }
 

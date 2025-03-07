@@ -16,7 +16,8 @@ body {
 
 button {
   background-color: #f0f0f0;
-  border-color: #16316d
+  color: #131313;
+  border: none;
 }
 
 h1 {
@@ -35,9 +36,9 @@ h3 {
 
 .material-symbols-outlined {
   font-variation-settings:
-  'FILL' 0,
-  'wght' 300,
-  'GRAD' 0,
+  'FILL' 1,
+  'wght' 700,
+  'GRAD' -25,
   'opsz' 24
 }
 
@@ -100,6 +101,17 @@ h3 {
   height: 800px;
 }
 
+.lowToleranceToolbar .overlay {
+  display: none;
+  background-color: #0e2a68;
+  width: 100%;
+  height: 100%;
+  opacity: 70%;
+  position: absolute;
+  z-index: 99;
+}
+
+
 .lowToleranceToolbar span.shades {
   font-size: 16px;
 }
@@ -130,7 +142,7 @@ h3 {
 }
 
 .lowToleranceToolbar .fieldContainer span {
-  position: relative;
+  
 }
 
 .lowToleranceToolbar .fieldRow {
@@ -174,6 +186,71 @@ h3 {
   width: 41px;
   height: 32px;
   margin-right: 8px;
+}
+
+.tabs {
+  display: flex;
+  position: relative;
+  background-color: #fff;
+  box-shadow: 0 0 1px 0 rgba(24, 94, 224, 0.15), 0 6px 12px 0 rgba(24, 94, 224, 0.15);
+  padding: 8px;
+  border-radius: 1px;
+  margin-right: 8px;
+}
+
+.tabs * {
+  z-index: 2;
+}
+
+.lowToleranceToolbar .container input[type="radio"] {
+  display: none;
+}
+
+.lowToleranceToolbar .tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  width: 50px;
+  font-size: .8rem;
+  color: black;
+  font-weight: 500;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: color 0.15s ease-in;
+}
+
+.lowToleranceToolbar .container input[type="radio"]:checked + label {
+  color: #185ee0;
+}
+
+.lowToleranceToolbar .container input[type="radio"]:checked + label > .notification {
+  background-color: #185ee0;
+  color: #fff;
+  margin: 0px;
+}
+
+.lowToleranceToolbar .container input[id="wall"]:checked ~ .glider {
+  transform: translateX(0);
+}
+
+.lowToleranceToolbar .container input[id="item"]:checked ~ .glider {
+  transform: translateX(100%);
+}
+
+.lowToleranceToolbar .container input[id="break"]:checked ~ .glider {
+  transform: translateX(200%);
+}
+
+.lowToleranceToolbar .glider {
+  position: absolute;
+  display: flex;
+  height: 24px;
+  width: 50px;
+  background-color: #e6eef9;
+  z-index: 1;
+  border-radius: 1px;
+  transition: 0.25s ease-out;
 }
 
 .playCanvas {

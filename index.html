@@ -20,7 +20,9 @@
         <!-- Main Canvas -->
         <canvas class="lowToleranceCanvas dashed-grid-paper" id="lowToleranceCanvas" tabindex='1'
             oncontextmenu="event.preventDefault();"></canvas>
-        <div class="lowToleranceToolbar" id="lowToleranceToolbar"><span class="title"><span class="shades">┤</span>
+        <div class="lowToleranceToolbar" id="lowToleranceToolbar">
+            <div class="overlay" id="overlay"></div>
+            <span class="title"><span class="shades">┤</span>
                 <span style="color:#b61717;">Low</span> Tolerance <span style="color:#1c6db9;">Zoo</span> <span
                     class="shades">├</span></span>
             <div class="fieldContainer">
@@ -39,11 +41,25 @@
                 <div class="fieldRow"><button class="material-symbols-outlined" id="layer2Button" title="Layer 2">visibility</button><span class="layerBox" id="layer2">Layer 2</span> </div>
 
                 <div class="fieldRow"><button class="material-symbols-outlined" id="layer1Button" title="Layer 1">visibility</button><span class="layerBox" id="layer1">Layer 1</span> </div>
+                <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
+                <div class="fieldRow">
+                    <div class="container">
+                        <div class="tabs">
+                            <input type="radio" id="wall" name="tabs" checked="">
+                            <label class="tab" for="wall">Wall</label>
+                            <input type="radio" id="item" name="tabs">
+                            <label class="tab" for="item">Item</label>
+                            <input type="radio" id="break" name="tabs">
+                            <label class="tab" for="break">Break</label>
+                            <span class="glider"></span>
+                        </div>
+                    </div><span class="fieldText">Sprite<br>Type</span>
+                </div>
             </div>
         </div>
         <!----------------->
         <div class="spriteContainer" id="spriteContainer">
-            <div class="spriteInfo" id="spriteInfo"><strong>Sprite Editor</strong> - F: fill | D: draw | esc: save and
+            <div class="spriteInfo" id="spriteInfo"><strong>Sprite Editor</strong><br> F: fill | D: draw | esc: save and
                 close editor - <em><span class="spriteInfoMode">Mode:</span> <span id="spriteDrawMode">Draw</span></em>
             </div>
             <canvas class="spriteCanvas" id="spriteCanvas" width="584" height="520"></canvas>
