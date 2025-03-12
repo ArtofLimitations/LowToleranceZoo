@@ -11,18 +11,23 @@ let gridSize = 16;
 let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
 let currentSprite = 1;
 
-export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
+export function drawSprite(x, y, tileSizeX, tileSizeY, spriteNumber, colors, context = ctx) {
     const data = getDataFromSheet(spriteNumber) ?? Array(gridSize).fill().map(() => Array(gridSize).fill(2));
     const dark = colors[0];
     const light = colors[1];
     const image = convertToImageData(data, dark, light);
     exportedCtx.putImageData(image, 0, 0);
-    //ctx.save();
-    //ctx.globalCompositeOperation = 'source-over';
-    //ctx.putImageData(image, x * tileSizeX, y * tileSizeY);
-    //ctx.filter = "blur(1px)";
-    ctx.drawImage(exportedCanvas, x * tileSizeX, y * tileSizeY, 32, 32);
-    //ctx.restore();
+ 
+    context.drawImage(exportedCanvas, x * tileSizeX, y * tileSizeY, 32, 32);
+}
+
+export function getSprite(spriteNumber, colors) {
+    const data = getDataFromSheet(spriteNumber) ?? Array(gridSize).fill().map(() => Array(gridSize).fill(2));
+    const dark = colors[0];
+    const light = colors[1];
+    const image = convertToImageData(data, dark, light);
+    exportedCtx.putImageData(image, 0, 0);
+    return exportedCanvas;
 }
 
 export function drawPlayerSprite (x, y, tileSizeX, tileSizeY, spriteNumber, colors) {
@@ -31,7 +36,7 @@ export function drawPlayerSprite (x, y, tileSizeX, tileSizeY, spriteNumber, colo
     const light = colors[1];
     const image = convertToImageData(data, dark, light);
     exportedCtx.putImageData(image, 0, 0)
-    ctx.drawImage(exportedCanvas, x, y, 32, 32);
+    ctx.drawImage(exportedCanvas, x * tileSizeX, y * tileSizeY, 32, 32);
 }
 
 export function drawSpriteImage(x, y, tileSizeX, tileSizeY, image) {

@@ -3,7 +3,7 @@
 const canvas = document.getElementById('lowToleranceCanvas');
 const ctx = canvas.getContext('2d');
  
-export function createBullet (x, y, direction, speed = 16, color = 'red', origin) {
+export function createBullet (x, y, direction, speed = 16, color = 'white', origin = 'player') {
     return {
         x: x * 32,
         y: y * 32,
@@ -14,8 +14,11 @@ export function createBullet (x, y, direction, speed = 16, color = 'red', origin
         origin: origin, // Origin of the bullet
         color: color, // Color of the bullet
         active: true, // Bullet is active until it goes off-screen or hits something
+        layer: origin === "player" ? 2 : 2, // Set layer to 2 if origin is "player", otherwise default to 1
+        type: 'bullet',
 
         update() {
+            
             // Move the bullet based on direction
             switch (this.direction) {
                 case 'up': this.y -= this.speed; break;
@@ -23,9 +26,11 @@ export function createBullet (x, y, direction, speed = 16, color = 'red', origin
                 case 'left': this.x -= this.speed; break;
                 case 'right': this.x += this.speed; break;
             }
-
-            this.oldX = Math.floor(this.x / 32);
-            this.oldY = Math.floor(this.y / 32);
+            this.oldX = Math.floor(this.x / 32) * 32;
+            this.oldY = Math.floor(this.y / 32) * 32;
+            console.log('old:', this.oldX, this.oldY);
+            console.log('new:', this.x, this.y);
+            
 
             // Deactivate bullet if it goes off-screen
             if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
@@ -35,8 +40,10 @@ export function createBullet (x, y, direction, speed = 16, color = 'red', origin
 
         draw() {
             if (this.active) {
-                ctx.fillStyle = 'red';
-                ctx.fillRect(this.x, this.y, 5, 5); // Draw a small square bullet
+                
+                ctx.fillStyle = color;
+                ctx.fillRect(this.x, this.y, 4, 4); // Draw a small square bullet
+              
             }
         }
     };

@@ -1,11 +1,10 @@
 import { loadCombinedData } from './file.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
-import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
+import { drawSprite, drawPlayerSprite, drawSpriteImage } from './sprite.js';
 import { createBullet } from './weapons.js';
-import { playerStats } from './player-stats.js';
 
 // Canvas Configurations
-const displayWidth = 1154;
+const displayWidth = 1474;
 const displayHeight = 800;
 const canvas = document.getElementById('lowToleranceCanvas');
 const scale = 1;
@@ -24,21 +23,29 @@ const tilesX = 36;                   // Board width and height
 const tilesY = 25;
 const hiddenLayers = new Set();      // Set to hold hidden layers
 const keys = {};
-const tilesCanvas = new OffscreenCanvas(4 * tileSizeX, 4 * tileSizeY);
-const tilesCtx = tilesCanvas.getContext('2d');
 
 // board variables
 let board = {};
 let loaded = false;
 
 // Player
-let player = playerStats;
+let player = {
+    x: 10,
+    y: 10,
+    oldX: 10,
+    oldY: 10,
+    layer: 2,
+};
 
-const stepSize = player.stepSize; // Step size for player movement
+const stepSize = 0.5; // Step size for player movement
 
 let bulletArray = [];
 
-let stats = player.stats;
+let stats = {
+    coins: 0,
+    score: 0,
+    lives: 3,
+};
 
 // File info
 export let filename = ''; // ############ File to load ###############
@@ -57,118 +64,59 @@ export function animateGame(currentTime) {
         // Update the position based on the speed and deltaTime
 
         //position += speed * (deltaTime / 1000) * 60;
-         updateBullets(deltaTime);
+        
         lastTime = currentTime;
     }
-    //if (loaded) {
-        //drawBoard();
-      //  renderLayersToMainCanvas(); // Draw the layers onto the main canvas
-    //}
 
     updatePlayer(deltaTime);
-   
-    
+    updateWeapon(deltaTime);
+
     // Loop the animation
     requestAnimationFrame(animateGame);
 }
 // ############ End of main animation function ############ 
 
-function updateBullets(deltaTime) {
+function findPlayerSprite() {
+    for (const key in placedSprites) {
+        const sprite = placedSprites[key];
+        if (sprite.type === 'player') {
+            const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
+            return { layer, x, y, ...sprite }; // Return sprite with position data
+        }
+    }
+    return null; // Return null if no player is found
+}
+
+function updateWeapon(deltaTime) {
 
     bulletArray.forEach((bullet, index) => {
-
+        //console.log('bullet: ', bullet.x / 32, bullet.y / 32);
+        let oldTiles = getOverlappingTiles(bullet.x, bullet.y); // Get tiles before update
         bullet.update();
-      
-        renderLayersToMainCanvas();
-        if (!canMoveTo(bullet.x / 32, bullet.y / 32, bullet)) bullet.active = false;
-       
+        let newTiles = getOverlappingTiles(bullet.x, bullet.y); // Get tiles after update
+
+        let affectedTiles = [...new Set([...oldTiles, ...newTiles])]; // Combine old and new tiles
+
+        //let reducedTiles = removeDuplicatesFromSet(affectedTiles); // Remove duplicates
+
+        redrawTiles(affectedTiles); // Redraw the affected tiles
+
+        //console.log('old: ', bullet.oldX, bullet.oldY);
+        //bullet.draw();
+
         // Remove bullets that are inactive
         if (!bullet.active) {
             bulletArray.splice(index, 1);
-            renderLayersToMainCanvas();
         }
     });
     bulletArray = bulletArray.filter(bullet => bullet.active);
 }
 
-const layerCanvases = {}; // Stores canvases for layers
-const layerContexts = {}; // Stores 2D contexts for layers
-
-function getLayerCanvas(layer) {
-    if (!layerCanvases[layer]) {
-        // Create OffscreenCanvas for the layer
-        layerCanvases[layer] = new OffscreenCanvas(tilesX * tileSizeX, tilesY * tileSizeY);
-        layerContexts[layer] = layerCanvases[layer].getContext('2d');
-    }
-    return layerContexts[layer];
-}
-
-function drawBoard() {
-    const sortedLayers = [1, 2, 3];
-
-    for (const layer of sortedLayers) {
-        const ctx = getLayerCanvas(layer);
-
-        // CLEAR OFFSCREEN CANVAS BEFORE DRAWING
-        ctx.clearRect(0, 0, layerCanvases[layer].width, layerCanvases[layer].height);
-
-        Object.keys(placedSprites)
-            .map(key => {
-                const [l, x, y] = key.split(',').map(Number);
-                return { l, x, y, ...placedSprites[key] };
-            })
-            .filter(sprite => sprite.l === layer) // Get only sprites for this layer
-            .forEach(sprite => {
-                if (sprite.type !== 'player') drawSpriteToCanvas(ctx, sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
-            });
-
-        //console.log(`Layer ${layer} generated`);
-    }
-}
-
-function updateTile(layer, x, y) {
-    const ctx = getLayerCanvas(layer);
-    
-    // Clear only the affected tile instead of the whole layer
-    ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
-
-    const spriteKey = `${layer},${x},${y}`;
-    if (placedSprites[spriteKey]) {
-        const sprite = placedSprites[spriteKey];
-        drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
-    }
-}
-
-function renderLayersToMainCanvas() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the main canvas
-    const sortedLayers = [1, 2, 3];
-
-    for (const layer of sortedLayers) {
-        if (layerCanvases[layer]) {
-            ctx.drawImage(layerCanvases[layer], 0, 0);
-        } else {
-        console.warn(`Layer ${layer} is missing!`); // Debugging
-        }
-        if (layer === player.layer) {
-            //console.log(player);
-            ctx.drawImage(getSprite(player.sprite, player.color), player.x * tileSizeX, player.y * tileSizeY);
-            //drawPlayerSprite(player.x, player.y, tileSizeX, tileSizeY, player.sprite, player.color);
-            bulletArray.forEach (bullet => {
-                bullet.draw(); 
-            });
-        }
-    }
-}
-
-function drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite, color) {
-    drawSprite(x, y, tileSizeX, tileSizeY, sprite, color, ctx); // Draw sprite on given canvas
-}
-
 // Draw the grid of tiles
-/*function drawBoard() {
+function drawBoard() {
     ctx.clearRect(0, 0, tilesX * tileSizeX + 1, tilesY * tileSizeY); // +1 to get rid of the line next to toolbar
     drawSpritesAt();
-}*/
+}
 
 function drawSpritesAt(x = null, y = null) {
     // Collect and sort all placed sprite keys by layer (ascending)
@@ -196,6 +144,65 @@ function drawSpritesAt(x = null, y = null) {
     }
 }
 
+function drawSpritesAtTiles(tileCoordsArray) {
+    // Collect all matching placedSprites keys and organize by layers
+    let spritesByLayer = { 1: [], 2: [], 3: [] }; // Ensure all layers exist
+
+    Object.keys(placedSprites)
+        .map(key => {
+            const [l, sx, sy] = key.split(',').map(Number);
+            return { l, x: sx, y: sy, ...placedSprites[key] }; // Convert key to an object
+        })
+        .filter(sprite => tileCoordsArray.some(coord => coord.x === sprite.x && coord.y === sprite.y)) // Keep only matching tiles
+        .forEach(sprite => {
+            //if (!spritesByLayer[sprite.l]) spritesByLayer[sprite.l] = [];
+            spritesByLayer[sprite.l].push(sprite); // Group by layer
+        });
+
+    // Create a new object with updated order
+    /*
+    const updatedSpritesByLayer = {
+        1: spritesByLayer[1],
+        2: spritesByLayer[2],
+        3: [], // New empty layer inserted between 2 and 4 for bullets
+        4: spritesByLayer[3], // Old layer 3 becomes layer 4
+    };
+
+    spritesByLayer = updatedSpritesByLayer;*/
+
+    // Sort layer keys in ascending order
+    const sortedLayers = Object.keys(spritesByLayer).map(Number).sort((a, b) => a - b);
+
+    // Draw all sprites layer by layer
+    for (const layer of sortedLayers) {
+        if (hiddenLayers.has(layer)) continue; // Skip hidden layers
+
+        for (const sprite of spritesByLayer[layer]) {
+            drawSprite(sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
+        
+        }
+
+        // Draw player after all other sprites on its layer
+        if (layer === player.layer) {
+            
+        bulletArray.forEach(bullet => {
+            //let bulletTiles = getOverlappingTiles(bullet.x, bullet.y);
+            //if (bullet.active && bullet.origin === 'player') {
+            //bulletTiles.forEach(tile => {
+            //if (tile.y < tilesY && tile.x < tilesX) { // Ensure it's within bounds
+            bullet.draw();
+            //}
+            //});
+            //}
+        });
+            drawPlayerSprite(player.x, player.y, tileSizeX, tileSizeY, player.sprite, player.color);
+        }
+         
+        
+    }
+}
+
+
 function getOverlappingTiles(x, y) {
     let leftTile = Math.floor(x / 32);
     let topTile = Math.floor(y / 32);
@@ -210,6 +217,20 @@ function getOverlappingTiles(x, y) {
     ];
 }
 
+/*function redrawTiles(tiles) {
+
+    for (let tile of tiles) {
+        //let tileX = tile.x * 32;
+        //let tileY = tile.y * 32;
+        clearTile(tile.x, tile.y); // Function to clear tile
+        //drawSpritesAt(tile.x, tile.y, tileX, tileY); // Function to re-draw tile
+        //ctx.beginPath();
+        //ctx.fillStyle = 'rgba(146, 27, 27, 0.8)';
+        //ctx.fillRect(tile.x * 32, tile.y * 32, 32, 32);
+    }
+    drawSpritesAtTiles(tiles);
+}*/
+
 function redrawTiles(tiles) {
     // Clear each tile first
     for (let tile of tiles) {
@@ -221,6 +242,10 @@ function redrawTiles(tiles) {
 
 function clearTile(x, y) {
     ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
+    //const key = `${player.layer},${x},${y}`;
+    /*if (placedSprites[key]) {
+        drawSpritesAt(x, y);
+    }*/
 }
 
 function checkTiles(x, y, direction) {
@@ -245,36 +270,27 @@ function checkTiles(x, y, direction) {
     }
 }
 
-function canMoveTo(x, y, object = player) {
+function canMoveTo(x, y) {
     //return !placedSprites[`${player.layer},${x},${y}`] || placedSprites[`${player.layer},${x},${y}`].type !== "wall";
     //let tiles = getOverlappingTiles(x * 32, y * 32);
-    if (object.type === 'bullet') {
-        x = x - .5;
-        y = y - .5;
-    }
-    let tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
+    let tiles = checkTiles(x * tileSizeX, y * tileSizeY, player.direction);
 
-    console.log(tiles);
+    //console.log(tiles);
 
     for (let tile of tiles) {
-        let tileKey = `${object.layer},${tile.x},${tile.y}`;
+        let tileKey = `${player.layer},${tile.x},${tile.y}`;
 
         if (tile.x < 0 || tile.y < 0 || tile.y >= tilesY || tile.x >= tilesX) {
             return false; // Out of bounds = collision
         }
         if (placedSprites[tileKey]) {
-            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'wall' || placedSprites[tileKey].type === 'break') {
-                if (object.type === 'bullet' && placedSprites[tileKey].type === 'break') {
-                    delete placedSprites[tileKey];
-                    updateTile(object.layer, tile.x, tile.y);
-                }
+            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'wall') {
                 return false; // Collision detected
             }
-            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'item' && object.type === 'player') {
+            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'item') {
                 stats.coins++; // for testing
                 console.log('coins: ', stats.coins);
                 delete placedSprites[tileKey];
-                updateTile(player.layer, tile.x, tile.y);
                 return true;
             }
         }
@@ -287,7 +303,7 @@ function updatePlayer(deltaTime) {
     if (accumulatedTime < moveSpeed) return; // Wait for the next frame
     accumulatedTime = 0;
 
-    //let oldTiles = getOverlappingTiles(player.x * 32, player.y * 32);
+    let oldTiles = getOverlappingTiles(player.x * 32, player.y * 32);
     let newX = player.x;
     let newY = player.y;
     // old x and y?
@@ -314,18 +330,21 @@ function updatePlayer(deltaTime) {
         player.x = newX;
         player.y = newY;
 
-        //let newTiles = getOverlappingTiles(player.x * 32, player.y * 32);
+        let newTiles = getOverlappingTiles(player.x * 32, player.y * 32);
 
-        //let uniqueTiles = [...new Set([...oldTiles, ...newTiles])];
+        let uniqueTiles = [...new Set([...oldTiles, ...newTiles])];
+        //let uniqueTiles = [...new Set([...oldTiles])];
 
         placedSprites[newKey] = placedSprites[oldKey];
         delete placedSprites[oldKey];
 
-        //drawLayersAtTiles(uniqueTiles);
-        //redrawLayers(player.x * 32, player.y * 32);
-        //drawTileAt(player.x, player.y, player.layer); // Updates a single tile at (5,5) on layer 2
-        renderLayersToMainCanvas();
-        //redrawTiles(uniqueTiles);
+        //console.log(uniqueTiles);
+        redrawTiles(uniqueTiles);
+        //drawSpritesAt(player.x, player.y);
+
+        //console.log('player: ', player.x, player.y);
+        //console.log('oldkey: ', oldKey);
+        //console.log(player.direction);
     }
 }
 
@@ -346,78 +365,14 @@ function handleLoadedGame(spriteSheetData, boardData) {
 
     console.log(player);
 
-    drawBoard(); // Generate all layers
-    renderLayersToMainCanvas(); // Draw them onto the main canvas
-
-    //drawBoard(); //<------------------------------------- Draw function for entire board
+    drawBoard(); //<------------------------------------- Draw function for entire board
 }
 
-function findPlayerSprite() {
-    for (const key in placedSprites) {
-        const sprite = placedSprites[key];
-        if (sprite.type === 'player') {
-            const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
-            return { layer, x, y, ...sprite }; // Return sprite with position data
-        }
-    }
-    return null; // Return null if no player is found
-}
 
-document.addEventListener("keydown", (event) => {
-    keys[event.key] = true;
-
-    if (event.key === "l") {
-        loadCombinedData(handleLoadedGame);
-    }
-
-    if (event.key === " ") { // Spacebar to shoot
-        bulletArray.push(createBullet(player.x + 0.5, player.y + 0.5, player.direction));
-    }
-
-    updateDirection(); // Update direction based on keys held
-});
-
-document.addEventListener("keyup", (event) => {
-    keys[event.key] = false;
-    updateDirection(); // Update direction when key is released
-});
-
-// Function to determine the correct direction
-function updateDirection() {
-    if (keys["ArrowUp"]) {
-        player.direction = "up";
-    } else if (keys["ArrowDown"]) {
-        player.direction = "down";
-    } else if (keys["ArrowLeft"]) {
-        player.direction = "left";
-    } else if (keys["ArrowRight"]) {
-        player.direction = "right";
-    }
-}
-
-/*
 document.addEventListener("keydown", (event) => {
     keys[event.key] = true;
     if (event.key === "l") {
         loadCombinedData(handleLoadedGame);
-    }
-
-    if (event.key === " ") { // Spacebar to shoot
-        switch (player.direction) {
-            case 'up':
-                bulletArray.push(createBullet(player.x + .5, player.y, player.direction));
-                break;
-            case 'down':
-                bulletArray.push(createBullet(player.x + .5, player.y, player.direction));
-                break;
-            case 'left':
-                bulletArray.push(createBullet(player.x, player.y + .5, player.direction));
-                break;
-            case 'right':
-                bulletArray.push(createBullet(player.x, player.y + .5, player.direction));
-                break;
-        }
-        //bulletArray.push(createBullet(player.x + .5, player.y + .5, player.direction));
     }
 
     switch (event.key) {
@@ -433,12 +388,17 @@ document.addEventListener("keydown", (event) => {
         case 'ArrowRight':
             player.direction = 'right';
             break;
+        case ' ':
+            // Shoot a bullet
+            bulletArray.push(createBullet(player.x + .5, player.y + .5, player.direction, 16, 'white', 'player'));
+            //bulletArray.push(createBullet(player.x, player.y, player.direction));
+            break;
     }
 
 });
 document.addEventListener("keyup", (event) => {
     keys[event.key] = false;
-});*/
+});
 
 // Initiate
 
