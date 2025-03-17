@@ -244,7 +244,7 @@ function checkTiles(x, y, direction) {
             { x: rightTile, y: bottomTile },];
     }
 }
-
+/*
 function canMoveTo(x, y, object = player) {
     //return !placedSprites[`${player.layer},${x},${y}`] || placedSprites[`${player.layer},${x},${y}`].type !== "wall";
     //let tiles = getOverlappingTiles(x * 32, y * 32);
@@ -277,10 +277,137 @@ function canMoveTo(x, y, object = player) {
                 updateTile(player.layer, tile.x, tile.y);
                 return true;
             }
+            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'push') {
+                let checkX = tile.x;
+                let checkY = tile.y;
+                switch (object.direction) {
+                    case 'up':
+                        checkY -= 1;
+                        break;
+                    case 'down':
+                        checkY += 1;
+                        break;
+                    case 'left':
+                        checkX -= 1;
+                        break;
+                    case 'right':
+                        checkX += 1;
+                        break;
+                }
+                let newTiles = checkTiles(checkX, y * checkY, object.direction);
+                if (placedSprites[`${object.layer},${newTiles}`]) {
+                    return false;
+                } else {
+                    placedSprites[tileKey] = placedSprites[`${object.layer},${newTiles}`];
+                    delete placedSprites[tileKey];
+                    updateTile(player.layer, tile.x, tile.y);
+                    return true;
+                }
+            }
+        }
+    }
+    return true;
+}*/
+function canMoveTo(x, y, object = player) {
+    if (object.type === 'bullet') {
+        x = x - 0.5;
+        y = y - 0.5;
+    }
+
+    let tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
+
+    for (let tile of tiles) {
+        let tileKey = `${object.layer},${tile.x},${tile.y}`;
+
+        if (tile.x < 0 || tile.y < 0 || tile.y >= tilesY || tile.x >= tilesX) {
+            return false; // Out of bounds = collision
+        }
+
+        if (placedSprites[tileKey]) {
+            let tileType = placedSprites[tileKey].type;
+
+            // Collision with walls or unbreakable objects
+            if (tileType === 'wall' || tileType === 'break') {
+                if (object.type === 'bullet' && tileType === 'break') {
+                    delete placedSprites[tileKey];
+                    updateTile(object.layer, tile.x, tile.y);
+                }
+                return false;
+            }
+
+            // Picking up an item
+            if (tileType === 'item' && object.type === 'player') {
+                stats.coins++;
+                console.log('Coins:', stats.coins);
+                delete placedSprites[tileKey];
+                updateTile(player.layer, tile.x, tile.y);
+                return true;
+            }
+
+            // If it's a pushable block
+            if (tileType === 'push') {
+                return tryPushTiles(tile.x, tile.y, object.direction, object.layer);
+               
+            }
         }
     }
     return true;
 }
+
+function tryPushTiles(startX, startY, direction, layer) {
+    let pushTiles = [];
+    let x = startX;
+    let y = startY;
+
+    // Move in the specified direction and collect pushable tiles
+    while (true) {
+        let key = `${layer},${x},${y}`;
+        if (!placedSprites[key] || placedSprites[key].type !== 'push') break;
+        
+        pushTiles.push({ x, y }); // Add to list of pushable tiles
+
+        // Move to next tile in the same direction
+        switch (direction) {
+            case 'up': y -= 1; break;
+            case 'down': y += 1; break;
+            case 'left': x -= 1; break;
+            case 'right': x += 1; break;
+        }
+    }
+
+    // The last tile in pushTiles is the final pushable tile
+    let lastTile = pushTiles[pushTiles.length - 1];
+    let newX = lastTile.x;
+    let newY = lastTile.y;
+
+    // Check if there is space at the end to move everything
+    switch (direction) {
+        case 'up': newY -= 1; break;
+        case 'down': newY += 1; break;
+        case 'left': newX -= 1; break;
+        case 'right': newX += 1; break;
+    }
+
+    let pushKey = `${layer},${newX},${newY}`;
+    if (placedSprites[pushKey]) {
+        return false; // If blocked, return false (don't push)
+    }
+
+    // Move all pushable tiles forward
+    for (let i = pushTiles.length - 1; i >= 0; i--) {
+        let oldKey = `${layer},${pushTiles[i].x},${pushTiles[i].y}`;
+        let newKey = `${layer},${pushTiles[i].x + (newX - lastTile.x)},${pushTiles[i].y + (newY - lastTile.y)}`;
+
+        placedSprites[newKey] = placedSprites[oldKey]; // Move tile
+        delete placedSprites[oldKey]; // Remove from old position
+
+        updateTile(layer, pushTiles[i].x, pushTiles[i].y);
+        updateTile(layer, pushTiles[i].x + (newX - lastTile.x), pushTiles[i].y + (newY - lastTile.y));
+    }
+
+    return true; // Movement allowed
+}
+
 
 function updatePlayer(deltaTime) {
     accumulatedTime += deltaTime;
@@ -338,7 +465,7 @@ function handleLoadedGame(spriteSheetData, boardData) {
 
     loaded = true;
     player = findPlayerSprite();
-    stats = {
+    stats = { // update this. loads with board / player stats
         coins: 0,
         score: 0,
         lives: 3
@@ -348,8 +475,6 @@ function handleLoadedGame(spriteSheetData, boardData) {
 
     drawBoard(); // Generate all layers
     renderLayersToMainCanvas(); // Draw them onto the main canvas
-
-    //drawBoard(); //<------------------------------------- Draw function for entire board
 }
 
 function findPlayerSprite() {
@@ -394,51 +519,6 @@ function updateDirection() {
         player.direction = "right";
     }
 }
-
-/*
-document.addEventListener("keydown", (event) => {
-    keys[event.key] = true;
-    if (event.key === "l") {
-        loadCombinedData(handleLoadedGame);
-    }
-
-    if (event.key === " ") { // Spacebar to shoot
-        switch (player.direction) {
-            case 'up':
-                bulletArray.push(createBullet(player.x + .5, player.y, player.direction));
-                break;
-            case 'down':
-                bulletArray.push(createBullet(player.x + .5, player.y, player.direction));
-                break;
-            case 'left':
-                bulletArray.push(createBullet(player.x, player.y + .5, player.direction));
-                break;
-            case 'right':
-                bulletArray.push(createBullet(player.x, player.y + .5, player.direction));
-                break;
-        }
-        //bulletArray.push(createBullet(player.x + .5, player.y + .5, player.direction));
-    }
-
-    switch (event.key) {
-        case 'ArrowUp':
-            player.direction = 'up';
-            break;
-        case 'ArrowDown':
-            player.direction = 'down';
-            break;
-        case 'ArrowLeft':
-            player.direction = 'left';
-            break;
-        case 'ArrowRight':
-            player.direction = 'right';
-            break;
-    }
-
-});
-document.addEventListener("keyup", (event) => {
-    keys[event.key] = false;
-});*/
 
 // Initiate
 

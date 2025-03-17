@@ -48,6 +48,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return data;
     }
 
+    function createPlayer() {
+        placedSprites[`${player.layer},${player.x},${player.y}`] = {
+            sprite: 1,
+            image: getSpriteImage(),
+            color: [[0, 0, 255, .5], [255, 255, 255, 1]],
+            type: 'player',
+            direction: 'down',
+            layer: 2
+        };
+    }
+
     // DRAW EVERY TILE
 
     // Draw the grid of tiles
@@ -145,6 +156,84 @@ document.addEventListener('DOMContentLoaded', () => {
         return { x, y };
     }
 
+    // Helper Function for Color Similarity
+    function isSimilarColor(color1, color2, tolerance = 30) {
+        if (!color1 || !color2) return false; // Prevent errors if one is empty
+        const [r1, g1, b1] = color1[0]; // Extract primary color (ignoring alpha)
+        const [r2, g2, b2] = color2[0];
+    
+        return (
+            Math.abs(r1 - r2) < tolerance &&
+            Math.abs(g1 - g2) < tolerance &&
+            Math.abs(b1 - b2) < tolerance
+        );
+    }
+
+    // Flood fill algorithm
+    function floodFill(startX, startY, newSpriteData, useColorComparison = false) {
+        const startKey = `${currentLayer},${startX},${startY}`;
+        const startTile = placedSprites[startKey] || null; // Get starting tile or null if empty
+    
+        // Store the starting color or sprite type
+        const startColor = startTile ? startTile.color : null;
+        const startSprite = startTile ? startTile.sprite : null;
+    
+        // Stack for iterative flood fill
+        const stack = [[startX, startY]];
+        const visited = new Set();
+    
+        while (stack.length > 0) {
+            const [x, y] = stack.pop();
+            const key = `${currentLayer},${x},${y}`;
+
+            // **Boundary Check**: Ensure x and y are within valid board range
+        if (x < 0 || y < 0 || x >= 36 || y >= 25) continue; 
+    
+            // Avoid re-processing the same tile
+            if (visited.has(key)) continue;
+            visited.add(key);
+    
+            const currentTile = placedSprites[key] || null; // Get tile, or null if empty
+            const currentColor = currentTile ? currentTile.color : null;
+            const currentSprite = currentTile ? currentTile.sprite : null;
+    
+            // **Determine if the tile should be filled**
+            let shouldFill = false;
+            if (useColorComparison) {
+                shouldFill = !currentTile || isSimilarColor(startColor, currentColor);
+            } else {
+                shouldFill = !currentTile || currentSprite === startSprite;
+            }
+    
+            if (!shouldFill) continue; // Skip if the tile doesn't match the criteria
+    
+            // Fill the tile with the new sprite and color
+            placedSprites[key] = {
+                ...newSpriteData,
+                type: newSpriteData.type || (currentTile ? currentTile.type : "wall") // Default to "floor" if empty
+            };
+    
+            // Add neighboring tiles to the stack
+            const neighbors = [
+                [x + 1, y], // Right
+                [x - 1, y], // Left
+                [x, y + 1], // Down
+                [x, y - 1], // Up
+            ];
+            for (const [nx, ny] of neighbors) {
+                const neighborKey = `${currentLayer},${nx},${ny}`;
+                if (!visited.has(neighborKey)) {
+                    stack.push([nx, ny]);
+                }
+            }
+        }
+    
+        // Redraw the board after flood fill
+        drawBoard();
+    }
+    
+    
+
     // grab the sprite at cursor when Enter key or right click
     function grabSprite(tileKey) {
         if (placedSprites[tileKey] !== undefined) {
@@ -162,44 +251,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle placing/removing sprites
     function handleTileClick(event) {
-
-        const [x, y] = [mouse.x, mouse.y]
+        const [x, y] = [mouse.x, mouse.y];
         const tileKey = `${currentLayer},${x},${y}`;
         [cursorX, cursorY] = [x, y];
+    
         console.log(`mouse: cursor ${cursorX},${cursorY}`);
+    
         switch (event.button) {
-            case 2: // right mouse button
+            case 2: // Right mouse button (Grab sprite)
                 grabSprite(tileKey);
                 break;
-            case 0: // left mouse button
-                if (placedSprites[tileKey]) {
-                    // Remove sprite if it exists
-                    if (placedSprites[tileKey].type != 'player') delete placedSprites[tileKey];
-                } else {
-                    // Place sprite
-                    placedSprites[tileKey] = {
-                        sprite: currentSprite,    // add current selected sprite (number)
-                        image: getSpriteImage(),   // add sprite data (2D array)
-                        color: colors,            // add current colors from palette (array)
+            case 0: // Left mouse button
+                if (mouse.mode === 'draw') {
+                    if (placedSprites[tileKey]) {
+                        // Remove sprite if it exists (except player)
+                        if (placedSprites[tileKey].type !== 'player') delete placedSprites[tileKey];
+                    } else {
+                        // Place sprite
+                        placedSprites[tileKey] = {
+                            sprite: currentSprite,
+                            image: getSpriteImage(),
+                            color: colors,
+                            type: type
+                        };
+                    }
+                } else if (mouse.mode === 'fill') {
+                    // Pressing SHIFT enables color-based filling
+                    const useColorComparison = key.shift;
+    
+                    // Perform Flood Fill
+                    floodFill(cursorX, cursorY, {
+                        sprite: currentSprite,
+                        image: getSpriteImage(),
+                        color: colors,
                         type: type
-                    };
-                    //console.log(placedSprites);
+                    }, useColorComparison);
                 }
                 break;
-            case 1:
+            case 1: // Middle mouse button (Adjust color)
                 if (placedSprites[tileKey]) {
                     const color = [
-                        adjustColor(placedSprites[tileKey].color[0], .1),
-                        adjustColor(placedSprites[tileKey].color[1], .1)
+                        adjustColor(placedSprites[tileKey].color[0], 0.1),
+                        adjustColor(placedSprites[tileKey].color[1], 0.1)
                     ];
                     placedSprites[tileKey].color = color;
-
                 }
         }
-        drawBoard(); //<------------------------------------- Draw function for entire board
-        //DrawSingleTile(); // <---------------------------------------------------- Draw Tile Function 1/2
+    
+        drawBoard();
         toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
-
     }
 
     // callback function for loading board POSSIBLY REMOVE
@@ -249,7 +349,6 @@ document.addEventListener('DOMContentLoaded', () => {
             //toolbarClicked(x, y);
             colors = currentColors;
             console.log('toolbar clicked');
-            
         }
     }
 
@@ -313,8 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         type: type                // default type is wall
                     };
                 };
-                //drawBoard(); // Refresh board
-                //drawSprites();
 
                 break;
             case 'Enter': // add layers later
@@ -405,10 +502,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (confirm('Are you sure you want reset board?')) {
                     placedSprites = {};
                     console.log('Board reset');
+                    createPlayer();
                     drawBoard(); //<------------------------------------- Draw function for entire board
                 } else {
                     console.log('Board not reset');
                 }
+                break;
+            case 'f': // flood fill
+                mouse.mode = 'fill';
+                console.log('flood fill mode');
+                break;
+            case 'd':
+                mouse.mode = 'draw';
+                console.log('draw mode');
                 break;
         }
 
@@ -422,7 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
             }
         }
-        console.log('main hidden:', hiddenLayers);
+        //console.log('main hidden:', hiddenLayers);
         //console.log(`key: cursor ${cursorX},${cursorY}`);
         //drawBoard(); // Redraw the board and cursor
         DrawSingleTile(cursorX, cursorY); // <---------------------------------------------------- Draw Tile Function 2/2
@@ -457,27 +563,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     editorToolbar.onclick = () => {
         colors = currentColors;
-        //canvas.focus();
-        console.log('toolbar clicked');
     }
 
     editorToolbar.onmouseup = () => {
         canvas.focus();
     }
 
-    //document.getElementById('saveBoard').addEventListener('click', saveBoard(placedSprites));
-
-    // Initial player setup
-    placedSprites[`${player.layer},${player.x},${player.y}`] = {
-        sprite: 1,
-        image: getSpriteImage(),
-        color: [[0, 0, 255, .5], [255, 255, 255, 1]],
-        type: 'player',
-        direction: 'down',
-        layer: 2
-    };
-
-    // Initial canvas setup
+    // Initial board setup
+    createPlayer();
     addMainEvents();
     toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
     drawBoard(); //<------------------------------------- Draw function for entire board

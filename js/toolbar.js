@@ -15,7 +15,8 @@ const paletteButton = document.getElementById('paletteButton');
 const spriteButton = document.getElementById('spriteButton');
 const layerButtons = [null, document.getElementById('layer1Button'), document.getElementById('layer2Button'), document.getElementById('layer3Button')];
 const boardLayers = [null, document.getElementById('layer1'), document.getElementById('layer2'), document.getElementById('layer3')];
-const spriteTypes = [document.getElementById('wall'), document.getElementById('item'), document.getElementById('break')];
+const spriteTypes = [document.getElementById('wall'), document.getElementById('item'), document.getElementById('break'), document.getElementById('push')];
+const editMode = document.getElementById('editMode');
 
 //const toolBarSize = 320; // Right side toolbar sized in tiles
 let colors = [[0, 0, 0, 1], [255, 255, 255, 1]];
@@ -119,6 +120,8 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
       
     }
   });
+
+  editMode.innerText = mouseStatus.mode;
 
 }
 

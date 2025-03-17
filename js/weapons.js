@@ -3,7 +3,7 @@
 const canvas = document.getElementById('lowToleranceCanvas');
 const ctx = canvas.getContext('2d');
  
-export function createBullet (x, y, direction, speed = 16, color = 'white', origin = 'player') {
+export function createBullet (x, y, direction, speed = 16, color = 'pink', origin = 'player') {
     return {
         x: x * 32,
         y: y * 32,

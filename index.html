@@ -51,14 +51,17 @@
                             <label class="tab" for="item">Item</label>
                             <input type="radio" id="break" name="tabs">
                             <label class="tab" for="break">Break</label>
+                            <input type="radio" id="push" name="tabs">
+                            <label class="tab" for="push">Push</label>
                             <span class="glider"></span>
                         </div>
-                    </div><span class="fieldText">Sprite<br>Type</span>
+                    </div><span class="fieldText">Tile<br>Type</span>
                 </div>
+                <div class="fieldRow"><span class="valueBox valueText" id="editMode"> Draw </span><span class="fieldText">Edit<br> Mode</span></div>
             </div>
         </div>
         <!----------------->
-        <div class="spriteContainer" id="spriteContainer">
+        <div class="spriteContainer" id="spriteContainer" oncontextmenu="event.preventDefault();">
             <div class="spriteInfo" id="spriteInfo"><strong>Sprite Editor</strong><br> F: fill | D: draw | esc: save and
                 close editor - <em><span class="spriteInfoMode">Mode:</span> <span id="spriteDrawMode">Draw</span></em>
             </div>

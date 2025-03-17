@@ -160,6 +160,9 @@ h3 {
   text-align: center;
   line-height: 2;
 }
+.lowToleranceToolbar .valueBox.valueText {
+  width: auto;
+}
 
 .lowToleranceToolbar .imageBox {
   background-color: #131313;
@@ -240,6 +243,10 @@ h3 {
 
 .lowToleranceToolbar .container input[id="break"]:checked ~ .glider {
   transform: translateX(200%);
+}
+
+.lowToleranceToolbar .container input[id="push"]:checked ~ .glider {
+  transform: translateX(300%);
 }
 
 .lowToleranceToolbar .glider {
