@@ -14,6 +14,7 @@ const swapColor = document.getElementById('swapButton');
 const paletteButton = document.getElementById('paletteButton');
 const spriteButton = document.getElementById('spriteButton');
 const layerButtons = [null, document.getElementById('layer1Button'), document.getElementById('layer2Button'), document.getElementById('layer3Button')];
+const layerOpacity = document.getElementById('3-opacity');
 const boardLayers = [null, document.getElementById('layer1'), document.getElementById('layer2'), document.getElementById('layer3')];
 const spriteTypes = [document.getElementById('wall'), document.getElementById('item'), document.getElementById('break'), document.getElementById('push')];
 const editMode = document.getElementById('editMode');
@@ -121,6 +122,10 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
     }
   });
 
+  layerOpacity.onchange = () => {
+    console.log('opacity:', layerOpacity.value * 5);
+  }
+
   editMode.innerText = mouseStatus.mode;
 
 }
@@ -133,124 +138,3 @@ export function updateType (type) { // Update sprite type in toolbar
     }
   });
 }
-/*
-  // Draw Dark Color
-  ctx.beginPath();
-  ctx.rect(leftSide + 80, 548 - 16, 32, 32);
-  ctx.fillStyle = `rgba(${colors[0][0]},${colors[0][1]}, ${colors[0][2]}, ${colors[0][3]})`;
-  ctx.fill();
-
-  // Draw Light Color
-  ctx.beginPath();
-  ctx.rect(leftSide + 152, 548 - 16, 32, 32);
-  ctx.fillStyle = `rgba(${colors[1][0]},${colors[1][1]}, ${colors[1][2]}, ${colors[1][3]})`;
-  ctx.fill();
-
-  // Draw layer number
-  ctx.beginPath();
-  ctx.fillStyle = '#222';
-  ctx.fillRect(leftSide, 632, 76, 32);
-
-  ctx.beginPath();
-  ctx.fillStyle = "#f7f8f3";
-  ctx.font = "16px Helvetica, Arial, Sans-Serif";
-  ctx.fillText('Layer:', leftSide + 10, 654);
-
-  ctx.beginPath();
-  ctx.fillStyle = "#addcca";
-  ctx.font = "16px Helvetica, Arial, Sans-Serif";
-  ctx.fillText(layer, leftSide + 58, 654);
-
-  // Status Bar
-  ctx.beginPath();
-  ctx.fillStyle = '#222';
-  ctx.fillRect(leftSide, canvas.height - 32, canvas.width, canvas.height);
-
-  ctx.beginPath();
-  ctx.fillStyle = "#f7f8f3";
-  ctx.font = "16px Helvetica, Arial, Sans-Serif";
-  ctx.fillText('Mode:', leftSide + 10, canvas.height - 11);
-
-  ctx.beginPath();
-  ctx.fillStyle = "#addcca";
-  ctx.font = "16px Helvetica, Arial, Sans-Serif";
-  ctx.fillText(mouseStatus.mode, leftSide + 58, canvas.height - 11);
-
-  ctx.beginPath();
-  ctx.fillStyle = "#f7f8f3";
-  ctx.font = "16px Helvetica, Arial, Sans-Serif";
-  ctx.fillText('x:     y:', leftSide + 110, canvas.height - 11);
-
-  ctx.beginPath();
-  ctx.fillStyle = "#addcca";
-  ctx.font = "16px Helvetica, Arial, Sans-Serif";
-  ctx.fillText(mouseStatus.x, leftSide + 124, canvas.height - 11);
-  ctx.fillText(mouseStatus.y, leftSide + 160, canvas.height - 11);
-
-  // Draw buttons
-  buttons.forEach(button => {
-    switch (button.type) {
-      case 'text':
-        // Draw toolbar TEXT buttons
-        ctx.fillStyle = '#f7f8f3';
-        ctx.fillRect(leftSide + button.x, button.y, button.width, button.height);
-
-        ctx.fillStyle = '#222';
-        ctx.font = '16px Arial';
-        ctx.fillText(button.label, leftSide + button.x + 10, button.y + 25);
-        break;
-      case 'icon':
-        // Draw toolbar ICON buttons
-        ctx.beginPath();
-        ctx.filter = "blur(8px)";
-        ctx.fillStyle = '#333';
-        ctx.beginPath();
-        ctx.filter = "none";
-        ctx.fillRect(leftSide + button.x, button.y, button.width, button.height + 2);
-        ctx.fillStyle = '#555';
-        ctx.fillRect(leftSide + button.x, button.y, button.width, button.height);
-
-        ctx.fillStyle = '#eee';
-        //ctx.font = '16px Arial';
-        ctx.font = '16px Material Symbols Outlined';
-        ctx.fillText(button.label, leftSide + button.x + 9, button.y + 23);
-        break;
-    }
-  });
-}
-
-function isInsideButton(bX, x, y, button) {
-  return (
-    x > bX + button.x && x < bX + button.x + button.width &&
-    y > button.y && y < button.y + button.height
-  );
-}
-
-export function toolbarClicked(x, y) {
-  let offsetX = canvas.width - toolBarSize;
-  buttons.forEach(button => {
-    if (isInsideButton(offsetX, x, y, button)) {
-      //alert(`${button.label} clicked!`);
-      switch (button.label) {
-        case 'palette':
-          removeMainEvents(); // remove main.js canvas events
-          pickColor(); // pick a color from palette.js
-          break;
-        case 'swap_horiz':
-          colors = toolbarSwapColor(); // swap colors from palette.js
-          // Draw Dark Color
-          ctx.beginPath();
-          ctx.rect(offsetX + 80, 548 - 16, 32, 32);
-          ctx.fillStyle = `rgba(${colors[0][0]},${colors[0][1]}, ${colors[0][2]}, ${colors[0][3]})`;
-          ctx.fill();
-
-          // Draw Light Color
-          ctx.beginPath();
-          ctx.rect(offsetX + 152, 548 - 16, 32, 32);
-          ctx.fillStyle = `rgba(${colors[1][0]},${colors[1][1]}, ${colors[1][2]}, ${colors[1][3]})`;
-          ctx.fill();
-          break;
-      }
-    }
-  });
-}*/

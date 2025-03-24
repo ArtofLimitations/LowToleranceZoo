@@ -36,7 +36,7 @@
                         class="material-symbols-outlined" id="swapButton" title="Swap colors">swap_horiz</button> <span
                         class="colorBox" id="colorBoxLight">L </span></div>
                 <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
-                <div class="fieldRow"><button class="material-symbols-outlined" id="layer3Button" title="Layer 3">visibility</button><span class="layerBox" id="layer3">Layer 3</span> </div>
+                <div class="fieldRow"><button class="material-symbols-outlined" id="layer3Button" title="Layer 3">visibility</button><span class="layerBox" id="layer3">Layer 3</span> <label class="slider"><input type="range" class="level" id="3-opacity" name="Layer 3 opacity" min="0" max="20" value="20"/></label> </div>
 
                 <div class="fieldRow"><button class="material-symbols-outlined" id="layer2Button" title="Layer 2">visibility</button><span class="layerBox" id="layer2">Layer 2</span> </div>
 
@@ -57,6 +57,9 @@
                         </div>
                     </div><span class="fieldText">Tile<br>Type</span>
                 </div>
+                <div class="fieldRow"><span class="fieldCategory">Terrain</span></div>
+                <div class="fieldRow"><span class="fieldCategory">Item</span></div>
+                <div class="fieldRow"><span class="fieldCategory">Creatures</span></div>
                 <div class="fieldRow"><span class="valueBox valueText" id="editMode"> Draw </span><span class="fieldText">Edit<br> Mode</span></div>
             </div>
         </div>
@@ -93,7 +96,7 @@
             <p><strong>Script Editor</strong></p>
             <div class="editorTextContainer" id="editorTextContainer">
                 <div class="fieldContainer"><input type="text" id="objectName" placeholder="Enter name"></div>
-                <div class="textEditorContainer"><textarea id="objectTextEditor" placeholder="Code here..."
+                <div class="textEditorContainer"><textarea id="textEditor" placeholder="Code here..."
                         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
                 </div>
             </div>

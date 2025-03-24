@@ -34,6 +34,55 @@ h3 {
   width: 100%;
 }
 
+.slider {
+  --slider-width: 40%;
+  --slider-height: 6px;
+  --slider-bg: rgb(82, 82, 82);
+  --slider-border-radius: 99px;
+
+  --level-color: #fff;
+  --level-transition-duration: .1s;
+}
+
+.slider {
+  cursor: pointer;
+  display: -webkit-inline-box;
+  display: -ms-inline-flexbox;
+  display: inline-flex;
+  -webkit-box-orient: horizontal;
+  
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+}
+
+.slider .level {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: var(--slider-width);
+  height: var(--slider-height);
+  background: var(--slider-bg);
+  overflow: hidden;
+  border-radius: var(--slider-border-radius);
+  -webkit-transition: height var(--level-transition-duration);
+  -o-transition: height var(--level-transition-duration);
+  transition: height var(--level-transition-duration);
+  cursor: inherit;
+}
+
+.slider .level::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 0;
+  height: 0;
+  -webkit-box-shadow: -200px 0 0 200px var(--level-color);
+  box-shadow: -200px 0 0 200px var(--level-color);
+}
+
+.slider:hover .level {
+  height: calc(var(--slider-height) * 2);
+}
+
 .material-symbols-outlined {
   font-variation-settings:
   'FILL' 1,
@@ -58,7 +107,8 @@ h3 {
   top: 0;
   left: 0;
   margin: auto;
-  border: 1px dashed #969977 !important;
+  /*border: 1px dashed #969977 !important;*/
+  box-shadow: rgba(50, 50, 93, 0.25) 0px 13px 27px -5px, rgba(0, 0, 0, 0.3) 0px 8px 16px -8px;
   outline: none;
 }
 
@@ -84,7 +134,7 @@ h3 {
 .lowToleranceCanvas:focus,
 .lowToleranceCanvas:active
 {
-  border: 1px dashed #bdd109 !important;
+  /*border: 1px dashed #bdd109 !important;*/
   outline: none;
 }
 
@@ -260,6 +310,18 @@ h3 {
   transition: 0.25s ease-out;
 }
 
+.lowToleranceToolbar .fieldCategory {
+  height: 32px;
+  width: 100px;
+  background-color: #2e4675;
+  line-height: 2;
+  padding-left: 8px;
+}
+
+.lowToleranceToolbar .fieldCategory:hover {
+  background-color: #5f76aa;
+}
+
 .playCanvas {
   background-color: #000;
 }
@@ -409,46 +471,13 @@ h3 {
  
 }
 
-/*
-.block {
-    
-    box-sizing: border-box;
-    width: 100%; 
-    border: 1px solid white;
-    margin-left: -100%;
-    padding-left: 124px;
-  
-}
-
-.spriteContainer {
-  
-    background-color: #222;
-    padding: 64px;
-    transform: translate(-400px,50px);
-    width: 600px;
-    margin: 0 auto;
-    
-}
-*/
-
 .lowToleranceCanvas {
-
-  /*background-color: #131313;
-  /*margin: 10px auto;
-    /*padding: 5px;
-    border: 5px solid #f7f8f31a;
-  border-style: none;*/
   border-radius: 4px;
-
 }
 
 .spriteCanvas {
-
   border: 1px solid black;
   image-rendering: pixelated;
-  /* Makes the spriteCanvas appear pixelated */
-  /* background-color: #e5e5f7; */
-  /* background-image: linear-gradient(45deg, #eeeefd 50%, #e5e5f7 50%); */
   background-color: #5f5f64;
   background-image: linear-gradient(45deg, #b1b1b1 50%, #c0c0c5 50%);
   background-size: 16px 16px;

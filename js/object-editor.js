@@ -1,4 +1,11 @@
 const container = document.getElementById('editorContainer');
+const text = document.getElementById('textEditor');
+let textOnly = false;
+let data = null;
+
+export function getObjectData() {
+    return data;
+}
 
 function handleKeyboard(event) {
     switch (event.key) {
@@ -7,7 +14,8 @@ function handleKeyboard(event) {
             removeObjectEvents();
             container.style.display = 'none';
             addMainEvents();
-            break;
+            data = text.value;
+            return text.value;
     }
 }
 
@@ -19,7 +27,12 @@ function removeObjectEvents() {
     document.removeEventListener('keydown', handleKeyboard);
 }
 
-export function editObject () {
+export function editObject (type) {
+    if (type === 'text') {
+        textOnly = true;
+    } else {
+        textOnly = false;
+    }
     container.style.display = 'block';
     addObjectEvents();
 }

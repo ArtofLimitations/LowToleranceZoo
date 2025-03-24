@@ -3,6 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet } from './weapons.js';
 import { playerStats } from './player-stats.js';
+import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
 const displayWidth = 1154;
@@ -30,15 +31,14 @@ const tilesCtx = tilesCanvas.getContext('2d');
 // board variables
 let board = {};
 let loaded = false;
+let nightMode = true;
 
 // Player
 let player = playerStats;
-
+let stats = player.stats;
 const stepSize = player.stepSize; // Step size for player movement
 
 let bulletArray = [];
-
-let stats = player.stats;
 
 // File info
 export let filename = ''; // ############ File to load ###############
@@ -57,17 +57,17 @@ export function animateGame(currentTime) {
         // Update the position based on the speed and deltaTime
 
         //position += speed * (deltaTime / 1000) * 60;
-         updateBullets(deltaTime);
+        updateBullets(deltaTime);
         lastTime = currentTime;
     }
     //if (loaded) {
-        //drawBoard();
-      //  renderLayersToMainCanvas(); // Draw the layers onto the main canvas
+    //drawBoard();
+    //  renderLayersToMainCanvas(); // Draw the layers onto the main canvas
     //}
 
     updatePlayer(deltaTime);
-   
-    
+
+
     // Loop the animation
     requestAnimationFrame(animateGame);
 }
@@ -78,10 +78,10 @@ function updateBullets(deltaTime) {
     bulletArray.forEach((bullet, index) => {
 
         bullet.update();
-      
+
         renderLayersToMainCanvas();
         if (!canMoveTo(bullet.x / 32, bullet.y / 32, bullet)) bullet.active = false;
-       
+
         // Remove bullets that are inactive
         if (!bullet.active) {
             bulletArray.splice(index, 1);
@@ -128,7 +128,7 @@ function drawBoard() {
 
 function updateTile(layer, x, y) {
     const ctx = getLayerCanvas(layer);
-    
+
     // Clear only the affected tile instead of the whole layer
     ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
 
@@ -145,18 +145,34 @@ function renderLayersToMainCanvas() {
 
     for (const layer of sortedLayers) {
         if (layerCanvases[layer]) {
+            ctx.save()
+            if (layer === 3) ctx.filter = 'opacity(0.8)';
+            //if (layer === 2) ctx.filter = 'blur(1px)';
+            //if (layer === 3) ctx.globalCompositeOperation = "lighter";
             ctx.drawImage(layerCanvases[layer], 0, 0);
+            ctx.restore();
         } else {
-        console.warn(`Layer ${layer} is missing!`); // Debugging
+            console.warn(`Layer ${layer} is missing!`); // Debugging
         }
         if (layer === player.layer) {
             //console.log(player);
+            ctx.save();
+            ctx.shadowColor = "white";
+            ctx.shadowBlur = 10;
             ctx.drawImage(getSprite(player.sprite, player.color), player.x * tileSizeX, player.y * tileSizeY);
-            //drawPlayerSprite(player.x, player.y, tileSizeX, tileSizeY, player.sprite, player.color);
-            bulletArray.forEach (bullet => {
-                bullet.draw(); 
+
+            bulletArray.forEach(bullet => {
+                bullet.draw();
             });
+            ctx.restore();
         }
+    }
+    if (nightMode) {
+        ctx.save();
+        ctx.globalCompositeOperation = "overlay";
+        ctx.fillStyle = 'rgba(0, 0, 0, .5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
     }
 }
 
@@ -347,7 +363,7 @@ function canMoveTo(x, y, object = player) {
             // If it's a pushable block
             if (tileType === 'push') {
                 return tryPushTiles(tile.x, tile.y, object.direction, object.layer);
-               
+
             }
         }
     }
@@ -363,7 +379,7 @@ function tryPushTiles(startX, startY, direction, layer) {
     while (true) {
         let key = `${layer},${x},${y}`;
         if (!placedSprites[key] || placedSprites[key].type !== 'push') break;
-        
+
         pushTiles.push({ x, y }); // Add to list of pushable tiles
 
         // Move to next tile in the same direction
@@ -491,32 +507,37 @@ function findPlayerSprite() {
 document.addEventListener("keydown", (event) => {
     keys[event.key] = true;
 
-    if (event.key === "l") {
+    if (event.key === 'l') {
         loadCombinedData(handleLoadedGame);
     }
 
-    if (event.key === " ") { // Spacebar to shoot
+    if (event.key === 'r') {
+        drawBoard(); // Generate all layers
+        renderLayersToMainCanvas(); // Draw them onto the main canvas
+    }
+
+    if (event.key === ' ') { // Spacebar to shoot
         bulletArray.push(createBullet(player.x + 0.5, player.y + 0.5, player.direction));
     }
 
     updateDirection(); // Update direction based on keys held
 });
 
-document.addEventListener("keyup", (event) => {
+document.addEventListener('keyup', (event) => {
     keys[event.key] = false;
     updateDirection(); // Update direction when key is released
 });
 
 // Function to determine the correct direction
 function updateDirection() {
-    if (keys["ArrowUp"]) {
-        player.direction = "up";
-    } else if (keys["ArrowDown"]) {
-        player.direction = "down";
-    } else if (keys["ArrowLeft"]) {
-        player.direction = "left";
-    } else if (keys["ArrowRight"]) {
-        player.direction = "right";
+    if (keys['ArrowUp']) {
+        player.direction = 'up';
+    } else if (keys['ArrowDown']) {
+        player.direction = 'down';
+    } else if (keys['ArrowLeft']) {
+        player.direction = 'left';
+    } else if (keys['ArrowRight']) {
+        player.direction = 'right';
     }
 }
 

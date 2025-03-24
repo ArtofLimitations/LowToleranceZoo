@@ -3,7 +3,7 @@
 const canvas = document.getElementById('lowToleranceCanvas');
 const ctx = canvas.getContext('2d');
  
-export function createBullet (x, y, direction, speed = 16, color = 'pink', origin = 'player') {
+export function createBullet (x, y, direction, speed = 16, color = 'white', origin = 'player') {
     return {
         x: x * 32,
         y: y * 32,
@@ -28,8 +28,8 @@ export function createBullet (x, y, direction, speed = 16, color = 'pink', origi
             }
             this.oldX = Math.floor(this.x / 32) * 32;
             this.oldY = Math.floor(this.y / 32) * 32;
-            console.log('old:', this.oldX, this.oldY);
-            console.log('new:', this.x, this.y);
+            //console.log('old:', this.oldX, this.oldY);
+            //console.log('new:', this.x, this.y);
             
 
             // Deactivate bullet if it goes off-screen

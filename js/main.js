@@ -4,7 +4,7 @@ import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
 import { saveBoard, loadBoard, saveCombinedData, loadCombinedData } from './file.js';
-import { editObject } from './object-editor.js';
+import { editObject, getObjectData } from './object-editor.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Low Tolerance Zoo');
@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Flood fill algorithm
-    function floodFill(startX, startY, newSpriteData, useColorComparison = false) {
+    function floodFill(startX, startY, newSpriteData, useColorComparison = true) {
         const startKey = `${currentLayer},${startX},${startY}`;
         const startTile = placedSprites[startKey] || null; // Get starting tile or null if empty
     
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fill the tile with the new sprite and color
             placedSprites[key] = {
                 ...newSpriteData,
-                type: newSpriteData.type || (currentTile ? currentTile.type : "wall") // Default to "floor" if empty
+                type: newSpriteData.type || (currentTile ? currentTile.type : "wall") // Default to "wall" if empty
             };
     
             // Add neighboring tiles to the stack
@@ -227,19 +227,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
-    
         // Redraw the board after flood fill
         drawBoard();
     }
     
-    
-
     // grab the sprite at cursor when Enter key or right click
     function grabSprite(tileKey) {
         if (placedSprites[tileKey] !== undefined) {
+            if (placedSprites[tileKey].type === 'sign') {
+                /////////////////////////////////////////////////////
+            }
             if (!key.ctrl) { // If the ctrl key isn't pressed then grab the sprite and color else just color
                 currentSprite = placedSprites[tileKey].sprite;
-                type = placedSprites[tileKey].type;
+                if (placedSprites[tileKey].type === 'player') {
+                    type = 'wall'; 
+                } else {
+                    type = placedSprites[tileKey].type;
+                }
                 updateSpriteData(currentSprite);   // from sprite-editor.js
                 updateType(type);                  // from toolbar.js
             }
@@ -272,7 +276,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             sprite: currentSprite,
                             image: getSpriteImage(),
                             color: colors,
-                            type: type
+                            type: type,
+                            data: getObjectData()
                         };
                     }
                 } else if (mouse.mode === 'fill') {
@@ -284,7 +289,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         sprite: currentSprite,
                         image: getSpriteImage(),
                         color: colors,
-                        type: type
+                        type: type,
+                        data: getObjectData()
                     }, useColorComparison);
                 }
                 break;
@@ -409,7 +415,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         sprite: currentSprite,    // add current selected sprite (number)
                         color: colors,            // add current colors from palette (array)
                         image: getSpriteImage(),  // add sprite image data
-                        type: type                // default type is wall
+                        type: type,               // default type is wall
+                        data: getObjectData()     // add extra data for tiles
                     };
                 };
 
@@ -418,22 +425,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 grabSprite(tileKey);
                 if (event.repeat) { return }
                 break;
-            case 'PageUp':
-                if (scale < 2) scale += 0.1;
-                canvas.width = displayWidth * scale;
-                canvas.height = displayHeight * scale;
-                console.log('scale: ', scale);
-                break;
-            case 'PageDown':
-                if (scale > 0.5) scale -= 0.1;
-                canvas.width = displayWidth * scale;
-                canvas.height = displayHeight * scale;
-                console.log('scale: ', scale);
-                break;
-            case 'Insert':
-                type = type === 'wall' ? 'item' : 'wall';
+            case 'pageup':
+                type = type === 'wall' ? 'sign' : 'wall';
                 updateType(type);
                 console.log('type: ', type);
+                if (event.repeat) { return }
+                break;
+            case 'Insert':
+                if (placedSprites[tileKey]) {
+                    if (placedSprites[tileKey].type === 'sign' || placedSprites[tileKey].type === 'object') {
+                        
+                        placedSprites[tileKey].data.text = editObject(); // open object script editor from object-editor.js
+                    }
+                }
+                if (event.repeat) { return }
                 break;
         }
 
