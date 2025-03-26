@@ -16,7 +16,7 @@ const spriteButton = document.getElementById('spriteButton');
 const layerButtons = [null, document.getElementById('layer1Button'), document.getElementById('layer2Button'), document.getElementById('layer3Button')];
 const layerOpacity = document.getElementById('3-opacity');
 const boardLayers = [null, document.getElementById('layer1'), document.getElementById('layer2'), document.getElementById('layer3')];
-const spriteTypes = [document.getElementById('wall'), document.getElementById('item'), document.getElementById('break'), document.getElementById('push')];
+const spriteTypes = [document.getElementById('wall'), document.getElementById('item'), document.getElementById('break'), document.getElementById('push'), document.getElementById('other')];
 const editMode = document.getElementById('editMode');
 
 //const toolBarSize = 320; // Right side toolbar sized in tiles
@@ -66,9 +66,10 @@ layerButtons.forEach((element, index) => {
   }
 });
 
-spriteTypes.forEach((element, index) => { 
+spriteTypes.forEach((element) => { 
   element.onclick = () => {
     const type = element.id;
+    if (type === 'other') return;
     callbackFunction( undefined, undefined, type);
   }
 });
@@ -137,4 +138,10 @@ export function updateType (type) { // Update sprite type in toolbar
       element.checked = true;
     }
   });
+  if (type !== 'wall' && type !== 'item' && type !== 'break' && type !== 'push') {
+    //spriteTypes.forEach((element) => {
+      //element.checked = false;
+    //})
+    spriteTypes[4].checked = true;
+  }
 }

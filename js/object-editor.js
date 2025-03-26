@@ -1,10 +1,14 @@
 const container = document.getElementById('editorContainer');
 const text = document.getElementById('textEditor');
 let textOnly = false;
-let data = null;
+let tileKey = null;
+let objectData = '';
+let callbackFunction = () => { };
 
-export function getObjectData() {
-    return data;
+export function getObjectData(key) {
+    //if (objectData[key] === undefined) return null;
+    console.log('objectData: ', objectData);
+    return objectData;
 }
 
 function handleKeyboard(event) {
@@ -14,8 +18,9 @@ function handleKeyboard(event) {
             removeObjectEvents();
             container.style.display = 'none';
             addMainEvents();
-            data = text.value;
-            return text.value;
+            objectData = text.value;
+            callbackFunction(text.value, tileKey);
+            //return text.value;
     }
 }
 
@@ -27,12 +32,15 @@ function removeObjectEvents() {
     document.removeEventListener('keydown', handleKeyboard);
 }
 
-export function editObject (type) {
+export function editObject (type, script, key, callback) {
     if (type === 'text') {
         textOnly = true;
     } else {
         textOnly = false;
     }
+    tileKey = key;
+    callbackFunction = callback;
+    text.value = script;
     container.style.display = 'block';
     addObjectEvents();
 }

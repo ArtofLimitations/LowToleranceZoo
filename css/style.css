@@ -21,7 +21,7 @@ button {
 }
 
 h1 {
-  color: #303030;
+  color: #ffffff;
   text-align: center;
 }
 
@@ -50,7 +50,7 @@ h3 {
   display: -ms-inline-flexbox;
   display: inline-flex;
   -webkit-box-orient: horizontal;
-  
+
   -webkit-box-align: center;
   -ms-flex-align: center;
   align-items: center;
@@ -85,10 +85,10 @@ h3 {
 
 .material-symbols-outlined {
   font-variation-settings:
-  'FILL' 1,
-  'wght' 700,
-  'GRAD' -25,
-  'opsz' 24
+    'FILL' 1,
+    'wght' 700,
+    'GRAD' -25,
+    'opsz' 24
 }
 
 @font-face {
@@ -102,7 +102,8 @@ h3 {
   height: 800px;
 }
 
-.lowToleranceCanvas, .playCanvas {
+.lowToleranceCanvas,
+.playCanvas {
   position: absolute;
   top: 0;
   left: 0;
@@ -124,16 +125,15 @@ h3 {
   background-color: var(--paper-color);
   background-size: var(--grid-dash) var(--grid-dash), var(--grid-size) var(--grid-size);
   background-image:
-  linear-gradient(to bottom, transparent var(--grid-gap), var(--paper-color) var(--grid-gap)), 
-  linear-gradient(to right, var(--grid-color) var(--grid-strength), transparent var(--grid-strength)),
-  linear-gradient(to right, transparent var(--grid-gap), var(--paper-color) var(--grid-gap)),
-  linear-gradient(to bottom, var(--grid-color) var(--grid-strength), transparent var(--grid-strength));
+    linear-gradient(to bottom, transparent var(--grid-gap), var(--paper-color) var(--grid-gap)),
+    linear-gradient(to right, var(--grid-color) var(--grid-strength), transparent var(--grid-strength)),
+    linear-gradient(to right, transparent var(--grid-gap), var(--paper-color) var(--grid-gap)),
+    linear-gradient(to bottom, var(--grid-color) var(--grid-strength), transparent var(--grid-strength));
 }
 
 .lowToleranceCanvas:focus-visible,
 .lowToleranceCanvas:focus,
-.lowToleranceCanvas:active
-{
+.lowToleranceCanvas:active {
   /*border: 1px dashed #bdd109 !important;*/
   outline: none;
 }
@@ -191,9 +191,7 @@ h3 {
   margin-right: 8px;
 }
 
-.lowToleranceToolbar .fieldContainer span {
-  
-}
+.lowToleranceToolbar .fieldContainer span {}
 
 .lowToleranceToolbar .fieldRow {
   display: flex;
@@ -210,6 +208,7 @@ h3 {
   text-align: center;
   line-height: 2;
 }
+
 .lowToleranceToolbar .valueBox.valueText {
   width: auto;
 }
@@ -273,30 +272,39 @@ h3 {
   transition: color 0.15s ease-in;
 }
 
-.lowToleranceToolbar .container input[type="radio"]:checked + label {
+.lowToleranceToolbar .tab.other {
+  color: #ff0000;
+  pointer-events: none;
+}
+
+.lowToleranceToolbar .container input[type="radio"]:checked+label {
   color: #185ee0;
 }
 
-.lowToleranceToolbar .container input[type="radio"]:checked + label > .notification {
+.lowToleranceToolbar .container input[type="radio"]:checked+label>.notification {
   background-color: #185ee0;
   color: #fff;
   margin: 0px;
 }
 
-.lowToleranceToolbar .container input[id="wall"]:checked ~ .glider {
+.lowToleranceToolbar .container input[id="wall"]:checked~.glider {
   transform: translateX(0);
 }
 
-.lowToleranceToolbar .container input[id="item"]:checked ~ .glider {
+.lowToleranceToolbar .container input[id="item"]:checked~.glider {
   transform: translateX(100%);
 }
 
-.lowToleranceToolbar .container input[id="break"]:checked ~ .glider {
+.lowToleranceToolbar .container input[id="break"]:checked~.glider {
   transform: translateX(200%);
 }
 
-.lowToleranceToolbar .container input[id="push"]:checked ~ .glider {
+.lowToleranceToolbar .container input[id="push"]:checked~.glider {
   transform: translateX(300%);
+}
+
+.lowToleranceToolbar .container input[id="other"]:checked~.glider {
+  transform: translateX(400%);
 }
 
 .lowToleranceToolbar .glider {
@@ -324,6 +332,38 @@ h3 {
 
 .playCanvas {
   background-color: #000;
+}
+
+.dialog-box {
+  display: none;
+  position: relative;
+  overflow: hidden;
+  top: 500px;
+  /* left: 0; */
+  /* bottom: 20px; */
+  margin: 0 auto;
+  text-align: center;
+  width: 60%;
+  height: 30%;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: rgb(255, 111, 94);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 24px;
+  padding: 20px;
+  animation: fade_in_show 0.5s;
+  z-index: 100;
+}
+
+@keyframes fade_in_show {
+  0% {
+       opacity: 0;
+       transform: scale(0);
+  }
+
+  100% {
+       opacity: 1;
+       transform: scale(1);
+  }
 }
 
 .spriteCanvas {
@@ -468,7 +508,7 @@ h3 {
   font-size: 16px;
   font-weight: 500;
   color: #222;
- 
+
 }
 
 .lowToleranceCanvas {

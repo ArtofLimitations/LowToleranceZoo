@@ -27,6 +27,8 @@ const hiddenLayers = new Set();      // Set to hold hidden layers
 const keys = {};
 const tilesCanvas = new OffscreenCanvas(4 * tileSizeX, 4 * tileSizeY);
 const tilesCtx = tilesCanvas.getContext('2d');
+const layerCanvases = {}; // Stores canvases for layers
+const layerContexts = {}; // Stores 2D contexts for layers
 
 // board variables
 let board = {};
@@ -37,7 +39,7 @@ let nightMode = true;
 let player = playerStats;
 let stats = player.stats;
 const stepSize = player.stepSize; // Step size for player movement
-
+let gamePaused = false;
 let bulletArray = [];
 
 // File info
@@ -46,11 +48,13 @@ export let filename = ''; // ############ File to load ###############
 // Timing
 let fps = 60;
 let lastTime = 0;  // Timing variables
-const moveSpeed = 100; // Pixels per second
+let moveSpeed = 100; // Pixels per second
 let accumulatedTime = 0;
 
 // ############ Main animation function ############ 
 export function animateGame(currentTime) {
+    if (gamePaused) return; // Stop the loop when the game is paused
+
     const deltaTime = currentTime - lastTime;
 
     if (deltaTime > 1000 / fps) { // 60 FPS cap
@@ -90,9 +94,6 @@ function updateBullets(deltaTime) {
     });
     bulletArray = bulletArray.filter(bullet => bullet.active);
 }
-
-const layerCanvases = {}; // Stores canvases for layers
-const layerContexts = {}; // Stores 2D contexts for layers
 
 function getLayerCanvas(layer) {
     if (!layerCanvases[layer]) {
@@ -235,6 +236,12 @@ function redrawTiles(tiles) {
     drawSpritesAtTiles(tiles);
 }
 
+function dialogBox(text) {
+    const dialog = document.getElementById('dialog-box');
+    dialog.innerHTML = text;
+    dialog.style.display = 'block';
+}
+
 function clearTile(x, y) {
     ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
 }
@@ -260,70 +267,7 @@ function checkTiles(x, y, direction) {
             { x: rightTile, y: bottomTile },];
     }
 }
-/*
-function canMoveTo(x, y, object = player) {
-    //return !placedSprites[`${player.layer},${x},${y}`] || placedSprites[`${player.layer},${x},${y}`].type !== "wall";
-    //let tiles = getOverlappingTiles(x * 32, y * 32);
-    if (object.type === 'bullet') {
-        x = x - .5;
-        y = y - .5;
-    }
-    let tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
 
-    console.log(tiles);
-
-    for (let tile of tiles) {
-        let tileKey = `${object.layer},${tile.x},${tile.y}`;
-
-        if (tile.x < 0 || tile.y < 0 || tile.y >= tilesY || tile.x >= tilesX) {
-            return false; // Out of bounds = collision
-        }
-        if (placedSprites[tileKey]) {
-            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'wall' || placedSprites[tileKey].type === 'break') {
-                if (object.type === 'bullet' && placedSprites[tileKey].type === 'break') {
-                    delete placedSprites[tileKey];
-                    updateTile(object.layer, tile.x, tile.y);
-                }
-                return false; // Collision detected
-            }
-            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'item' && object.type === 'player') {
-                stats.coins++; // for testing
-                console.log('coins: ', stats.coins);
-                delete placedSprites[tileKey];
-                updateTile(player.layer, tile.x, tile.y);
-                return true;
-            }
-            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'push') {
-                let checkX = tile.x;
-                let checkY = tile.y;
-                switch (object.direction) {
-                    case 'up':
-                        checkY -= 1;
-                        break;
-                    case 'down':
-                        checkY += 1;
-                        break;
-                    case 'left':
-                        checkX -= 1;
-                        break;
-                    case 'right':
-                        checkX += 1;
-                        break;
-                }
-                let newTiles = checkTiles(checkX, y * checkY, object.direction);
-                if (placedSprites[`${object.layer},${newTiles}`]) {
-                    return false;
-                } else {
-                    placedSprites[tileKey] = placedSprites[`${object.layer},${newTiles}`];
-                    delete placedSprites[tileKey];
-                    updateTile(player.layer, tile.x, tile.y);
-                    return true;
-                }
-            }
-        }
-    }
-    return true;
-}*/
 function canMoveTo(x, y, object = player) {
     if (object.type === 'bullet') {
         x = x - 0.5;
@@ -343,15 +287,22 @@ function canMoveTo(x, y, object = player) {
             let tileType = placedSprites[tileKey].type;
 
             // Collision with walls or unbreakable objects
-            if (tileType === 'wall' || tileType === 'break') {
+            if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object') {
+                // If it's a bullet hitting a breakable tile
                 if (object.type === 'bullet' && tileType === 'break') {
                     delete placedSprites[tileKey];
                     updateTile(object.layer, tile.x, tile.y);
                 }
+                // if it's a sign, show script
+                if (tileType === 'sign' && object.type === 'player') {
+                    gamePaused = true; // Pause the game loop
+                    dialogBox(placedSprites[tileKey].data.script
+                        .replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                }
                 return false;
             }
 
-            // Picking up an item
+            // Picking up an item or destroying tile
             if (tileType === 'item' && object.type === 'player') {
                 stats.coins++;
                 console.log('Coins:', stats.coins);
@@ -367,6 +318,7 @@ function canMoveTo(x, y, object = player) {
             }
         }
     }
+
     return true;
 }
 
@@ -419,6 +371,8 @@ function tryPushTiles(startX, startY, direction, layer) {
 
         updateTile(layer, pushTiles[i].x, pushTiles[i].y);
         updateTile(layer, pushTiles[i].x + (newX - lastTile.x), pushTiles[i].y + (newY - lastTile.y));
+
+        //moveSpeed += i * 10; // move speed based on number of tiles pushed
     }
 
     return true; // Movement allowed
@@ -506,6 +460,13 @@ function findPlayerSprite() {
 
 document.addEventListener("keydown", (event) => {
     keys[event.key] = true;
+
+    if (gamePaused && (event.key === 'Escape' || event.key === 'Enter')) {
+        document.getElementById('dialog-box').style.display = 'none';
+        gamePaused = false; // Resume the game loop
+        requestAnimationFrame(animateGame);
+        return;
+    }
 
     if (event.key === 'l') {
         loadCombinedData(handleLoadedGame);

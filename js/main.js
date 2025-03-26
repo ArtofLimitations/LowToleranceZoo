@@ -30,18 +30,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let placedSprites = {};              // Store the positions of placed sprites (as key-value pairs)
     let tilesX = 36;                     // Board width and height
     let tilesY = 25;
+    let [cursorX, cursorY] = [9, 4];     // Keyboard cursor
     let currentSprite = 1;               // Sprite to draw. Default = 1
     let currentLayer = 2;                // Layer to draw sprite on. 1 = floor 2 = default 3 = ceiling
-    let [cursorX, cursorY] = [9, 4];     // Keyboard cursor
     let tileSetLength = 300;             // Size of tileset
     let colors = currentColors;          // colors selected from palette
+    let type = 'wall';
+    let tileData = { script: '' };                                                                      // default type for placed sprites
     let key = { ctrl: false, shift: false, alt: false, lastClick: 0, clickDelay: 100 };     // keyboard status object. click delay in ms
     let mouse = {
         x: cursorX, y: cursorY, oldX: cursorX, oldY: cursorY, down: false,
         button: 0, mode: 'draw', lastClick: 0, clickDelay: 50
     };                                                                                      // mouse status object. click delay. see handleMouseMove function. click delay in ms
     let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2 }                             // basic stats for player
-    let type = 'wall';                                                                      // default type for placed sprites
 
     function getSpriteImage() {
         const data = getDataFromSheet(currentSprite); // from sprite-sheet.js
@@ -63,16 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Draw the grid of tiles
     function drawBoard() {
-        //console.log('drawing whole board');
         ctx.clearRect(0, 0, tilesX * tileSizeX + 1, tilesY * tileSizeY); // +1 to get rid of the line next to toolbar
-        /*for (let y = 0; y < tilesY; y++) {
-            for (let x = 0; x < tilesX; x++) {
-                drawTile(x, y);
-            }
-        }*/
+
         drawSprites();
         drawCursor();
-        //toolbar(currentSprite, colors, currentLayer, mouse);
     }
 
     function drawSprites() {
@@ -122,23 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
         drawCursor();
     }
 
-    // Draw to single tile to create a grid
-    function drawTile(x, y) {
-        const posX = x * tileSizeX;
-        const posY = y * tileSizeY;
-        //console.log(`tile:${x},${y} cursor:${cursorX},${cursorY}`);
-        ctx.lineWidth = 1;
-        if (x === cursorX && y === cursorY) { // Tile = red if cursor at pos
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 10, 10, 0.6)';
-        } else {
-            ctx.beginPath();
-            //ctx.strokeStyle = 'rgba(90, 100, 10, 0.1)';
-            ctx.strokeStyle = 'rgba(255, 111, 94, 0.1)';
-        }
-        ctx.strokeRect(posX, posY, tileSizeX, tileSizeY);
-    }
-
     // draw the top red cursor
     function drawCursor() {
         const posX = cursorX * tileSizeX;
@@ -149,19 +127,12 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeRect(posX + 1, posY + 1, tileSizeX - 2, tileSizeY - 2);
     }
 
-    // Get tile coordinates from mouse click
-    function getTileCoordinates(mouseX, mouseY) {
-        const x = Math.floor(mouseX / tileSizeX);
-        const y = Math.floor(mouseY / tileSizeY);
-        return { x, y };
-    }
-
     // Helper Function for Color Similarity
-    function isSimilarColor(color1, color2, tolerance = 30) {
+    function isSimilarColor(color1, color2, tolerance = 0) {
         if (!color1 || !color2) return false; // Prevent errors if one is empty
         const [r1, g1, b1] = color1[0]; // Extract primary color (ignoring alpha)
         const [r2, g2, b2] = color2[0];
-    
+
         return (
             Math.abs(r1 - r2) < tolerance &&
             Math.abs(g1 - g2) < tolerance &&
@@ -173,30 +144,32 @@ document.addEventListener('DOMContentLoaded', () => {
     function floodFill(startX, startY, newSpriteData, useColorComparison = true) {
         const startKey = `${currentLayer},${startX},${startY}`;
         const startTile = placedSprites[startKey] || null; // Get starting tile or null if empty
-    
+
         // Store the starting color or sprite type
         const startColor = startTile ? startTile.color : null;
         const startSprite = startTile ? startTile.sprite : null;
-    
+
         // Stack for iterative flood fill
         const stack = [[startX, startY]];
         const visited = new Set();
-    
+
         while (stack.length > 0) {
             const [x, y] = stack.pop();
             const key = `${currentLayer},${x},${y}`;
 
             // **Boundary Check**: Ensure x and y are within valid board range
-        if (x < 0 || y < 0 || x >= 36 || y >= 25) continue; 
-    
+            if (x < 0 || y < 0 || x >= 36 || y >= 25) continue;
+            
             // Avoid re-processing the same tile
             if (visited.has(key)) continue;
             visited.add(key);
-    
+
             const currentTile = placedSprites[key] || null; // Get tile, or null if empty
             const currentColor = currentTile ? currentTile.color : null;
             const currentSprite = currentTile ? currentTile.sprite : null;
-    
+
+            if (currentTile && currentTile.type === 'player') continue; // Skip player
+
             // **Determine if the tile should be filled**
             let shouldFill = false;
             if (useColorComparison) {
@@ -204,15 +177,15 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 shouldFill = !currentTile || currentSprite === startSprite;
             }
-    
+
             if (!shouldFill) continue; // Skip if the tile doesn't match the criteria
-    
+
             // Fill the tile with the new sprite and color
             placedSprites[key] = {
                 ...newSpriteData,
                 type: newSpriteData.type || (currentTile ? currentTile.type : "wall") // Default to "wall" if empty
             };
-    
+
             // Add neighboring tiles to the stack
             const neighbors = [
                 [x + 1, y], // Right
@@ -230,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Redraw the board after flood fill
         drawBoard();
     }
-    
+
     // grab the sprite at cursor when Enter key or right click
     function grabSprite(tileKey) {
         if (placedSprites[tileKey] !== undefined) {
@@ -240,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!key.ctrl) { // If the ctrl key isn't pressed then grab the sprite and color else just color
                 currentSprite = placedSprites[tileKey].sprite;
                 if (placedSprites[tileKey].type === 'player') {
-                    type = 'wall'; 
+                    type = 'wall';
                 } else {
                     type = placedSprites[tileKey].type;
                 }
@@ -248,9 +221,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateType(type);                  // from toolbar.js
             }
             colors = placedSprites[tileKey].color; // color grab
+            tileData = placedSprites[tileKey].data; // object data grab
             updateColor(colors); // from palette.js
-            //toolbar(currentSprite, colors, currentLayer, mouse);
         }
+    }
+
+    function placeSprite(key, sprite, type) {
+        const tileKey = key;
+        placedSprites[tileKey] = {
+            sprite: sprite,
+            image: getSpriteImage(),
+            color: colors,
+            type: type,
+            data: {
+                script: '',
+                text: ''
+            } // from object-editor.js
+        };
+        if (type === 'object' || type === 'sign') placedSprites[tileKey].data.script = tileData.script;
     }
 
     // Handle placing/removing sprites
@@ -258,9 +246,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const [x, y] = [mouse.x, mouse.y];
         const tileKey = `${currentLayer},${x},${y}`;
         [cursorX, cursorY] = [x, y];
-    
+
         console.log(`mouse: cursor ${cursorX},${cursorY}`);
-    
+
         switch (event.button) {
             case 2: // Right mouse button (Grab sprite)
                 grabSprite(tileKey);
@@ -272,18 +260,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (placedSprites[tileKey].type !== 'player') delete placedSprites[tileKey];
                     } else {
                         // Place sprite
-                        placedSprites[tileKey] = {
-                            sprite: currentSprite,
-                            image: getSpriteImage(),
-                            color: colors,
-                            type: type,
-                            data: getObjectData()
-                        };
+                        placeSprite(tileKey, currentSprite, type); // Place sprite
                     }
                 } else if (mouse.mode === 'fill') {
                     // Pressing SHIFT enables color-based filling
                     const useColorComparison = key.shift;
-    
+
                     // Perform Flood Fill
                     floodFill(cursorX, cursorY, {
                         sprite: currentSprite,
@@ -303,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     placedSprites[tileKey].color = color;
                 }
         }
-    
+
         drawBoard();
         toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
     }
@@ -387,6 +369,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function handleObjectScript(data, key) {
+        placedSprites[key].data.script = data;
+        console.log('handle object script:', data);
+    }
+
     function handleKeyboard(event) {
         const tileKey = `${currentLayer},${cursorX},${cursorY}`;
         console.log(event.key);
@@ -407,37 +394,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case ' ':
                 if (placedSprites[tileKey]) {
-
                     if (placedSprites[tileKey].type != 'player') delete placedSprites[tileKey]; // Remove sprite if it exists
                 } else {
-                    // Place sprite
-                    placedSprites[tileKey] = {
-                        sprite: currentSprite,    // add current selected sprite (number)
-                        color: colors,            // add current colors from palette (array)
-                        image: getSpriteImage(),  // add sprite image data
-                        type: type,               // default type is wall
-                        data: getObjectData()     // add extra data for tiles
-                    };
-                };
-
+                    placeSprite(tileKey, currentSprite, type); // Place sprite
+                }
                 break;
             case 'Enter': // add layers later
                 grabSprite(tileKey);
+                if (placedSprites[tileKey]) {
+                    if (placedSprites[tileKey].type === 'sign') {
+                        editObject('text', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
+                        //placedSprites[tileKey].data.text = getObjectData(tileKey);
+                    }
+                    if (placedSprites[tileKey].type === 'object') {
+                        editObject('object', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
+                        //placedSprites[tileKey].data.script = getObjectData(tileKey);
+                    }
+                    console.log('object data: ', getObjectData(tileKey));
+                }
                 if (event.repeat) { return }
                 break;
-            case 'pageup':
-                type = type === 'wall' ? 'sign' : 'wall';
-                updateType(type);
+            case 'PageUp':
                 console.log('type: ', type);
                 if (event.repeat) { return }
                 break;
             case 'Insert':
-                if (placedSprites[tileKey]) {
-                    if (placedSprites[tileKey].type === 'sign' || placedSprites[tileKey].type === 'object') {
-                        
-                        placedSprites[tileKey].data.text = editObject(); // open object script editor from object-editor.js
-                    }
-                }
+                // nothing here yet
                 if (event.repeat) { return }
                 break;
         }
@@ -456,19 +438,29 @@ document.addEventListener('DOMContentLoaded', () => {
             case '=':
                 if (currentSprite < tileSetLength) currentSprite += 1; // iterate through sprite sheet
                 console.log('current sprite: ' + currentSprite);
-                updateSpriteData(currentSprite);
+                updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
                 break;
             case '-':
                 if (currentSprite > 1) currentSprite -= 1;
                 console.log('current sprite: ' + currentSprite);
-                updateSpriteData(currentSprite);
+                updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
                 break;
             case 'b':
                 if (!event.ctrlKey) saveBoard(placedSprites); // save board (not sprite sheet)
                 if (event.repeat) { return }
                 break;
+            case 'i':
+                placeSprite(tileKey, currentSprite, 'sign'); // Place sprite
+                if (placedSprites[tileKey]) {
+                    editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
+                }
+                if (event.repeat) { return }
+                break;
             case 'o':
-                editObject(); // open object script editor from object-editor.js
+                placeSprite(tileKey, currentSprite, 'object'); // Place sprite
+                if (placedSprites[tileKey]) {
+                    editObject('object', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
+                }
                 if (event.repeat) { return }
                 break;
             case '1':
@@ -498,10 +490,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 drawBoard(); //<------------------------------------- Draw function for entire board
                 return;
             case 's': // Save board & sprite sheet
-                saveCombinedData(getSpriteSheet(), placedSprites);
+                saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
                 break;
             case 'l': // load board & sprite sheet
-                loadCombinedData(handleLoadedGame);
+                loadCombinedData(handleLoadedGame); // load board and sprite sheet from file.js
                 break;
             case 'r': // reset board
                 if (confirm('Are you sure you want reset board?')) {
@@ -528,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
             key.ctrl = true;
             switch (event.key.toLowerCase()) { // Check the key
                 case "b": // Handle 'Ctrl + B' to load board (no sprite sheet)
-                    loadBoard(handleLoadedBoard);
+                    loadBoard(handleLoadedBoard); // from file.js
                     if (event.repeat) { return }
                     return;
             }
@@ -569,7 +561,6 @@ document.addEventListener('DOMContentLoaded', () => {
     editorToolbar.onclick = () => {
         colors = currentColors;
     }
-
     editorToolbar.onmouseup = () => {
         canvas.focus();
     }
