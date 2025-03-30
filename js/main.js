@@ -233,12 +233,18 @@ document.addEventListener('DOMContentLoaded', () => {
             image: getSpriteImage(),
             color: colors,
             type: type,
+            layer: currentLayer,
+            oldKey: tileKey,
             data: {
+                name: '',
+                speed: 2,
+                timer: 0,
                 script: '',
-                text: ''
-            } // from object-editor.js
+                scriptIndex: 0,
+                text: '',
+            } // default data for placed sprites
         };
-        if (type === 'object' || type === 'sign') placedSprites[tileKey].data.script = tileData.script;
+        if (type === 'object' || type === 'sign') placedSprites[tileKey].data.script = tileData.script; // update object.data.script if type = sign or object
     }
 
     // Handle placing/removing sprites
@@ -371,12 +377,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleObjectScript(data, key) {
         placedSprites[key].data.script = data;
+        //placedSprites[key].data.text = text;
         console.log('handle object script:', data);
     }
 
     function handleKeyboard(event) {
         const tileKey = `${currentLayer},${cursorX},${cursorY}`;
-        console.log(event.key);
+        //console.log(event.key);
 
         switch (event.key) {
 
@@ -410,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         editObject('object', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
                         //placedSprites[tileKey].data.script = getObjectData(tileKey);
                     }
-                    console.log('object data: ', getObjectData(tileKey));
+                    console.log('grabbed:, ', placedSprites[tileKey]);
                 }
                 if (event.repeat) { return }
                 break;
@@ -459,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'o':
                 placeSprite(tileKey, currentSprite, 'object'); // Place sprite
                 if (placedSprites[tileKey]) {
-                    editObject('object', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
+                    editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
                 }
                 if (event.repeat) { return }
                 break;

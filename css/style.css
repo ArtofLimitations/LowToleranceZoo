@@ -336,22 +336,36 @@ h3 {
 
 .dialog-box {
   display: none;
+  flex-direction: column;
+  justify-content: center; 
+  align-items:center;
   position: relative;
   overflow: hidden;
   top: 500px;
-  /* left: 0; */
-  /* bottom: 20px; */
   margin: 0 auto;
-  text-align: center;
   width: 60%;
-  height: 30%;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: rgb(255, 111, 94);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  max-height: 30%;
+  min-height: 10%;
+  background-color: rgba(0, 0, 0, 0.8);
+  border-radius: 10px;
+  color: #fff;
+  /*font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;*/
+  font-family: 'Fira Code', monospace;
   font-size: 24px;
-  padding: 20px;
+  text-shadow: 0px 1px 20px #444, 0px 1px 10px rgba(255, 255, 255, 0.8);
+  padding: 20px 60px;
   animation: fade_in_show 0.5s;
   z-index: 100;
+}
+
+.dialog-box[data-next]::after {
+  content: "...";
+  position: absolute;
+  bottom: 5px;
+  right: 10px;
+  font-size: 1.2em;
+  font-weight: bold;
+  color: white;
 }
 
 @keyframes fade_in_show {

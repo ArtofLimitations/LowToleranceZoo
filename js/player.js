@@ -20,15 +20,16 @@ ctx.imageSmoothingEnabled = false
 // Game configurations
 let placedSprites = {};
 const tileSizeX = 32;                // Single tile size
-const tileSizeY = 32;
+const tileSizeY = 32;               
 const tilesX = 36;                   // Board width and height
 const tilesY = 25;
 const hiddenLayers = new Set();      // Set to hold hidden layers
-const keys = {};
+const keys = {};                     // Hold key states
 const tilesCanvas = new OffscreenCanvas(4 * tileSizeX, 4 * tileSizeY);
 const tilesCtx = tilesCanvas.getContext('2d');
-const layerCanvases = {}; // Stores canvases for layers
-const layerContexts = {}; // Stores 2D contexts for layers
+const layerCanvases = {};            // Stores canvases for layers
+const layerContexts = {};            // Stores 2D contexts for layers
+let placedObjects = {};              // Stores objects on the board
 
 // board variables
 let board = {};
@@ -61,23 +62,20 @@ export function animateGame(currentTime) {
         // Update the position based on the speed and deltaTime
 
         //position += speed * (deltaTime / 1000) * 60;
-        updateBullets(deltaTime);
+        updateBullets();
+        setInterval(() => processObjectScripts(deltaTime), 500);
         lastTime = currentTime;
-    }
-    //if (loaded) {
-    //drawBoard();
-    //  renderLayersToMainCanvas(); // Draw the layers onto the main canvas
-    //}
-
+    }  
     updatePlayer(deltaTime);
-
 
     // Loop the animation
     requestAnimationFrame(animateGame);
 }
 // ############ End of main animation function ############ 
 
-function updateBullets(deltaTime) {
+// ############ Drawing functions ############
+
+function updateBullets() {
 
     bulletArray.forEach((bullet, index) => {
 
@@ -146,12 +144,14 @@ function renderLayersToMainCanvas() {
 
     for (const layer of sortedLayers) {
         if (layerCanvases[layer]) {
+
             ctx.save()
-            if (layer === 3) ctx.filter = 'opacity(0.8)';
+            //if (layer === 3) ctx.filter = 'opacity(0.8)';
             //if (layer === 2) ctx.filter = 'blur(1px)';
-            //if (layer === 3) ctx.globalCompositeOperation = "lighter";
+            //if (layer === 3) ctx.globalCompositeOperation = "destination-over";
             ctx.drawImage(layerCanvases[layer], 0, 0);
             ctx.restore();
+
         } else {
             console.warn(`Layer ${layer} is missing!`); // Debugging
         }
@@ -171,7 +171,7 @@ function renderLayersToMainCanvas() {
     if (nightMode) {
         ctx.save();
         ctx.globalCompositeOperation = "overlay";
-        ctx.fillStyle = 'rgba(0, 0, 0, .5)';
+        ctx.fillStyle = 'rgba(0, 0, 0, .7)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
     }
@@ -181,37 +181,317 @@ function drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite, color) {
     drawSprite(x, y, tileSizeX, tileSizeY, sprite, color, ctx); // Draw sprite on given canvas
 }
 
-// Draw the grid of tiles
-/*function drawBoard() {
-    ctx.clearRect(0, 0, tilesX * tileSizeX + 1, tilesY * tileSizeY); // +1 to get rid of the line next to toolbar
-    drawSpritesAt();
-}*/
+function clearTile(x, y) {
+    ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
+}
 
-function drawSpritesAt(x = null, y = null) {
-    // Collect and sort all placed sprite keys by layer (ascending)
-    const sortedKeys = Object.keys(placedSprites)
-        .map(key => key.split(',').map(Number)) // Convert "l,x,y" to [l, x, y]
-        //.sort(([l1], [l2]) => l1 - l2); // Sort by layer (ascending)
-        .sort(([l1, , y1], [l2, , y2]) => l1 - l2 || y1 - y2); // Sort by layer, then by Y-position
+//############ Object functions ############
+function processObjectScripts(deltaTime) {
+    
+    for (let key in placedObjects) {
+        let obj = placedObjects[key];
 
-    for (const [l, sx, sy] of sortedKeys) {
-        // Skip hidden layers
-        if (hiddenLayers.has(l)) continue;
+        obj.timer--;
+        if (obj.timer > 0) continue;
+        obj.timer = obj.speed; // Reset timer
 
-        // If x and y are provided, only draw the sprite(s) at (x, y)
-        if (x !== null && y !== null && (sx !== x || sy !== y)) continue;
+        if (!obj.script || !Array.isArray(obj.script)) {
+            console.error("Error: obj.script is undefined or not an array", obj);
+            return;
+        }
+        
+        if (typeof obj.scriptIndex !== 'number' || obj.scriptIndex < 0 || obj.scriptIndex >= obj.script.length) {
+            console.error("Error: obj.scriptIndex is out of bounds", obj.scriptIndex);
+            return;
+        }
+        
+        if (typeof obj.script[obj.scriptIndex] !== 'string') {
+            console.error("Error: obj.script[obj.scriptIndex] is not a string", obj.script[obj.scriptIndex]);
+            return;
+        }
 
-        const spriteInfo = placedSprites[`${l},${sx},${sy}`];
-        if (spriteInfo) {
-            if (spriteInfo.type === 'player') {
-                // Use player's actual position instead of tile position
-                drawPlayerSprite(player.x, player.y, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+        let command = obj.script[obj.scriptIndex].split(' ');
+        let action = command[0];
+        let args = command.slice(1);
+
+        executeObjectCommand(obj, action, args);
+
+        obj.scriptIndex++;
+
+        if (command[0] === "#loop") {
+            if (obj.labels[":loop"] !== undefined) {
+                obj.scriptIndex = obj.labels[":loop"]; // Jump to label position
             } else {
-                drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+                console.error("Error: Missing ':loop' label in script.");
             }
+            return;
+        }
+
+        // Auto-stop if script ends without `#end`
+        if (obj.scriptIndex >= obj.script.length) {
+            obj.scriptIndex = obj.labels[':loop'] || obj.script.length - 1;
         }
     }
 }
+
+function executeObjectCommand(obj, action, args) {
+    switch (action) {
+        case '#end':
+            break;
+        case "@name":
+            obj.name = args.join(" ");
+            break;
+        case "#text":
+            //showDialog(args.join(" ")); 
+            break;
+        case "#change":
+            obj.sprite = parseInt(args[0]);
+            obj.color = args[1];
+            break;
+        case "#move":
+            moveObject(obj, args[0], obj.layer);
+            break;
+        case "#wait":
+            obj.timer += parseInt(args[0]); // Add delay
+            break;
+        case "#loop":
+            obj.scriptIndex = obj.labels[":loop"] || 0;
+            break;
+    }
+}
+
+function moveObject(obj, direction, layer) {
+    let [x, y] = [obj.x, obj.y];
+
+    switch (direction) {
+        case "up": y -= 1; break;
+        case "down": y += 1; break;
+        case "left": x -= 1; break;
+        case "right": x += 1; break;
+    }
+
+    let newKey = `${layer},${x},${y}`;
+    if (!placedObjects[newKey]) {
+        delete placedObjects[`${layer},${obj.x},${obj.y}`]; 
+        obj.x = x;
+        obj.y = y;
+        placedObjects[newKey] = obj;
+    }
+}
+
+function loadObjectsFromGameData() {
+    placedObjects = {}; // Reset objects
+
+    for (let key in placedSprites) {
+        let tile = placedSprites[key];
+
+        // Extract layer, x, y from key
+        let [layer, x, y] = key.split(",").map(Number);
+
+        if (tile.type === "object" && tile.data.script) {
+            placedObjects[key] = {
+                layer,
+                x,
+                y,
+                sprite: tile.sprite,
+                color: tile.color,
+                name: tile.data.name || "",
+                //speed: tile.data.speed || 1,  // Default to speed 1
+                speed: 10,
+                timer: tile.data.timer || 0,  // Initialize timer
+                //script: parseScript(tile.data.script), // Parse script
+                script: parseScriptFromTextarea(tile.data.script), // Parse script
+                scriptIndex: 0, 
+                labels: {},  // Will store labels (e.g., `:touch`)
+            };
+
+            //const parsedScript = parseScript(tile.data.script);
+            //placedObjects[key].script = parsedScript.script;  // Store only the script array
+            //placedObjects[key].labels = parsedScript.labels;  // Store the labels separately
+
+            // Parse labels for quick jumps
+            console.log(placedObjects[key].script);
+            //placedObjects[key].labels = extractLabels(tile.data.script);
+            //placedObjects[key].labels = extractLabels(placedObjects[key].script);
+        }
+    }
+}
+
+function extractLabels(scriptArray) {
+    let labels = {};
+    scriptArray.forEach((line, index) => {
+        if (line.startsWith(":")) {
+            labels[line] = index;
+            console.log(labels);
+        }
+    });
+    return labels;
+}
+
+/*
+function parseScript(text) {
+    let lines = text.trim().split("\n").map(line => line.trim());
+    let script = [];
+    let labels = {}; // Store label positions
+    let collectingText = false;
+    let textBlock = "";
+    let index = 0;
+
+    for (let line of lines) {
+        if (line === "#text") {
+            collectingText = true;
+            textBlock = "";
+            continue;
+        }
+
+        if (collectingText) {
+            if (line === "#end") {
+                script.push(`#text ${textBlock.trim()}`);
+                collectingText = false;
+            } else {
+                textBlock += line + "\n";
+            }
+            continue;
+        }
+
+        if (line.startsWith(":")) {
+            labels[line] = index; // Store label position
+            continue; // Don't store labels in the script array
+        }
+
+        if (line !== "") {
+            script.push(line);
+            index++;
+        }
+    }
+
+    //return { script, labels };
+    //return script;
+    //return { script, labels }; // Return both separately
+}*/
+
+function parseScript(scriptArray) {
+    let labels = {};
+    let parsedScript = [];
+
+    scriptArray.forEach((line, index) => {
+        if (line.startsWith(":")) {
+            labels[line] = index; // Store label positions
+        }
+        parsedScript.push(line);
+    });
+
+    return { script: parsedScript, labels }; // Return both separately
+}
+
+function handleObjectTouch(tileKey) {
+    let obj = placedObjects[tileKey];
+    if (obj && obj.labels[":touch"]) {
+        obj.scriptIndex = obj.labels[":touch"];
+    }
+}
+
+function parseScriptFromTextarea(text) {
+    let lines = text.trim().split("\n").map(line => line.trim());
+    let script = [];
+    let collectingText = false;
+    let textBlock = "";
+
+    for (let line of lines) {
+        if (line === "#text") {
+            collectingText = true;
+            textBlock = "";
+            continue;
+        } 
+        
+        if (collectingText) {
+            if (line === "#end") {
+                script.push(`#text ${textBlock.trim()}`); // Store full text block as one entry
+                collectingText = false;
+            } else {
+                textBlock += line + "\n"; // Keep collecting multi-line text
+            }
+            continue;
+        }
+
+        // Store regular commands or section headers
+        if (line !== "") {
+            script.push(line);
+        }
+    }
+
+    return script;
+}
+
+// ############ Dialog box functions ############
+
+function paginateText(text, maxLength) { // Split text into pages
+    let pages = [];
+    let segments = text.split("<page>"); // Split by <page> tag
+
+    for (let segment of segments) {
+        let words = segment.trim().split(" ");
+        let currentPage = "";
+
+        for (let word of words) {
+            if ((currentPage + word).length <= maxLength) {
+                currentPage += word + " ";
+            } else {
+                pages.push(currentPage.trim());
+                currentPage = word + " ";
+            }
+        }
+        if (currentPage.trim()) {
+            pages.push(currentPage.trim());
+        }
+    }
+
+    return pages;
+}
+
+function showDialog(text) { // Show dialog box with text
+    let pages = paginateText(text, 200); // Adjust maxLength as needed
+    let pageIndex = 0;
+    const dialog = document.getElementById('dialog-box');
+
+    function updateDialog() {
+        dialog.innerHTML = pages[pageIndex];
+
+        // Add '...' indicator if there's another page
+        if (pageIndex < pages.length - 1) {
+            dialog.setAttribute('data-next', 'true');
+        } else {
+            dialog.removeAttribute('data-next');
+        }
+
+        dialog.style.display = 'flex';
+    }
+
+    let inputBlocked = true;
+    updateDialog();
+
+    setTimeout(() => inputBlocked = false, 300); // Block input for 1000ms
+
+    document.addEventListener('keydown', function nextPage(event) {
+        if (inputBlocked) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+            inputBlocked = true;
+            pageIndex++;
+
+            if (pageIndex < pages.length) {
+                updateDialog();
+                setTimeout(() => inputBlocked = false, 300);
+            } else {
+                dialog.style.display = 'none';
+                gamePaused = false;
+                document.removeEventListener('keydown', nextPage);
+                requestAnimationFrame(animateGame);
+            }
+        }
+    });
+}
+
+// ############ Collision detection ############
 
 function getOverlappingTiles(x, y) {
     let leftTile = Math.floor(x / 32);
@@ -225,25 +505,6 @@ function getOverlappingTiles(x, y) {
         { x: leftTile, y: bottomTile },
         { x: rightTile, y: bottomTile }
     ];
-}
-
-function redrawTiles(tiles) {
-    // Clear each tile first
-    for (let tile of tiles) {
-        clearTile(tile.x, tile.y);
-    }
-
-    drawSpritesAtTiles(tiles);
-}
-
-function dialogBox(text) {
-    const dialog = document.getElementById('dialog-box');
-    dialog.innerHTML = text;
-    dialog.style.display = 'block';
-}
-
-function clearTile(x, y) {
-    ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
 }
 
 function checkTiles(x, y, direction) {
@@ -296,8 +557,14 @@ function canMoveTo(x, y, object = player) {
                 // if it's a sign, show script
                 if (tileType === 'sign' && object.type === 'player') {
                     gamePaused = true; // Pause the game loop
-                    dialogBox(placedSprites[tileKey].data.script
-                        .replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                    //dialogBox(placedSprites[tileKey].data.script
+                        //.replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                    showDialog(placedSprites[tileKey].data.script
+                    .replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                }
+
+                if (tileType === 'object' && object.type === 'player') {
+                    handleObjectTouch(tileKey); 
                 }
                 return false;
             }
@@ -378,7 +645,7 @@ function tryPushTiles(startX, startY, direction, layer) {
     return true; // Movement allowed
 }
 
-
+// ############ Player movement ############
 function updatePlayer(deltaTime) {
     accumulatedTime += deltaTime;
     if (accumulatedTime < moveSpeed) return; // Wait for the next frame
@@ -430,6 +697,7 @@ function updatePlayer(deltaTime) {
 function handleLoadedGame(spriteSheetData, boardData) {
     placedSprites = boardData;
     replaceSpriteSheet(spriteSheetData);
+    loadObjectsFromGameData();
 
     console.log('Loaded Board', placedSprites);
 
@@ -458,17 +726,25 @@ function findPlayerSprite() {
     return null; // Return null if no player is found
 }
 
-document.addEventListener("keydown", (event) => {
-    keys[event.key] = true;
+// Key mapping (now using key names instead of key codes)
+let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F5: "F5", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10", F11: "F11", F12: "F12" };
 
-    if (gamePaused && (event.key === 'Escape' || event.key === 'Enter')) {
+document.addEventListener("keydown", (event) => {
+       keys[event.key] = true;
+
+    var key = event.code; // Use event.code
+    if (util[key]) {
+        event.preventDefault();
+    }
+
+    /*if (gamePaused && (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ')) {
         document.getElementById('dialog-box').style.display = 'none';
         gamePaused = false; // Resume the game loop
         requestAnimationFrame(animateGame);
         return;
-    }
+    }*/
 
-    if (event.key === 'l') {
+    if (event.key === 'l' && !gamePaused) { // load game
         loadCombinedData(handleLoadedGame);
     }
 
@@ -477,7 +753,12 @@ document.addEventListener("keydown", (event) => {
         renderLayersToMainCanvas(); // Draw them onto the main canvas
     }
 
-    if (event.key === ' ') { // Spacebar to shoot
+    if (event.key === 'p') {
+        gamePaused = !gamePaused;
+        if (!gamePaused) requestAnimationFrame(animateGame);
+    }
+
+    if (event.key === ' ' && !gamePaused) { // Spacebar to shoot
         bulletArray.push(createBullet(player.x + 0.5, player.y + 0.5, player.direction));
     }
 
