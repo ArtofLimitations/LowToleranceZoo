@@ -195,13 +195,14 @@ function processObjectScripts(deltaTime) {
         if (obj.timer > 0) continue;
         obj.timer = obj.speed; // Reset timer
 
+        /*
         if (!obj.script || !Array.isArray(obj.script)) {
             console.error("Error: obj.script is undefined or not an array", obj);
             return;
         }
         
         if (typeof obj.scriptIndex !== 'number' || obj.scriptIndex < 0 || obj.scriptIndex >= obj.script.length) {
-            console.error("Error: obj.scriptIndex is out of bounds", obj.scriptIndex);
+            //console.error("Error: obj.scriptIndex is out of bounds", obj.scriptIndex);
             return;
         }
         
@@ -209,6 +210,9 @@ function processObjectScripts(deltaTime) {
             console.error("Error: obj.script[obj.scriptIndex] is not a string", obj.script[obj.scriptIndex]);
             return;
         }
+        */
+
+        if (obj.resting) continue; // Skip if object is resting
 
         let command = obj.script[obj.scriptIndex].split(' ');
         let action = command[0];
@@ -229,7 +233,7 @@ function processObjectScripts(deltaTime) {
 
         // Auto-stop if script ends without `#end`
         if (obj.scriptIndex >= obj.script.length) {
-            obj.scriptIndex = obj.labels[':loop'] || obj.script.length - 1;
+           obj.resting = true;
         }
     }
 }
@@ -237,12 +241,14 @@ function processObjectScripts(deltaTime) {
 function executeObjectCommand(obj, action, args) {
     switch (action) {
         case '#end':
+            obj.resting = true;
             break;
         case "@name":
             obj.name = args.join(" ");
             break;
         case "#text":
-            //showDialog(args.join(" ")); 
+            gamePaused = true; // Pause the game loop
+            showDialog(args.join(" ")); 
             break;
         case "#change":
             obj.sprite = parseInt(args[0]);
@@ -272,10 +278,20 @@ function moveObject(obj, direction, layer) {
 
     let newKey = `${layer},${x},${y}`;
     if (!placedObjects[newKey]) {
-        delete placedObjects[`${layer},${obj.x},${obj.y}`]; 
+        const oldObj = placedSprites[`${layer},${obj.x},${obj.y}`] // copy old object
+
+        delete placedObjects[`${layer},${obj.x},${obj.y}`]; // from objects list
+        delete placedSprites[`${layer},${obj.x},${obj.y}`]; // from sprites / tiles list
+
+        updateTile(layer, obj.x, obj.y); 
+
         obj.x = x;
         obj.y = y;
-        placedObjects[newKey] = obj;
+
+        placedObjects[newKey] = obj; // objects
+        placedSprites[newKey] = oldObj; // tiles
+
+        updateTile(layer, obj.x, obj.y);
     }
 }
 
@@ -299,20 +315,19 @@ function loadObjectsFromGameData() {
                 //speed: tile.data.speed || 1,  // Default to speed 1
                 speed: 10,
                 timer: tile.data.timer || 0,  // Initialize timer
-                //script: parseScript(tile.data.script), // Parse script
-                script: parseScriptFromTextarea(tile.data.script), // Parse script
+                script: {}, // Parse script
+                //script: parseScriptFromTextarea(tile.data.script), // Parse script
                 scriptIndex: 0, 
                 labels: {},  // Will store labels (e.g., `:touch`)
+                resting: false,
             };
 
-            //const parsedScript = parseScript(tile.data.script);
-            //placedObjects[key].script = parsedScript.script;  // Store only the script array
-            //placedObjects[key].labels = parsedScript.labels;  // Store the labels separately
-
             // Parse labels for quick jumps
+            const parsedScript = parseScript(tile.data.script);
+            placedObjects[key].script = parsedScript.script;  // Store only the script array
+            placedObjects[key].labels = parsedScript.labels;  // Store the labels separately
+
             console.log(placedObjects[key].script);
-            //placedObjects[key].labels = extractLabels(tile.data.script);
-            //placedObjects[key].labels = extractLabels(placedObjects[key].script);
         }
     }
 }
@@ -328,7 +343,6 @@ function extractLabels(scriptArray) {
     return labels;
 }
 
-/*
 function parseScript(text) {
     let lines = text.trim().split("\n").map(line => line.trim());
     let script = [];
@@ -365,29 +379,16 @@ function parseScript(text) {
         }
     }
 
-    //return { script, labels };
+    return { script, labels };
     //return script;
     //return { script, labels }; // Return both separately
-}*/
-
-function parseScript(scriptArray) {
-    let labels = {};
-    let parsedScript = [];
-
-    scriptArray.forEach((line, index) => {
-        if (line.startsWith(":")) {
-            labels[line] = index; // Store label positions
-        }
-        parsedScript.push(line);
-    });
-
-    return { script: parsedScript, labels }; // Return both separately
 }
 
 function handleObjectTouch(tileKey) {
     let obj = placedObjects[tileKey];
     if (obj && obj.labels[":touch"]) {
         obj.scriptIndex = obj.labels[":touch"];
+        obj.resting = false; // Wake up the object
     }
 }
 
