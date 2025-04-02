@@ -1,10 +1,12 @@
 // Weapons module
 // Init: js/player.js
-const canvas = document.getElementById('lowToleranceCanvas');
-const ctx = canvas.getContext('2d');
- 
-export function createBullet (x, y, direction, speed = 16, color = 'white', origin = 'player') {
+//const canvas = document.getElementById('lowToleranceCanvas');
+//const ctx = canvas.getContext('2d'); 
+
+export function createBullet (canvas, x, y, direction, speed = 16, color = 'white', origin = 'player') {
     return {
+        canvas: canvas,
+        ctx: canvas.getContext('2d'),
         x: x * 32,
         y: y * 32,
         oldX: x,
@@ -33,7 +35,7 @@ export function createBullet (x, y, direction, speed = 16, color = 'white', orig
             
 
             // Deactivate bullet if it goes off-screen
-            if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
+            if (this.x < 0 || this.x > this.canvas.width || this.y < 0 || this.y > this.canvas.height) {
                 this.active = false;
             }
         },
@@ -41,8 +43,8 @@ export function createBullet (x, y, direction, speed = 16, color = 'white', orig
         draw() {
             if (this.active) {
                 
-                ctx.fillStyle = color;
-                ctx.fillRect(this.x, this.y, 4, 4); // Draw a small square bullet
+                this.ctx.fillStyle = color;
+                this.ctx.fillRect(this.x, this.y, 4, 4); // Draw a small square bullet
               
             }
         }

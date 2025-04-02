@@ -20,7 +20,7 @@ ctx.imageSmoothingEnabled = false
 // Game configurations
 let placedSprites = {};
 const tileSizeX = 32;                // Single tile size
-const tileSizeY = 32;               
+const tileSizeY = 32;
 const tilesX = 36;                   // Board width and height
 const tilesY = 25;
 const hiddenLayers = new Set();      // Set to hold hidden layers
@@ -49,7 +49,7 @@ export let filename = ''; // ############ File to load ###############
 // Timing
 let fps = 60;
 let lastTime = 0;  // Timing variables
-let moveSpeed = 100; // Pixels per second
+let moveSpeed = 80; // Pixels per second
 let accumulatedTime = 0;
 
 // ############ Main animation function ############ 
@@ -60,17 +60,19 @@ export function animateGame(currentTime) {
 
     if (deltaTime > 1000 / fps) { // 60 FPS cap
         // Update the position based on the speed and deltaTime
+        lastTime = currentTime;
 
         //position += speed * (deltaTime / 1000) * 60;
         updateBullets();
-        setInterval(() => processObjectScripts(deltaTime), 500);
-        lastTime = currentTime;
-    }  
-    updatePlayer(deltaTime);
+        updateObjects(deltaTime);
+        updatePlayer(deltaTime);
+
+    }
 
     // Loop the animation
     requestAnimationFrame(animateGame);
 }
+
 // ############ End of main animation function ############ 
 
 // ############ Drawing functions ############
@@ -186,54 +188,43 @@ function clearTile(x, y) {
 }
 
 //############ Object functions ############
-function processObjectScripts(deltaTime) {
-    
+function updateObjects(deltaTime) {
+
     for (let key in placedObjects) {
         let obj = placedObjects[key];
 
-        obj.timer--;
-        if (obj.timer > 0) continue;
-        obj.timer = obj.speed; // Reset timer
+        obj.timeSinceLastMove += deltaTime;
+        if (obj.timeSinceLastMove >= obj.moveInterval) {
 
-        /*
-        if (!obj.script || !Array.isArray(obj.script)) {
-            console.error("Error: obj.script is undefined or not an array", obj);
-            return;
-        }
-        
-        if (typeof obj.scriptIndex !== 'number' || obj.scriptIndex < 0 || obj.scriptIndex >= obj.script.length) {
-            //console.error("Error: obj.scriptIndex is out of bounds", obj.scriptIndex);
-            return;
-        }
-        
-        if (typeof obj.script[obj.scriptIndex] !== 'string') {
-            console.error("Error: obj.script[obj.scriptIndex] is not a string", obj.script[obj.scriptIndex]);
-            return;
-        }
-        */
+            
 
-        if (obj.resting) continue; // Skip if object is resting
+            if (obj.resting) continue; // Skip if object is resting
 
-        let command = obj.script[obj.scriptIndex].split(' ');
-        let action = command[0];
-        let args = command.slice(1);
+            let command = obj.script[obj.scriptIndex].split(' ');
+            let action = command[0];
+            let args = command.slice(1);
 
-        executeObjectCommand(obj, action, args);
+            executeObjectCommand(obj, action, args);
 
-        obj.scriptIndex++;
+            obj.scriptIndex++;
 
-        if (command[0] === "#loop") {
-            if (obj.labels[":loop"] !== undefined) {
-                obj.scriptIndex = obj.labels[":loop"]; // Jump to label position
-            } else {
-                console.error("Error: Missing ':loop' label in script.");
+            if (command[0] === "#loop") {
+                if (obj.labels[":loop"] !== undefined) {
+                    obj.scriptIndex = obj.labels[":loop"]; // Jump to label position
+                } else {
+                    console.error("Error: Missing ':loop' label in script.");
+                }
+                return;
             }
-            return;
-        }
 
-        // Auto-stop if script ends without `#end`
-        if (obj.scriptIndex >= obj.script.length) {
-           obj.resting = true;
+            // Auto-stop if script ends without `#end`
+            if (obj.scriptIndex >= obj.script.length) {
+                obj.resting = true;
+            }
+
+            obj.timeSinceLastMove = 0;
+
+            renderLayersToMainCanvas();
         }
     }
 }
@@ -248,11 +239,32 @@ function executeObjectCommand(obj, action, args) {
             break;
         case "#text":
             gamePaused = true; // Pause the game loop
-            showDialog(args.join(" ")); 
+            showDialog(args.join(" "));
             break;
         case "#change":
-            obj.sprite = parseInt(args[0]);
-            obj.color = args[1];
+            let spriteNumber = parseInt(args[0], 10);
+            let dark, light;
+
+            // Detect if colors are RGB or named
+            if (args[1].startsWith("(")) {
+                // RGB format: Extract two sets of RGB values
+                dark = extractRGB(args.slice(1, 4).join(" ")); 
+                light = extractRGB(args.slice(4, 7).join(" "));
+            } else {
+                // Named colors
+                dark = namedColors[args[1]] || [0, 0, 0]; // Default to black if not found
+                light = namedColors[args[2]] || [255, 255, 255]; // Default to white if not found
+            }
+
+            // Apply sprite change
+            obj.sprite = spriteNumber;
+            obj.color = [dark, light];
+
+            placedSprites[`${obj.layer},${obj.x},${obj.y}`].sprite = spriteNumber;
+            placedSprites[`${obj.layer},${obj.x},${obj.y}`].color = [dark, light];
+            updateTile(obj.layer, obj.x, obj.y); // Update tile with new sprite
+            renderLayersToMainCanvas(); // Ensure visual update
+
             break;
         case "#move":
             moveObject(obj, args[0], obj.layer);
@@ -263,10 +275,35 @@ function executeObjectCommand(obj, action, args) {
         case "#loop":
             obj.scriptIndex = obj.labels[":loop"] || 0;
             break;
+        case '#nightmode':
+            nightMode = !nightMode;
+            break;
+        default:
+            console.warn(`Unknown command: ${action}`);
     }
 }
 
-function moveObject(obj, direction, layer) {
+// Helper function to extract RGB values
+
+function extractRGB(str) {
+    let match = str.match(/\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(\.\d+)?)?\)/); // Capture RGB, ignore alpha
+    return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3]), 1] : [0, 0, 0, 1]; // Default to black with full alpha
+}
+
+// Named color lookup table
+const namedColors = {
+    "red": [255, 0, 0, 255],
+    "pink": [255, 182, 193, 255],
+    "blue": [0, 0, 255, 255],
+    "green": [0, 255, 0, 255],
+    "yellow": [255, 255, 0, 255],
+    "purple": [128, 0, 128, 255],
+    "orange": [255, 165, 0, 255],
+    "white": [255, 255, 255, 255],
+    "black": [0, 0, 0, 255]
+};
+
+/*function moveObject(obj, direction, layer) {
     let [x, y] = [obj.x, obj.y];
 
     switch (direction) {
@@ -283,16 +320,42 @@ function moveObject(obj, direction, layer) {
         delete placedObjects[`${layer},${obj.x},${obj.y}`]; // from objects list
         delete placedSprites[`${layer},${obj.x},${obj.y}`]; // from sprites / tiles list
 
-        updateTile(layer, obj.x, obj.y); 
+        updateTile(layer, obj.x, obj.y);
 
         obj.x = x;
         obj.y = y;
 
-        placedObjects[newKey] = obj; // objects
-        placedSprites[newKey] = oldObj; // tiles
+        placedObjects[newKey] = obj;    // objects
+        placedSprites[newKey] = oldObj; // object tile
 
         updateTile(layer, obj.x, obj.y);
     }
+}*/
+
+function moveObject(obj, direction, layer) {
+    const offsets = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+    if (!offsets[direction]) return; // Invalid direction guard
+
+    const [dx, dy] = offsets[direction];
+    const [newX, newY] = [obj.x + dx, obj.y + dy];
+
+    const oldKey = `${layer},${obj.x},${obj.y}`;
+    const newKey = `${layer},${newX},${newY}`;
+
+    if (placedObjects[newKey]) return; // Prevent movement if occupied
+
+    placedSprites[newKey] = placedSprites[oldKey]; // Move sprite
+    placedObjects[newKey] = obj;
+
+    delete placedObjects[oldKey];
+    delete placedSprites[oldKey];
+
+    updateTile(layer, obj.x, obj.y); // Clear old tile
+
+    obj.x = newX;
+    obj.y = newY;
+
+    updateTile(layer, obj.x, obj.y); // Update new tile
 }
 
 function loadObjectsFromGameData() {
@@ -312,12 +375,13 @@ function loadObjectsFromGameData() {
                 sprite: tile.sprite,
                 color: tile.color,
                 name: tile.data.name || "",
-                //speed: tile.data.speed || 1,  // Default to speed 1
-                speed: 10,
+                speed: tile.data.speed || 1,  // Default to speed 1
                 timer: tile.data.timer || 0,  // Initialize timer
+                timeSinceLastMove: 0, // Time since last move
+                moveInterval: tile.data.moveInterval || 300, // Default move interval
                 script: {}, // Parse script
                 //script: parseScriptFromTextarea(tile.data.script), // Parse script
-                scriptIndex: 0, 
+                scriptIndex: 0,
                 labels: {},  // Will store labels (e.g., `:touch`)
                 resting: false,
             };
@@ -330,17 +394,6 @@ function loadObjectsFromGameData() {
             console.log(placedObjects[key].script);
         }
     }
-}
-
-function extractLabels(scriptArray) {
-    let labels = {};
-    scriptArray.forEach((line, index) => {
-        if (line.startsWith(":")) {
-            labels[line] = index;
-            console.log(labels);
-        }
-    });
-    return labels;
 }
 
 function parseScript(text) {
@@ -359,8 +412,9 @@ function parseScript(text) {
         }
 
         if (collectingText) {
-            if (line === "#end") {
+            if (line.startsWith("#")) {
                 script.push(`#text ${textBlock.trim()}`);
+                script.push(line); // Keep the command
                 collectingText = false;
             } else {
                 textBlock += line + "\n";
@@ -403,8 +457,8 @@ function parseScriptFromTextarea(text) {
             collectingText = true;
             textBlock = "";
             continue;
-        } 
-        
+        }
+
         if (collectingText) {
             if (line === "#end") {
                 script.push(`#text ${textBlock.trim()}`); // Store full text block as one entry
@@ -559,13 +613,13 @@ function canMoveTo(x, y, object = player) {
                 if (tileType === 'sign' && object.type === 'player') {
                     gamePaused = true; // Pause the game loop
                     //dialogBox(placedSprites[tileKey].data.script
-                        //.replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                    //.replace(/(?:\r\n|\r|\n)/g, '<br>'));
                     showDialog(placedSprites[tileKey].data.script
-                    .replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                        .replace(/(?:\r\n|\r|\n)/g, '<br>'));
                 }
 
                 if (tileType === 'object' && object.type === 'player') {
-                    handleObjectTouch(tileKey); 
+                    handleObjectTouch(tileKey);
                 }
                 return false;
             }
@@ -696,8 +750,11 @@ function updatePlayer(deltaTime) {
 
 // Load board and replace spritesheet
 function handleLoadedGame(spriteSheetData, boardData) {
+
     placedSprites = boardData;
+
     replaceSpriteSheet(spriteSheetData);
+
     loadObjectsFromGameData();
 
     console.log('Loaded Board', placedSprites);
@@ -731,7 +788,7 @@ function findPlayerSprite() {
 let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F5: "F5", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10", F11: "F11", F12: "F12" };
 
 document.addEventListener("keydown", (event) => {
-       keys[event.key] = true;
+    keys[event.key] = true;
 
     var key = event.code; // Use event.code
     if (util[key]) {
@@ -760,7 +817,7 @@ document.addEventListener("keydown", (event) => {
     }
 
     if (event.key === ' ' && !gamePaused) { // Spacebar to shoot
-        bulletArray.push(createBullet(player.x + 0.5, player.y + 0.5, player.direction));
+        bulletArray.push(createBullet(canvas, player.x + 0.5, player.y + 0.5, player.direction));
     }
 
     updateDirection(); // Update direction based on keys held
