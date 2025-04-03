@@ -3,6 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet } from './weapons.js';
 import { playerStats } from './player-stats.js';
+import { extractRGB, namedColors, loadObjectsFromGameData } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -30,6 +31,7 @@ const tilesCtx = tilesCanvas.getContext('2d');
 const layerCanvases = {};            // Stores canvases for layers
 const layerContexts = {};            // Stores 2D contexts for layers
 let placedObjects = {};              // Stores objects on the board
+//const namedColors = namedColorList;  // Named colors for easy reference
 
 // board variables
 let board = {};
@@ -48,11 +50,14 @@ export let filename = ''; // ############ File to load ###############
 
 // Timing
 let fps = 60;
-let lastTime = 0;  // Timing variables
+let lastTime = 0;   // Timing variables
 let moveSpeed = 80; // Pixels per second
 let accumulatedTime = 0;
 
-// ############ Main animation function ############ 
+// #################################################
+// ############ Main animation function ############
+// #################################################
+
 export function animateGame(currentTime) {
     if (gamePaused) return; // Stop the loop when the game is paused
 
@@ -75,7 +80,9 @@ export function animateGame(currentTime) {
 
 // ############ End of main animation function ############ 
 
+// ###########################################
 // ############ Drawing functions ############
+// ###########################################
 
 function updateBullets() {
 
@@ -187,16 +194,26 @@ function clearTile(x, y) {
     ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
 }
 
-//############ Object functions ############
+// ##########################################
+// ############ Object functions ############
+// ##########################################
+
 function updateObjects(deltaTime) {
 
     for (let key in placedObjects) {
         let obj = placedObjects[key];
 
+        // Handle waiting state
+        if (obj.waiting) {
+            obj.waitTime--;
+            if (obj.waitTime <= 0) {
+                obj.waiting = false; // Done waiting
+            }
+            continue; // Skip executing new commands
+        }
+
         obj.timeSinceLastMove += deltaTime;
         if (obj.timeSinceLastMove >= obj.moveInterval) {
-
-            
 
             if (obj.resting) continue; // Skip if object is resting
 
@@ -204,9 +221,18 @@ function updateObjects(deltaTime) {
             let action = command[0];
             let args = command.slice(1);
 
+            if (command[0].startsWith('@')) {
+                obj.name = command[0].substring(1); // Set name
+                obj.scriptIndex++;
+                continue; // Skip to next command
+            }
+
             executeObjectCommand(obj, action, args);
 
+            // Move script index only if not waiting
+            //if (!obj.waiting) {
             obj.scriptIndex++;
+            //}
 
             if (command[0] === "#loop") {
                 if (obj.labels[":loop"] !== undefined) {
@@ -234,9 +260,9 @@ function executeObjectCommand(obj, action, args) {
         case '#end':
             obj.resting = true;
             break;
-        case "@name":
-            obj.name = args.join(" ");
-            break;
+        //case `@${action}`:
+        //obj.name = args.join(" ");
+        //break;
         case "#text":
             gamePaused = true; // Pause the game loop
             showDialog(args.join(" "));
@@ -248,7 +274,7 @@ function executeObjectCommand(obj, action, args) {
             // Detect if colors are RGB or named
             if (args[1].startsWith("(")) {
                 // RGB format: Extract two sets of RGB values
-                dark = extractRGB(args.slice(1, 4).join(" ")); 
+                dark = extractRGB(args.slice(1, 4).join(" "));
                 light = extractRGB(args.slice(4, 7).join(" "));
             } else {
                 // Named colors
@@ -266,11 +292,51 @@ function executeObjectCommand(obj, action, args) {
             renderLayersToMainCanvas(); // Ensure visual update
 
             break;
+        case '#changecolor':
+            if (args[0] === "undefined") { console.warn("No color provided"); return; }
+            let color = extractRGB(args[0]); // Extract RGB values
+            let spriteKey = `${obj.layer},${obj.x},${obj.y}`;
+            if (placedSprites[spriteKey]) {
+                placedSprites[spriteKey].color = color; // Update color
+                updateTile(obj.layer, obj.x, obj.y); // Update tile with new color
+                renderLayersToMainCanvas(); // Ensure visual update
+            }
+            break;
+        case '#changesprite':
+            if (args[0] === "undefined" || isNaN(args[0])) { console.warn("No sprite provided or NaN"); return; }
+            let spriteKeyChange = `${obj.layer},${obj.x},${obj.y}`;
+            if (placedSprites[spriteKeyChange]) {
+                placedSprites[spriteKeyChange].sprite = parseInt(args[0], 10); // Update sprite
+                updateTile(obj.layer, obj.x, obj.y); // Update tile with new sprite
+                renderLayersToMainCanvas(); // Ensure visual update
+            }
+            break;
+        case "#timer":
+            obj.timer = parseInt(args[0], 10); // Set timer
+            break;
         case "#move":
-            moveObject(obj, args[0], obj.layer);
+            let direction = args[0];
+            switch (args[0]) {
+                case 'north': direction = 'up'; break;
+                case 'south': direction = 'down'; break;
+                case 'east': direction = 'right'; break;
+                case 'west': direction = 'left'; break;
+            }
+            moveObject(obj, direction, obj.layer);
+            break;
+        case '#shoot':
+            if (args[0] === "undefined") { console.warn("No direction provided"); return; }
+            if (args[0] === 'seek') {
+                // Implement seeking logic here
+                console.warn("Seeking bullets not implemented yet");
+                return;
+            }
+            let bullet = createBullet(canvas, obj.x, obj.y, args[0], 16, 'white', 'object');
+            bulletArray.push(bullet);
             break;
         case "#wait":
-            obj.timer += parseInt(args[0]); // Add delay
+            obj.waiting = true; // Set waiting state
+            obj.waitTime = parseInt(args[0], 10); // Store remaining cycles
             break;
         case "#loop":
             obj.scriptIndex = obj.labels[":loop"] || 0;
@@ -283,8 +349,7 @@ function executeObjectCommand(obj, action, args) {
     }
 }
 
-// Helper function to extract RGB values
-
+/*/ Helper function to extract RGB values
 function extractRGB(str) {
     let match = str.match(/\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(\.\d+)?)?\)/); // Capture RGB, ignore alpha
     return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3]), 1] : [0, 0, 0, 1]; // Default to black with full alpha
@@ -301,40 +366,14 @@ const namedColors = {
     "orange": [255, 165, 0, 255],
     "white": [255, 255, 255, 255],
     "black": [0, 0, 0, 255]
-};
-
-/*function moveObject(obj, direction, layer) {
-    let [x, y] = [obj.x, obj.y];
-
-    switch (direction) {
-        case "up": y -= 1; break;
-        case "down": y += 1; break;
-        case "left": x -= 1; break;
-        case "right": x += 1; break;
-    }
-
-    let newKey = `${layer},${x},${y}`;
-    if (!placedObjects[newKey]) {
-        const oldObj = placedSprites[`${layer},${obj.x},${obj.y}`] // copy old object
-
-        delete placedObjects[`${layer},${obj.x},${obj.y}`]; // from objects list
-        delete placedSprites[`${layer},${obj.x},${obj.y}`]; // from sprites / tiles list
-
-        updateTile(layer, obj.x, obj.y);
-
-        obj.x = x;
-        obj.y = y;
-
-        placedObjects[newKey] = obj;    // objects
-        placedSprites[newKey] = oldObj; // object tile
-
-        updateTile(layer, obj.x, obj.y);
-    }
-}*/
+};*/
 
 function moveObject(obj, direction, layer) {
     const offsets = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-    if (!offsets[direction]) return; // Invalid direction guard
+    if (!offsets[direction]) {
+        console.warn(`Invalid direction: ${direction} for #move`);
+        return; // Invalid direction guard
+    }
 
     const [dx, dy] = offsets[direction];
     const [newX, newY] = [obj.x + dx, obj.y + dy];
@@ -358,6 +397,7 @@ function moveObject(obj, direction, layer) {
     updateTile(layer, obj.x, obj.y); // Update new tile
 }
 
+/*
 function loadObjectsFromGameData() {
     placedObjects = {}; // Reset objects
 
@@ -375,6 +415,9 @@ function loadObjectsFromGameData() {
                 sprite: tile.sprite,
                 color: tile.color,
                 name: tile.data.name || "",
+                direction: 'down', // Default direction
+                waiting: false, // Initialize waiting state
+                waitTime: 0, // Initialize wait time
                 speed: tile.data.speed || 1,  // Default to speed 1
                 timer: tile.data.timer || 0,  // Initialize timer
                 timeSinceLastMove: 0, // Time since last move
@@ -434,9 +477,7 @@ function parseScript(text) {
     }
 
     return { script, labels };
-    //return script;
-    //return { script, labels }; // Return both separately
-}
+} */
 
 function handleObjectTouch(tileKey) {
     let obj = placedObjects[tileKey];
@@ -446,39 +487,9 @@ function handleObjectTouch(tileKey) {
     }
 }
 
-function parseScriptFromTextarea(text) {
-    let lines = text.trim().split("\n").map(line => line.trim());
-    let script = [];
-    let collectingText = false;
-    let textBlock = "";
-
-    for (let line of lines) {
-        if (line === "#text") {
-            collectingText = true;
-            textBlock = "";
-            continue;
-        }
-
-        if (collectingText) {
-            if (line === "#end") {
-                script.push(`#text ${textBlock.trim()}`); // Store full text block as one entry
-                collectingText = false;
-            } else {
-                textBlock += line + "\n"; // Keep collecting multi-line text
-            }
-            continue;
-        }
-
-        // Store regular commands or section headers
-        if (line !== "") {
-            script.push(line);
-        }
-    }
-
-    return script;
-}
-
+// ##############################################
 // ############ Dialog box functions ############
+// ##############################################
 
 function paginateText(text, maxLength) { // Split text into pages
     let pages = [];
@@ -504,7 +515,7 @@ function paginateText(text, maxLength) { // Split text into pages
     return pages;
 }
 
-function showDialog(text) { // Show dialog box with text
+function showDialog(text, object = null) { // Show dialog box with text
     let pages = paginateText(text, 200); // Adjust maxLength as needed
     let pageIndex = 0;
     const dialog = document.getElementById('dialog-box');
@@ -546,7 +557,9 @@ function showDialog(text) { // Show dialog box with text
     });
 }
 
+// #############################################
 // ############ Collision detection ############
+// #############################################
 
 function getOverlappingTiles(x, y) {
     let leftTile = Math.floor(x / 32);
@@ -570,14 +583,18 @@ function checkTiles(x, y, direction) {
 
     switch (direction) {
         case 'up':
+        case 'north':
             return [{ x: leftTile, y: topTile },
             { x: rightTile, y: topTile },];
+        case 'south':
         case 'down':
             return [{ x: leftTile, y: bottomTile },
             { x: rightTile, y: bottomTile },];
+        case 'west':
         case 'left':
             return [{ x: leftTile, y: topTile },
             { x: leftTile, y: bottomTile },];
+        case 'east':
         case 'right':
             return [{ x: rightTile, y: topTile },
             { x: rightTile, y: bottomTile },];
@@ -602,6 +619,8 @@ function canMoveTo(x, y, object = player) {
         if (placedSprites[tileKey]) {
             let tileType = placedSprites[tileKey].type;
 
+            //if (object === 'bullet' && tileType === 'object' && object.origin === 'object') return true; 
+
             // Collision with walls or unbreakable objects
             if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object') {
                 // If it's a bullet hitting a breakable tile
@@ -621,6 +640,7 @@ function canMoveTo(x, y, object = player) {
                 if (tileType === 'object' && object.type === 'player') {
                     handleObjectTouch(tileKey);
                 }
+                
                 return false;
             }
 
@@ -700,7 +720,10 @@ function tryPushTiles(startX, startY, direction, layer) {
     return true; // Movement allowed
 }
 
+// #########################################
 // ############ Player movement ############
+// #########################################
+
 function updatePlayer(deltaTime) {
     accumulatedTime += deltaTime;
     if (accumulatedTime < moveSpeed) return; // Wait for the next frame
@@ -740,13 +763,13 @@ function updatePlayer(deltaTime) {
         placedSprites[newKey] = placedSprites[oldKey];
         delete placedSprites[oldKey];
 
-        //drawLayersAtTiles(uniqueTiles);
-        //redrawLayers(player.x * 32, player.y * 32);
-        //drawTileAt(player.x, player.y, player.layer); // Updates a single tile at (5,5) on layer 2
-        renderLayersToMainCanvas();
-        //redrawTiles(uniqueTiles);
+        renderLayersToMainCanvas();  
     }
 }
+
+// #############################################
+// ######## Events & loading functions #########
+// #############################################
 
 // Load board and replace spritesheet
 function handleLoadedGame(spriteSheetData, boardData) {
@@ -755,12 +778,12 @@ function handleLoadedGame(spriteSheetData, boardData) {
 
     replaceSpriteSheet(spriteSheetData);
 
-    loadObjectsFromGameData();
-
+    placedObjects = loadObjectsFromGameData(placedSprites);
     console.log('Loaded Board', placedSprites);
 
     loaded = true;
     player = findPlayerSprite();
+
     stats = { // update this. loads with board / player stats
         coins: 0,
         score: 0,
@@ -840,8 +863,6 @@ function updateDirection() {
         player.direction = 'right';
     }
 }
-
-// Initiate
 
 // Start the animation
 requestAnimationFrame(animateGame);
