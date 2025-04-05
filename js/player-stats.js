@@ -1,4 +1,4 @@
-export let playerStats = {
+export let defaultPlayerStats = {
     name: "Player",
     x: 10,
     y: 10,

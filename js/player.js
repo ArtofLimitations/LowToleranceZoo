@@ -2,8 +2,8 @@ import { loadCombinedData } from './file.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet } from './weapons.js';
-import { playerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData } from './object-functions.js';
+import { defaultPlayerStats } from './player-stats.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -39,9 +39,10 @@ let loaded = false;
 let nightMode = true;
 
 // Player
-let player = playerStats;
-let stats = player.stats;
-const stepSize = player.stepSize; // Step size for player movement
+let player = defaultPlayerStats; // Player object
+let playerStats = defaultPlayerStats;
+//let stats = playerStats;
+const stepSize = playerStats.stepSize; // Step size for player movement
 let gamePaused = false;
 let bulletArray = [];
 
@@ -221,11 +222,11 @@ function updateObjects(deltaTime) {
             let action = command[0];
             let args = command.slice(1);
 
-            if (command[0].startsWith('@')) {
+            /*if (command[0].startsWith('@')) {
                 obj.name = command[0].substring(1); // Set name
                 obj.scriptIndex++;
                 continue; // Skip to next command
-            }
+            }*/
 
             executeObjectCommand(obj, action, args);
 
@@ -256,16 +257,20 @@ function updateObjects(deltaTime) {
 }
 
 function executeObjectCommand(obj, action, args) {
+
+    if (action.startsWith("@")) {
+        // Set the object's name to everything after @
+        obj.name = action.slice(1) + (args.length > 0 ? " " + args.join(" ") : "");
+        return;
+    }
+
     switch (action) {
         case '#end':
             obj.resting = true;
             break;
-        //case `@${action}`:
-        //obj.name = args.join(" ");
-        //break;
         case "#text":
             gamePaused = true; // Pause the game loop
-            showDialog(args.join(" "));
+            showDialog(args.join(" "), obj);
             break;
         case "#change":
             let spriteNumber = parseInt(args[0], 10);
@@ -296,20 +301,18 @@ function executeObjectCommand(obj, action, args) {
             if (args[0] === "undefined") { console.warn("No color provided"); return; }
             let color = extractRGB(args[0]); // Extract RGB values
             let spriteKey = `${obj.layer},${obj.x},${obj.y}`;
-            if (placedSprites[spriteKey]) {
-                placedSprites[spriteKey].color = color; // Update color
-                updateTile(obj.layer, obj.x, obj.y); // Update tile with new color
-                renderLayersToMainCanvas(); // Ensure visual update
-            }
+            placedSprites[spriteKey].color = color; // Update color
+            placedObjects[spriteKey].color = color; // Update object color
+            updateTile(obj.layer, obj.x, obj.y); // Update tile with new color
+            renderLayersToMainCanvas(); // Ensure visual update
             break;
         case '#changesprite':
             if (args[0] === "undefined" || isNaN(args[0])) { console.warn("No sprite provided or NaN"); return; }
             let spriteKeyChange = `${obj.layer},${obj.x},${obj.y}`;
-            if (placedSprites[spriteKeyChange]) {
-                placedSprites[spriteKeyChange].sprite = parseInt(args[0], 10); // Update sprite
-                updateTile(obj.layer, obj.x, obj.y); // Update tile with new sprite
-                renderLayersToMainCanvas(); // Ensure visual update
-            }
+            placedSprites[spriteKeyChange].sprite = parseInt(args[0], 10); // Update sprite
+            placedObjects[spriteKeyChange].sprite = parseInt(args[0], 10); // Update object sprite
+            updateTile(obj.layer, obj.x, obj.y); // Update tile with new sprite
+            renderLayersToMainCanvas(); // Ensure visual update
             break;
         case "#timer":
             obj.timer = parseInt(args[0], 10); // Set timer
@@ -331,7 +334,35 @@ function executeObjectCommand(obj, action, args) {
                 console.warn("Seeking bullets not implemented yet");
                 return;
             }
-            let bullet = createBullet(canvas, obj.x, obj.y, args[0], 16, 'white', 'object');
+            let bulletDirection = convertDirections(args[0]);
+            let x = obj.x;
+            let y = obj.y;
+
+            if (bulletDirection === -1) console.warn(`Invalid direction "${args[0]}" provided for bullet`);
+
+            switch (bulletDirection) {
+                case 'up':
+                    bulletDirection = 'up';
+                    y -= 0.5;
+                    x += 0.5;
+                    break;
+                case 'down':
+                    bulletDirection = 'down';
+                    y += 1;
+                    x += 0.5;
+                    break;
+                case 'right':
+                    bulletDirection = 'right';
+                    x += 1;
+                    y += 0.5;
+                    break;
+                case 'left':
+                    bulletDirection = 'left';
+                    x -= 0.5;
+                    y += 0.5;
+                    break;
+            }
+            let bullet = createBullet(canvas, x, y, bulletDirection, 16, 'white', obj.name);
             bulletArray.push(bullet);
             break;
         case "#wait":
@@ -340,6 +371,35 @@ function executeObjectCommand(obj, action, args) {
             break;
         case "#loop":
             obj.scriptIndex = obj.labels[":loop"] || 0;
+            break;
+        case "#zap":
+            const zapLabel = `:${args[0]}`;
+            if (!obj.zappedLabels[zapLabel]) {
+                obj.zappedLabels[zapLabel] = 1;
+            } else {
+                obj.zappedLabels[zapLabel]++;
+            }
+            break;
+        case "#restore":
+            const restoreLabel = `:${args[0]}`;
+            delete obj.zappedLabels[restoreLabel];
+            break;
+        case "#trigger":
+            let triggerLabel = args[0];
+            let index = resolveLabel(obj, triggerLabel);
+            if (index !== null) {
+                obj.scriptIndex = index;
+            } else {
+                console.warn(`No active labels found for :${triggerLabel}`);
+            }
+            break;
+        case '#take':
+            let item = args[0];
+            let amount = parseInt(args[1], 10);
+            if (isNaN(amount)) amount = 1; // Default to 1 if not specified
+            takeStat(playerStats, item, amount);
+            console.log(`Took ${amount} ${item}(s)`);
+            console.log(playerStats.health);
             break;
         case '#nightmode':
             nightMode = !nightMode;
@@ -482,7 +542,14 @@ function parseScript(text) {
 function handleObjectTouch(tileKey) {
     let obj = placedObjects[tileKey];
     if (obj && obj.labels[":touch"]) {
-        obj.scriptIndex = obj.labels[":touch"];
+        //obj.scriptIndex = obj.labels[":touch"];
+        let index = resolveLabel(obj, ":touch");
+        if (index !== null) {
+            obj.scriptIndex = index;
+        } else {
+            // Optionally skip or log that all labels were zapped
+            console.warn("No active :touch labels found.");
+        }
         obj.resting = false; // Wake up the object
     }
 }
@@ -515,10 +582,17 @@ function paginateText(text, maxLength) { // Split text into pages
     return pages;
 }
 
-function showDialog(text, object = null) { // Show dialog box with text
+function showDialog(text, object = null) {
     let pages = paginateText(text, 200); // Adjust maxLength as needed
     let pageIndex = 0;
     const dialog = document.getElementById('dialog-box');
+
+    // Set object name if available
+    if (object && object.name) {
+        dialog.setAttribute('data-object-name', object.name);
+    } else {
+        dialog.removeAttribute('data-object-name');
+    }
 
     function updateDialog() {
         dialog.innerHTML = pages[pageIndex];
@@ -536,7 +610,7 @@ function showDialog(text, object = null) { // Show dialog box with text
     let inputBlocked = true;
     updateDialog();
 
-    setTimeout(() => inputBlocked = false, 300); // Block input for 1000ms
+    setTimeout(() => inputBlocked = false, 300); // Block input for 300ms
 
     document.addEventListener('keydown', function nextPage(event) {
         if (inputBlocked) return;
@@ -583,33 +657,117 @@ function checkTiles(x, y, direction) {
 
     switch (direction) {
         case 'up':
-        case 'north':
             return [{ x: leftTile, y: topTile },
             { x: rightTile, y: topTile },];
-        case 'south':
         case 'down':
             return [{ x: leftTile, y: bottomTile },
             { x: rightTile, y: bottomTile },];
-        case 'west':
         case 'left':
             return [{ x: leftTile, y: topTile },
             { x: leftTile, y: bottomTile },];
-        case 'east':
         case 'right':
             return [{ x: rightTile, y: topTile },
             { x: rightTile, y: bottomTile },];
     }
 }
 
-function canMoveTo(x, y, object = player) {
-    if (object.type === 'bullet') {
-        x = x - 0.5;
-        y = y - 0.5;
+function ccheckBulletTiles(x, y) {
+    const bulletSize = 8; // Bullet collision area (8x8)
+
+    let leftTile = Math.floor((x - bulletSize) / tileSizeX);
+    let topTile = Math.floor((y - bulletSize) / tileSizeY);
+    let rightTile = Math.floor((x + bulletSize) / tileSizeX);
+    let bottomTile = Math.floor((y + bulletSize) / tileSizeY);
+
+    let tiles = [];
+
+    for (let tx = leftTile; tx <= rightTile; tx++) {
+        for (let ty = topTile; ty <= bottomTile; ty++) {
+            tiles.push({ x: tx, y: ty });
+            tiles.push({ x: tx - 0.5, y: ty });
+            tiles.push({ x: tx + 0.5, y: ty });
+            tiles.push({ x: tx, y: ty - 0.5 });
+            tiles.push({ x: tx, y: ty + 0.5 });
+        }
     }
 
-    let tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
+    return tiles;
+}
+
+function checkBulletTiles(x, y) {
+    const bulletSize = 8; // Bullet collision area (8x8)
+
+    let leftTile = Math.floor((x - bulletSize) / tileSizeX);
+    let topTile = Math.floor((y - bulletSize) / tileSizeY);
+    let rightTile = Math.floor((x + bulletSize) / tileSizeX);
+    let bottomTile = Math.floor((y + bulletSize) / tileSizeY);
+
+    const tileSet = new Set();
+
+    for (let tx = leftTile; tx <= rightTile; tx++) {
+        for (let ty = topTile; ty <= bottomTile; ty++) {
+            const offsets = [
+                [0, 0],
+                [-0.5, 0],
+                [0.5, 0],
+                [0, -0.5],
+                [0, 0.5]
+            ];
+
+            for (const [dx, dy] of offsets) {
+                const fx = tx + dx;
+                const fy = ty + dy;
+
+                if (fx >= 0 && fy >= 0) {
+                    tileSet.add(`${fx},${fy}`);
+                }
+            }
+        }
+    }
+
+    // Convert back into array of tile objects
+    const tiles = Array.from(tileSet).map(key => {
+        const [xStr, yStr] = key.split(',');
+        return { x: parseFloat(xStr), y: parseFloat(yStr) };
+    });
+
+    return tiles;
+}
+
+/*function checkTiles(x, y, direction) {
+    const width = tileSizeX;
+    const height = tileSizeY;
+
+    let leftTile = Math.floor(x / tileSizeX);
+    let topTile = Math.floor(y / tileSizeY);
+    let rightTile = Math.floor((x + width - 1) / tileSizeX);
+    let bottomTile = Math.floor((y + height - 1) / tileSizeY);
+
+    let tilePositions = [];
+
+    // Get all tile positions occupied by the bounding box
+    for (let tx = leftTile; tx <= rightTile; tx++) {
+        for (let ty = topTile; ty <= bottomTile; ty++) {
+            tilePositions.push({ x: tx, y: ty });
+        }
+    }
+
+    return tilePositions;
+}*/
+
+function canMoveTo(x, y, object = player) {
+    //if (object.type === 'bullet' && object.origin === 'player') { // just for centering bullets
+    //    x = x - 0.5;
+    //    y = y - 0.5;
+    //}
+
+    let tiles = [];
+    if (object.type === 'bullet') {
+        tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.oldX, object.oldY);
+    } else { tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction); }
 
     for (let tile of tiles) {
+
         let tileKey = `${object.layer},${tile.x},${tile.y}`;
 
         if (tile.x < 0 || tile.y < 0 || tile.y >= tilesY || tile.x >= tilesX) {
@@ -618,6 +776,10 @@ function canMoveTo(x, y, object = player) {
 
         if (placedSprites[tileKey]) {
             let tileType = placedSprites[tileKey].type;
+
+            if (object.type === 'bullet' && object.origin === 'player' && tileType === 'player') {
+                return true;    // Bullet hit something (not itself or its owner)
+            }
 
             //if (object === 'bullet' && tileType === 'object' && object.origin === 'object') return true; 
 
@@ -640,17 +802,23 @@ function canMoveTo(x, y, object = player) {
                 if (tileType === 'object' && object.type === 'player') {
                     handleObjectTouch(tileKey);
                 }
-                
+
                 return false;
             }
 
             // Picking up an item or destroying tile
             if (tileType === 'item' && object.type === 'player') {
-                stats.coins++;
-                console.log('Coins:', stats.coins);
+                playerStats.stats.coins++;
+                console.log('Coins:', playerStats.stats.coins);
                 delete placedSprites[tileKey];
                 updateTile(player.layer, tile.x, tile.y);
                 return true;
+            }
+
+            if (object.type === 'bullet' && tileType === 'player') {
+                // Handle bullet hitting player
+                console.log('Hit player!');
+                return false; // Prevent movement
             }
 
             // If it's a pushable block
@@ -659,6 +827,8 @@ function canMoveTo(x, y, object = player) {
 
             }
         }
+        //ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Debugging color
+        //ctx.fillRect(tile.x * tileSizeX, tile.y * tileSizeY, tileSizeX, tileSizeY); // Debugging
     }
 
     return true;
@@ -763,7 +933,7 @@ function updatePlayer(deltaTime) {
         placedSprites[newKey] = placedSprites[oldKey];
         delete placedSprites[oldKey];
 
-        renderLayersToMainCanvas();  
+        renderLayersToMainCanvas();
     }
 }
 
@@ -784,12 +954,14 @@ function handleLoadedGame(spriteSheetData, boardData) {
     loaded = true;
     player = findPlayerSprite();
 
-    stats = { // update this. loads with board / player stats
+    /*stats = { // update this. loads with board / player stats
         coins: 0,
         score: 0,
         lives: 3
-    };
+    };*/
 
+    //stats = player.stats;
+    console.log('Loaded Stats', playerStats);
     console.log(player);
 
     drawBoard(); // Generate all layers

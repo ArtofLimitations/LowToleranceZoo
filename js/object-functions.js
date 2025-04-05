@@ -26,11 +26,12 @@ export function loadObjectsFromGameData(gameData) {
                 speed: tile.data.speed || 1,  // Default to speed 1
                 timer: tile.data.timer || 0,  // Initialize timer
                 timeSinceLastMove: 0, // Time since last move
-                moveInterval: tile.data.moveInterval || 300, // Default move interval
+                moveInterval: tile.data.moveInterval || 100, // Default move interval
                 script: {}, // Parse script
                 //script: parseScriptFromTextarea(tile.data.script), // Parse script
                 scriptIndex: 0,
                 labels: {},  // Will store labels (e.g., `:touch`)
+                zappedLabels: {},
                 resting: false,
             };
 
@@ -48,7 +49,7 @@ export function loadObjectsFromGameData(gameData) {
 function parseScript(text) {
     let lines = text.trim().split("\n").map(line => line.trim());
     let script = [];
-    let labels = {}; // Store label positions
+    let labels = {}; // Store label positions as arrays
     let collectingText = false;
     let textBlock = "";
     let index = 0;
@@ -63,8 +64,9 @@ function parseScript(text) {
         if (collectingText) {
             if (line.startsWith("#")) {
                 script.push(`#text ${textBlock.trim()}`);
-                script.push(line); // Keep the command
+                script.push(line); // Next command
                 collectingText = false;
+                index += 2;
             } else {
                 textBlock += line + "\n";
             }
@@ -72,8 +74,11 @@ function parseScript(text) {
         }
 
         if (line.startsWith(":")) {
-            labels[line] = index; // Store label position
-            continue; // Don't store labels in the script array
+            if (!labels[line]) {
+                labels[line] = [];
+            }
+            labels[line].push(index); // Push the label position
+            continue; // Labels aren't stored in the script array
         }
 
         if (line !== "") {
@@ -84,6 +89,28 @@ function parseScript(text) {
 
     return { script, labels };
 }
+
+export function resolveLabel(obj, label) {
+    const locations = obj.labels[label];
+    const zapped = obj.zappedLabels?.[label] || 0;
+
+    if (!locations || locations.length <= zapped) return null;
+    return locations[zapped];
+}
+
+export function takeStat(stats, item, amount) {
+    if (amount <= 0) {
+        console.error("Invalid amount to take.");
+        return;
+    }
+
+    if (stats.hasOwnProperty(item)) {
+        stats[item] -= amount;
+    } else {
+        console.error("Invalid item type.");
+    }
+}
+
 
 // Helper function to extract RGB values
 export function extractRGB(str) {
@@ -103,3 +130,27 @@ export const namedColors = {
     "white": [255, 255, 255, 255],
     "black": [0, 0, 0, 255]
 };
+
+export function convertDirections(direction) {
+    const dir = direction.toLowerCase(); // Normalize to lowercase 
+    switch (dir) {
+        case 'up':
+        case 'north':
+        case 'n':
+            return 'up';
+        case 'right':
+        case 'east':
+        case 'e':
+            return 'right';
+        case 'down':
+        case 'south':
+        case 's':
+            return 'down';
+        case 'left':
+        case 'west':
+        case 'w':
+            return 'left';
+        default:
+            return -1; // Invalid direction
+    }
+}

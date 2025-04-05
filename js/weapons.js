@@ -20,7 +20,9 @@ export function createBullet (canvas, x, y, direction, speed = 16, color = 'whit
         type: 'bullet',
 
         update() {
-            
+            //this.oldX = this.x;
+            //this.oldY = this.y;
+
             // Move the bullet based on direction
             switch (this.direction) {
                 case 'north':
@@ -32,8 +34,8 @@ export function createBullet (canvas, x, y, direction, speed = 16, color = 'whit
                 case 'west':
                 case 'right': this.x += this.speed; break;
             }
-            this.oldX = Math.floor(this.x / 32) * 32;
-            this.oldY = Math.floor(this.y / 32) * 32;
+            //this.oldX = Math.floor(this.x / 32) * 32;
+            //this.oldY = Math.floor(this.y / 32) * 32;
             //console.log('old:', this.oldX, this.oldY);
             //console.log('new:', this.x, this.y);
 

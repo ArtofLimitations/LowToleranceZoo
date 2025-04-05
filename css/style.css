@@ -358,11 +358,22 @@ h3 {
   z-index: 100;
 }
 
+#dialog-box::before {
+  content: attr(data-object-name);
+  position: absolute;
+  top: 1px;
+  left: 32px;
+  font-size: 14px;
+  font-weight: bold;
+  color: yellow;
+  z-index: 99;
+}
+
 .dialog-box[data-next]::after {
   content: "...";
   position: absolute;
   bottom: 5px;
-  right: 10px;
+  right: 24px;
   font-size: 1.2em;
   font-weight: bold;
   color: white;
