@@ -14,6 +14,34 @@ body {
   -webkit-user-select: none;
 }
 
+div {
+  --sb-track-color: #ffffff;
+  --sb-thumb-color: #0e2a68;
+  --sb-size: 16px;
+}
+
+div::-webkit-scrollbar {
+  width: var(--sb-size)
+}
+
+div::-webkit-scrollbar-track {
+  background: var(--sb-track-color);
+  border-radius: 1px;
+}
+
+div::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb-color);
+  border-radius: 1px;
+  
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  div {
+    scrollbar-color: var(--sb-thumb-color)
+                     var(--sb-track-color);
+  }
+}
+
 button {
   background-color: #f0f0f0;
   color: #131313;
@@ -158,7 +186,7 @@ h3 {
   height: 100%;
   opacity: 70%;
   position: absolute;
-  z-index: 99;
+  z-index: 5;
 }
 
 
@@ -355,7 +383,7 @@ h3 {
   text-shadow: 0px 1px 20px #444, 0px 1px 10px rgba(255, 255, 255, 0.8);
   padding: 20px 60px;
   animation: fade_in_show 0.5s;
-  z-index: 100;
+  z-index: 99;
 }
 
 #dialog-box::before {
@@ -377,6 +405,29 @@ h3 {
   font-size: 1.2em;
   font-weight: bold;
   color: white;
+}
+
+.game-over-box {
+  display: none;
+  flex-direction: column;
+  justify-content: center; 
+  align-items:center;
+  position: relative;
+  overflow: hidden;
+  top: 45%;
+  margin: 0 auto;
+  width: 60%;
+  max-height: 30%;
+  min-height: 10%;
+  background-color: rgba(0, 0, 0, 0.8);
+  border-radius: 32px;
+  color: #be2915;
+  font-family: 'Fira Code', monospace;
+  font-size: 24px;
+  text-shadow: 0px 1px 20px #4f0600, 0px 1px 10px rgba(255, 70, 38, 0.8);
+  padding: 20px 60px;
+  animation: fade_in_show 2.5s;
+  z-index: 99;
 }
 
 @keyframes fade_in_show {
@@ -534,6 +585,78 @@ h3 {
   font-weight: 500;
   color: #222;
 
+}
+
+.boardSelect {
+  display: none;
+  /* Hidden initially */
+  box-sizing: content-box;
+  position: relative;
+  top: 0;
+  width: 55%;
+  color: #fff;
+  margin: 0 auto;
+  background-color: #222;
+  border-width: 5px;
+  border-color: rgba(34, 34, 34, .9);
+  padding: 64px;
+  box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
+  z-index: 6;
+}
+
+.boardList {
+  background-color: #fff;
+  color: #222;
+  height: 360px;
+  padding: 1px 0px;
+  overflow: scroll;
+  overflow-x: hidden;
+}
+
+.boardList ol {
+  list-style-type: none;
+  counter-reset: li;
+  padding: 0;
+  margin-left: 10px;
+}
+
+.boardList li {
+  border-bottom: 2px solid #eee;
+  line-height: 1.5;
+  margin-right: 10px;
+}
+
+.boardList li:hover {
+  background-color: #0e2a68;
+  color: #fff;
+  border-bottom: 2px solid #0e2a68;
+  box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
+}
+
+.boardList li:before  {
+  counter-increment: li;
+  content: counter(li, decimal-leading-zero);
+  margin-right: 10px;
+	color: red;
+}
+
+.boardList li:active {
+  background-color: #0e2a68;
+  color: #fff;
+  border-bottom: 2px solid #0e2a68;
+  box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
+}
+
+.boardList li.selected {
+  background-color: #ffc800;
+  color: #fff;
+  border-bottom: 2px solid #ffc800;
+}
+
+.boardSelect button {
+  background-color: #f0f0f0;
+  margin-top: 8px;
+  height: 32px;
 }
 
 .lowToleranceCanvas {

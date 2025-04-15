@@ -2,6 +2,8 @@ export let defaultPlayerStats = {
     name: "Player",
     x: 10,
     y: 10,
+    width: 32,
+    height: 32,
     oldX: 10,
     oldY: 10,
     layer: 2,
@@ -13,6 +15,7 @@ export let defaultPlayerStats = {
     level: 1,
     experience: 0,
     experienceToNextLevel: 100,
+    gameOver: false,
     inventory: [],
     equipped: {
         weapon: null,

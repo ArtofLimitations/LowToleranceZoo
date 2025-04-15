@@ -15,7 +15,7 @@ canvas.style.width = displayWidth + 'px';
 canvas.style.height = displayHeight + 'px';
 canvas.width = displayWidth * scale;
 canvas.height = displayHeight * scale;
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { alpha: false });
 ctx.imageSmoothingEnabled = false
 
 // Game configurations
@@ -42,7 +42,7 @@ let nightMode = true;
 let player = defaultPlayerStats; // Player object
 let playerStats = defaultPlayerStats;
 //let stats = playerStats;
-const stepSize = playerStats.stepSize; // Step size for player movement
+const stepSize = player.stepSize; // Step size for player movement
 let gamePaused = false;
 let bulletArray = [];
 
@@ -72,7 +72,6 @@ export function animateGame(currentTime) {
         updateBullets();
         updateObjects(deltaTime);
         updatePlayer(deltaTime);
-
     }
 
     // Loop the animation
@@ -222,18 +221,10 @@ function updateObjects(deltaTime) {
             let action = command[0];
             let args = command.slice(1);
 
-            /*if (command[0].startsWith('@')) {
-                obj.name = command[0].substring(1); // Set name
-                obj.scriptIndex++;
-                continue; // Skip to next command
-            }*/
-
-            executeObjectCommand(obj, action, args);
+            executeObjectCommand(obj, action, args); // Start executing #commands
 
             // Move script index only if not waiting
-            //if (!obj.waiting) {
             obj.scriptIndex++;
-            //}
 
             if (command[0] === "#loop") {
                 if (obj.labels[":loop"] !== undefined) {
@@ -317,7 +308,7 @@ function executeObjectCommand(obj, action, args) {
         case "#timer":
             obj.timer = parseInt(args[0], 10); // Set timer
             break;
-        case "#move":
+        case '#move':
             let direction = args[0];
             switch (args[0]) {
                 case 'north': direction = 'up'; break;
@@ -328,10 +319,10 @@ function executeObjectCommand(obj, action, args) {
             moveObject(obj, direction, obj.layer);
             break;
         case '#shoot':
-            if (args[0] === "undefined") { console.warn("No direction provided"); return; }
+            if (args[0] === 'undefined') { console.warn('No direction provided'); return; }
             if (args[0] === 'seek') {
                 // Implement seeking logic here
-                console.warn("Seeking bullets not implemented yet");
+                console.warn('Seeking bullets not implemented yet');
                 return;
             }
             let bulletDirection = convertDirections(args[0]);
@@ -365,14 +356,14 @@ function executeObjectCommand(obj, action, args) {
             let bullet = createBullet(canvas, x, y, bulletDirection, 16, 'white', obj.name);
             bulletArray.push(bullet);
             break;
-        case "#wait":
+        case '#wait':
             obj.waiting = true; // Set waiting state
             obj.waitTime = parseInt(args[0], 10); // Store remaining cycles
             break;
-        case "#loop":
-            obj.scriptIndex = obj.labels[":loop"] || 0;
+        case '#loop':
+            obj.scriptIndex = obj.labels[':loop'] || 0;
             break;
-        case "#zap":
+        case '#zap':
             const zapLabel = `:${args[0]}`;
             if (!obj.zappedLabels[zapLabel]) {
                 obj.zappedLabels[zapLabel] = 1;
@@ -380,7 +371,7 @@ function executeObjectCommand(obj, action, args) {
                 obj.zappedLabels[zapLabel]++;
             }
             break;
-        case "#restore":
+        case '#restore':
             const restoreLabel = `:${args[0]}`;
             delete obj.zappedLabels[restoreLabel];
             break;
@@ -397,147 +388,62 @@ function executeObjectCommand(obj, action, args) {
             let item = args[0];
             let amount = parseInt(args[1], 10);
             if (isNaN(amount)) amount = 1; // Default to 1 if not specified
-            takeStat(playerStats, item, amount);
+            takeStat(player, item, amount);
             console.log(`Took ${amount} ${item}(s)`);
-            console.log(playerStats.health);
+            console.log(player.health);
             break;
         case '#nightmode':
             nightMode = !nightMode;
+            break;
+        case '#die':
+            placedObjects[`${obj.layer},${obj.x},${obj.y}`];
+            placedSprites[`${obj.layer},${obj.x},${obj.y}`];
+            updateTile(obj.layer, obj.x, obj.y);
             break;
         default:
             console.warn(`Unknown command: ${action}`);
     }
 }
 
-/*/ Helper function to extract RGB values
-function extractRGB(str) {
-    let match = str.match(/\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(\.\d+)?)?\)/); // Capture RGB, ignore alpha
-    return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3]), 1] : [0, 0, 0, 1]; // Default to black with full alpha
-}
-
-// Named color lookup table
-const namedColors = {
-    "red": [255, 0, 0, 255],
-    "pink": [255, 182, 193, 255],
-    "blue": [0, 0, 255, 255],
-    "green": [0, 255, 0, 255],
-    "yellow": [255, 255, 0, 255],
-    "purple": [128, 0, 128, 255],
-    "orange": [255, 165, 0, 255],
-    "white": [255, 255, 255, 255],
-    "black": [0, 0, 0, 255]
-};*/
-
 function moveObject(obj, direction, layer) {
     const offsets = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-    if (!offsets[direction]) {
+    const dir = convertDirections(direction);
+
+    if (!offsets[dir]) {
         console.warn(`Invalid direction: ${direction} for #move`);
         return; // Invalid direction guard
     }
 
-    const [dx, dy] = offsets[direction];
+    const [dx, dy] = offsets[dir];
     const [newX, newY] = [obj.x + dx, obj.y + dy];
 
     const oldKey = `${layer},${obj.x},${obj.y}`;
     const newKey = `${layer},${newX},${newY}`;
 
-    if (placedObjects[newKey]) return; // Prevent movement if occupied
+    if (placedObjects[newKey]) return; // Prevent movement if occupied by another object
+    //if (placedSprites[newKey]) {
+    if (canMoveTo(newX, newY, obj)) { // can the object move?
 
-    placedSprites[newKey] = placedSprites[oldKey]; // Move sprite
-    placedObjects[newKey] = obj;
 
-    delete placedObjects[oldKey];
-    delete placedSprites[oldKey];
+        placedSprites[newKey] = placedSprites[oldKey]; // Move sprite
+        placedObjects[newKey] = obj;
 
-    updateTile(layer, obj.x, obj.y); // Clear old tile
+        delete placedObjects[oldKey];
+        delete placedSprites[oldKey];
 
-    obj.x = newX;
-    obj.y = newY;
+        updateTile(layer, obj.x, obj.y); // Clear old tile
 
-    updateTile(layer, obj.x, obj.y); // Update new tile
-}
+        obj.x = newX;
+        obj.y = newY;
+        obj.direction = dir; // change the object's direction
 
-/*
-function loadObjectsFromGameData() {
-    placedObjects = {}; // Reset objects
-
-    for (let key in placedSprites) {
-        let tile = placedSprites[key];
-
-        // Extract layer, x, y from key
-        let [layer, x, y] = key.split(",").map(Number);
-
-        if (tile.type === "object" && tile.data.script) {
-            placedObjects[key] = {
-                layer,
-                x,
-                y,
-                sprite: tile.sprite,
-                color: tile.color,
-                name: tile.data.name || "",
-                direction: 'down', // Default direction
-                waiting: false, // Initialize waiting state
-                waitTime: 0, // Initialize wait time
-                speed: tile.data.speed || 1,  // Default to speed 1
-                timer: tile.data.timer || 0,  // Initialize timer
-                timeSinceLastMove: 0, // Time since last move
-                moveInterval: tile.data.moveInterval || 300, // Default move interval
-                script: {}, // Parse script
-                //script: parseScriptFromTextarea(tile.data.script), // Parse script
-                scriptIndex: 0,
-                labels: {},  // Will store labels (e.g., `:touch`)
-                resting: false,
-            };
-
-            // Parse labels for quick jumps
-            const parsedScript = parseScript(tile.data.script);
-            placedObjects[key].script = parsedScript.script;  // Store only the script array
-            placedObjects[key].labels = parsedScript.labels;  // Store the labels separately
-
-            console.log(placedObjects[key].script);
-        }
+        updateTile(layer, obj.x, obj.y); // Update new tile
     }
-}
-
-function parseScript(text) {
-    let lines = text.trim().split("\n").map(line => line.trim());
-    let script = [];
-    let labels = {}; // Store label positions
-    let collectingText = false;
-    let textBlock = "";
-    let index = 0;
-
-    for (let line of lines) {
-        if (line === "#text") {
-            collectingText = true;
-            textBlock = "";
-            continue;
-        }
-
-        if (collectingText) {
-            if (line.startsWith("#")) {
-                script.push(`#text ${textBlock.trim()}`);
-                script.push(line); // Keep the command
-                collectingText = false;
-            } else {
-                textBlock += line + "\n";
-            }
-            continue;
-        }
-
-        if (line.startsWith(":")) {
-            labels[line] = index; // Store label position
-            continue; // Don't store labels in the script array
-        }
-
-        if (line !== "") {
-            script.push(line);
-            index++;
-        }
+    else {
+        return; // no
     }
-
-    return { script, labels };
-} */
+    //}
+}
 
 function handleObjectTouch(tileKey) {
     let obj = placedObjects[tileKey];
@@ -631,6 +537,19 @@ function showDialog(text, object = null) {
     });
 }
 
+function showGameOver(text) {
+    const dialog = document.getElementById('game-over-box');
+    dialog.innerHTML = text;
+    dialog.style.display = 'flex';
+}
+
+function youDied() {
+    player.gameOver = true;
+    gamePaused = true;
+    showGameOver('<center>You Died<br><b style="font-size: 48px">Game Over</b></center>');
+    cancelAnimationFrame(animateGame);
+}
+
 // #############################################
 // ############ Collision detection ############
 // #############################################
@@ -671,27 +590,47 @@ function checkTiles(x, y, direction) {
     }
 }
 
-function ccheckBulletTiles(x, y) {
-    const bulletSize = 8; // Bullet collision area (8x8)
+function isOverlappingTile(object, tileX, tileY) {
+    const tileLeft = tileX * tileSizeX;
+    const tileTop = tileY * tileSizeY;
+    const tileRight = tileLeft + tileSizeX;
+    const tileBottom = tileTop + tileSizeY;
 
-    let leftTile = Math.floor((x - bulletSize) / tileSizeX);
-    let topTile = Math.floor((y - bulletSize) / tileSizeY);
-    let rightTile = Math.floor((x + bulletSize) / tileSizeX);
-    let bottomTile = Math.floor((y + bulletSize) / tileSizeY);
+    const objLeft = object.x * tileSizeX;
+    const objTop = object.y * tileSizeY;
+    const objRight = objLeft + object.width;
+    const objBottom = objTop + object.height;
 
-    let tiles = [];
+    return !(objRight <= tileLeft ||
+        objLeft >= tileRight ||
+        objBottom <= tileTop ||
+        objTop >= tileBottom);
+}
 
-    for (let tx = leftTile; tx <= rightTile; tx++) {
-        for (let ty = topTile; ty <= bottomTile; ty++) {
-            tiles.push({ x: tx, y: ty });
-            tiles.push({ x: tx - 0.5, y: ty });
-            tiles.push({ x: tx + 0.5, y: ty });
-            tiles.push({ x: tx, y: ty - 0.5 });
-            tiles.push({ x: tx, y: ty + 0.5 });
-        }
-    }
+function _isOverlappingTile(object, tileX, tileY) {
+    const buffer = 0.01; // Small value to prevent edge-only contact
 
-    return tiles;
+    const tileLeft = tileX * tileSizeX + buffer;
+    const tileTop = tileY * tileSizeY + buffer;
+    const tileRight = (tileX + 0.5) * tileSizeX - buffer;
+    const tileBottom = (tileY + 0.5) * tileSizeY - buffer;
+
+    //const objLeft = object.x * tileSizeX - object.width / 2 + buffer;
+    //const objTop = object.y * tileSizeY - object.height / 2 + buffer;
+    //const objRight = objLeft + object.width - 2 * buffer;
+    //const objBottom = objTop + object.height - 2 * buffer;
+
+    const objLeft = object.x * tileSizeX - object.width / 2 + buffer;
+    const objTop = object.y * tileSizeY - object.height / 2 + buffer;
+    const objRight = objLeft + object.width - 2 * buffer;
+    const objBottom = objTop + object.height - 2 * buffer;
+
+    return !(
+        objRight <= tileLeft ||
+        objLeft >= tileRight ||
+        objBottom <= tileTop ||
+        objTop >= tileBottom
+    );
 }
 
 function checkBulletTiles(x, y) {
@@ -734,37 +673,12 @@ function checkBulletTiles(x, y) {
     return tiles;
 }
 
-/*function checkTiles(x, y, direction) {
-    const width = tileSizeX;
-    const height = tileSizeY;
-
-    let leftTile = Math.floor(x / tileSizeX);
-    let topTile = Math.floor(y / tileSizeY);
-    let rightTile = Math.floor((x + width - 1) / tileSizeX);
-    let bottomTile = Math.floor((y + height - 1) / tileSizeY);
-
-    let tilePositions = [];
-
-    // Get all tile positions occupied by the bounding box
-    for (let tx = leftTile; tx <= rightTile; tx++) {
-        for (let ty = topTile; ty <= bottomTile; ty++) {
-            tilePositions.push({ x: tx, y: ty });
-        }
-    }
-
-    return tilePositions;
-}*/
-
 function canMoveTo(x, y, object = player) {
-    //if (object.type === 'bullet' && object.origin === 'player') { // just for centering bullets
-    //    x = x - 0.5;
-    //    y = y - 0.5;
-    //}
 
     let tiles = [];
-    if (object.type === 'bullet') {
-        tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.oldX, object.oldY);
-    } else { tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction); }
+    if (object.type === 'bullet') tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.oldX, object.oldY);
+    else tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
+    //tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction)
 
     for (let tile of tiles) {
 
@@ -772,6 +686,12 @@ function canMoveTo(x, y, object = player) {
 
         if (tile.x < 0 || tile.y < 0 || tile.y >= tilesY || tile.x >= tilesX) {
             return false; // Out of bounds = collision
+        }
+
+        if (isOverlappingTile(player, tile.x, tile.y) && object.type === 'object') {
+            console.log('player detected!');
+            return tryPushPlayer(player.x, player.y, object.direction, object.layer);
+            return false;
         }
 
         if (placedSprites[tileKey]) {
@@ -782,6 +702,10 @@ function canMoveTo(x, y, object = player) {
             }
 
             //if (object === 'bullet' && tileType === 'object' && object.origin === 'object') return true; 
+            if (tileType === 'player' && object.type === 'object') {
+                console.log('object push. player: ', x, y);
+                return tryPushTiles(player.x, player.y, object.direction, object.layer);
+            }
 
             // Collision with walls or unbreakable objects
             if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object') {
@@ -808,8 +732,8 @@ function canMoveTo(x, y, object = player) {
 
             // Picking up an item or destroying tile
             if (tileType === 'item' && object.type === 'player') {
-                playerStats.stats.coins++;
-                console.log('Coins:', playerStats.stats.coins);
+                player.stats.coins++;
+                console.log('Coins:', player.stats.coins);
                 delete placedSprites[tileKey];
                 updateTile(player.layer, tile.x, tile.y);
                 return true;
@@ -824,7 +748,6 @@ function canMoveTo(x, y, object = player) {
             // If it's a pushable block
             if (tileType === 'push') {
                 return tryPushTiles(tile.x, tile.y, object.direction, object.layer);
-
             }
         }
         //ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Debugging color
@@ -868,6 +791,13 @@ function tryPushTiles(startX, startY, direction, layer) {
         case 'right': newX += 1; break;
     }
 
+    if (isOverlappingTile(player, newX, newY)) return false;
+
+    // Prevent pushing off the board
+    if (newX < 0 || newY < 0 || newX >= tilesX || newY >= tilesY) {
+        return false;
+    }
+
     let pushKey = `${layer},${newX},${newY}`;
     if (placedSprites[pushKey]) {
         return false; // If blocked, return false (don't push)
@@ -890,6 +820,50 @@ function tryPushTiles(startX, startY, direction, layer) {
     return true; // Movement allowed
 }
 
+function tryPushPlayer(startX, startY, direction, layer) {
+    let dx = 0, dy = 0;
+    switch (direction) {
+        case 'up': dy = -1; break;
+        case 'down': dy = 1; break;
+        case 'left': dx = -1; break;
+        case 'right': dx = 1; break;
+    }
+
+    const newX = player.x + dx;
+    const newY = player.y + dy;
+
+    // Prevent pushing out of bounds
+    if (newX < 0 || newY < 0 || newX >= tilesX || newY >= tilesY) return false;
+
+    // Check if player is roughly aligned to the grid
+    //const aligned = Math.abs(player.x - Math.round(player.x)) < 0.5 &&
+    //                Math.abs(player.y - Math.round(player.y)) < 0.5;
+    //if (!aligned) return false;
+
+    // Check if the tile ahead is empty
+    const tiles = checkTiles(newX * tileSizeX, newY * tileSizeY, direction)
+    console.log(tiles);
+    for (let tile of tiles) {
+
+        let tileKey = `${layer},${tile.x},${tile.y}`;
+
+        if (placedSprites[tileKey]) {
+            if (placedSprites[tileKey].type === 'push') {
+                const success = tryPushTiles(tile.x, tile.y, direction, layer);
+                if (!success) return false; // If push fails, don't push player
+            } else {
+                return false; // Something else is in the way
+            }
+        }
+    }
+
+    // Push the player
+    player.x = newX;
+    player.y = newY;
+
+    return true;
+}
+
 // #########################################
 // ############ Player movement ############
 // #########################################
@@ -903,6 +877,8 @@ function updatePlayer(deltaTime) {
     let newX = player.x;
     let newY = player.y;
     // old x and y?
+
+    if (player.health === 0) youDied();
 
     switch (true) {
         case keys['ArrowUp'] && canMoveTo(player.x, player.y - stepSize):
@@ -953,12 +929,7 @@ function handleLoadedGame(spriteSheetData, boardData) {
 
     loaded = true;
     player = findPlayerSprite();
-
-    /*stats = { // update this. loads with board / player stats
-        coins: 0,
-        score: 0,
-        lives: 3
-    };*/
+    player = { ...playerStats, ...player };
 
     //stats = player.stats;
     console.log('Loaded Stats', playerStats);
@@ -980,7 +951,7 @@ function findPlayerSprite() {
 }
 
 // Key mapping (now using key names instead of key codes)
-let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F5: "F5", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10", F11: "F11", F12: "F12" };
+let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10", F11: "F11", F12: "F12" };
 
 document.addEventListener("keydown", (event) => {
     keys[event.key] = true;

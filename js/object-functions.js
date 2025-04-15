@@ -17,8 +17,11 @@ export function loadObjectsFromGameData(gameData) {
                 layer,
                 x,
                 y,
+                width: 32,
+                height: 32,
                 sprite: tile.sprite,
                 color: tile.color,
+                type: 'object',
                 name: tile.data.name || "",
                 direction: 'down', // Default direction
                 waiting: false, // Initialize waiting state
@@ -28,7 +31,6 @@ export function loadObjectsFromGameData(gameData) {
                 timeSinceLastMove: 0, // Time since last move
                 moveInterval: tile.data.moveInterval || 100, // Default move interval
                 script: {}, // Parse script
-                //script: parseScriptFromTextarea(tile.data.script), // Parse script
                 scriptIndex: 0,
                 labels: {},  // Will store labels (e.g., `:touch`)
                 zappedLabels: {},
@@ -105,12 +107,12 @@ export function takeStat(stats, item, amount) {
     }
 
     if (stats.hasOwnProperty(item)) {
-        stats[item] -= amount;
+        if (stats[item] > 0) stats[item] -= amount;
+        if (stats[item] < 0) stats[item] === 0;
     } else {
         console.error("Invalid item type.");
     }
 }
-
 
 // Helper function to extract RGB values
 export function extractRGB(str) {

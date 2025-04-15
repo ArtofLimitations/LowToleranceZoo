@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.imageSmoothingEnabled = false
 
     const editorToolbar = document.getElementById('lowToleranceToolbar');
+    const overlay = document.getElementById('overlay');
 
     // Low Tolerance Zoo editor Configurations
     const tileSizeX = 32;                // Single tile size
@@ -36,18 +37,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let tileSetLength = 300;             // Size of tileset
     let colors = currentColors;          // colors selected from palette
     let type = 'wall';
-    let tileData = { script: '' };                                                                      // default type for placed sprites
+    let tileData = { script: '' };
+    let popup = { active: false, type: null };
+    let boardList = [[1, 'Title Screen'], [2, 'Default']];
+    let currentBoard = 2;
+    let world = {};                                                                       // default type for placed sprites
     let key = { ctrl: false, shift: false, alt: false, lastClick: 0, clickDelay: 100 };     // keyboard status object. click delay in ms
     let mouse = {
         x: cursorX, y: cursorY, oldX: cursorX, oldY: cursorY, down: false,
         button: 0, mode: 'draw', lastClick: 0, clickDelay: 50
-    };                                                                                      // mouse status object. click delay. see handleMouseMove function. click delay in ms
-    let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2 }                             // basic stats for player
+    };                                                                                    // mouse status object. click delay. see handleMouseMove function. click delay in ms
+    let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2 }                           // basic stats for player
 
-    function getSpriteImage() {
-        const data = getDataFromSheet(currentSprite); // from sprite-sheet.js
-        return data;
-    }
+    // ######################################
+    //          LOW TOLERANCE ZOO
+    // ######################################
 
     function createPlayer() {
         placedSprites[`${player.layer},${player.x},${player.y}`] = {
@@ -60,9 +64,45 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // DRAW EVERY TILE
+    function createPlayerInBoard(board) {
+        world[board][`${player.layer},${player.x},${player.y}`] = {
+            sprite: 1,
+            image: getSpriteImage(),
+            color: [[0, 0, 255, .5], [255, 255, 255, 1]],
+            type: 'player',
+            direction: 'down',
+            layer: 2
+        };
+    }
 
-    // Draw the grid of tiles
+    function addBoardToWorld(newBoard = false) {
+        if (newBoard) world[currentBoard] = placedSprites; // Add the current board to the world object
+        else world[currentBoard] = {}; // Initialize the current board in the world object
+        console.log('World:', world);
+    }
+
+    function createWorldFromBoards() {
+        world = {}; // Initialize the world object
+        for (const [boardId, boardName] of boardList) {
+            world[boardId] = {}; // Create an empty object for each board
+        }
+        console.log('World:', world);
+    }
+
+    function getBoardFromWorld() {
+        return world[currentBoard]; // Get the current board from the world object
+    }
+
+    // ######################################
+    // DRAWING FUNCTIONS
+    // ######################################
+
+    function getSpriteImage() {
+        const data = getDataFromSheet(currentSprite); // from sprite-sheet.js
+        return data;
+    }
+
+    // DRAW EVERY TILE
     function drawBoard() {
         ctx.clearRect(0, 0, tilesX * tileSizeX + 1, tilesY * tileSizeY); // +1 to get rid of the line next to toolbar
 
@@ -127,6 +167,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeRect(posX + 1, posY + 1, tileSizeX - 2, tileSizeY - 2);
     }
 
+    // ######################################
+    // PLACE SPRITE FUNCTIONS
+    // ######################################
+
     // Helper Function for Color Similarity
     function isSimilarColor(color1, color2, tolerance = 0) {
         if (!color1 || !color2) return false; // Prevent errors if one is empty
@@ -159,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // **Boundary Check**: Ensure x and y are within valid board range
             if (x < 0 || y < 0 || x >= 36 || y >= 25) continue;
-            
+
             // Avoid re-processing the same tile
             if (visited.has(key)) continue;
             visited.add(key);
@@ -207,9 +251,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // grab the sprite at cursor when Enter key or right click
     function grabSprite(tileKey) {
         if (placedSprites[tileKey] !== undefined) {
-            if (placedSprites[tileKey].type === 'sign') {
-                /////////////////////////////////////////////////////
-            }
             if (!key.ctrl) { // If the ctrl key isn't pressed then grab the sprite and color else just color
                 currentSprite = placedSprites[tileKey].sprite;
                 if (placedSprites[tileKey].type === 'player') {
@@ -246,6 +287,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         if (type === 'object' || type === 'sign') placedSprites[tileKey].data.script = tileData.script; // update object.data.script if type = sign or object
     }
+
+    // ######################################
+    // EVENT HANDLING FUNCTIONS
+    // ######################################
 
     // Handle placing/removing sprites
     function handleTileClick(event) {
@@ -294,33 +339,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         drawBoard();
         toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
-    }
-
-    // callback function for loading board POSSIBLY REMOVE
-    function handleLoadedBoard(data) {
-        console.log("Data loaded into application:", data);
-        placedSprites = data;
-        drawBoard(); //<------------------------------------- Draw function for entire board
-    }
-
-    // callback function for loading game. Loads single boards
-    function handleLoadedGame(spriteSheetData, boardData) {
-        placedSprites = boardData;
-        replaceSpriteSheet(spriteSheetData);
-        hiddenLayers = new Set();
-        console.log('Loaded Board');
-        drawBoard(); //<------------------------------------- Draw function for entire board
-    }
-
-    function handleToolbarClick(layer = currentLayer, hidden = hiddenLayers, spriteType = type) {
-        currentLayer = layer;
-        hiddenLayers = hidden;
-        type = spriteType;
-        console.log('current layer: ', currentLayer);
-        console.log('hidden layers: ', hiddenLayers);
-        console.log('sprite type: ', type);
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
-        drawBoard(); //<------------------------------------- Draw function for entire board
     }
 
     // Handles mouse clicks
@@ -375,176 +393,307 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // callback function for loading board POSSIBLY REMOVE
+    function handleLoadedBoard(data) {
+        console.log("Data loaded into application:", data);
+        placedSprites = data;
+
+        drawBoard(); //<------------------------------------- Draw function for entire board
+    }
+
+    // callback function for loading game. Loads single boards
+    function handleLoadedGame(spriteSheetData, boardData) {
+        placedSprites = boardData;
+        addBoardToWorld(); // Add the current board to the world object
+        replaceSpriteSheet(spriteSheetData);
+
+        hiddenLayers = new Set();
+
+        console.log('Loaded Board');
+        drawBoard(); //<------------------------------------- Draw function for entire board
+    }
+
+    function handleToolbarClick(layer = currentLayer, hidden = hiddenLayers, spriteType = type) {
+        currentLayer = layer;
+        hiddenLayers = hidden;
+        type = spriteType;
+
+        console.log('current layer: ', currentLayer);
+        console.log('hidden layers: ', hiddenLayers);
+        console.log('sprite type: ', type);
+
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
+        drawBoard(); //<------------------------------------- Draw function for entire board
+    }
+
     function handleObjectScript(data, key) {
         placedSprites[key].data.script = data;
-        //placedSprites[key].data.text = text;
+
         console.log('handle object script:', data);
     }
+
+    // ######################################
+    // POPUP FUNCTIONS 
+    // ######################################
+
+    function removeSelectedClass(listItems) {
+        const selectedItems = listItems.querySelectorAll('.selected');
+        selectedItems.forEach((item) => {
+            item.classList.remove('selected');
+        });
+    }
+
+    function boardSelect() { //  Board selector. This is a popup that allows the user to select a board from the list of boards.
+        popup.active = true;
+        popup.type = 'boardSelect';
+
+        overlay.style.display = 'block';
+
+        const addButton = document.getElementById('addBoardButton');
+        const selectContainer = document.getElementById('boardSelect');
+        const listItems = document.getElementById('boardListItems');
+
+        listItems.innerHTML = ''; // Clear previous items
+
+        boardList.forEach((item) => {
+            const listItem = document.createElement('li');
+            listItem.textContent = item[1]; // Display the name of the board
+            if (item[0] === currentBoard) {
+                listItem.classList.add('selected'); // Highlight the selected board
+            }
+            listItem.onclick = () => {
+                currentBoard = item[0]; // Set the selected board
+                console.log('Selected Board: ', currentBoard);
+                placedSprites = world[currentBoard]; // Get the selected board from the world object
+
+                popup.active = false;
+
+                overlay.style.display = 'none';
+                selectContainer.style.display = 'none';
+                canvas.focus();
+
+                drawBoard();
+            };
+            listItems.appendChild(listItem);
+        });
+        addButton.onclick = () => { // Add new board button
+            const newBoardName = prompt('Enter new board name:');
+            if (newBoardName) {
+                const newBoardId = boardList.length + 1; // Simple ID generation
+                boardList.push([newBoardId, newBoardName]);
+                world[newBoardId] = {}; // Initialize the new board in the world object
+                createPlayerInBoard(newBoardId); // Create player in the new board
+                console.log('New Board Added: ', newBoardId, newBoardName);
+
+                boardSelect(); // Refresh the board selector to show the new board
+            }
+        }
+        selectContainer.style.display = 'block';
+    }
+
+    // ######################################
+    // KEYBOARD HANDLING FUNCTIONS
+    // ######################################
 
     function handleKeyboard(event) {
         const tileKey = `${currentLayer},${cursorX},${cursorY}`;
         //console.log(event.key);
 
-        switch (event.key) {
+        if (!popup.active) { // use different key events for popups like the board selector
 
-            case 'ArrowUp':
-                if (cursorY > 0) cursorY -= 1;          // Move up
-                break;
-            case 'ArrowDown':
-                if (cursorY < tilesY - 1) cursorY += 1; // Move down
-                break;
-            case 'ArrowLeft':
-                if (cursorX > 0) cursorX -= 1;          // Move left
-                break;
-            case 'ArrowRight':
-                if (cursorX < tilesX - 1) cursorX += 1; // Move right
-                break;
-            case ' ':
-                if (placedSprites[tileKey]) {
-                    if (placedSprites[tileKey].type != 'player') delete placedSprites[tileKey]; // Remove sprite if it exists
-                } else {
-                    placeSprite(tileKey, currentSprite, type); // Place sprite
-                }
-                break;
-            case 'Enter': // add layers later
-                grabSprite(tileKey);
-                if (placedSprites[tileKey]) {
-                    if (placedSprites[tileKey].type === 'sign') {
-                        editObject('text', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
-                        //placedSprites[tileKey].data.text = getObjectData(tileKey);
+            switch (event.key) {
+
+                case 'ArrowUp':
+                    if (cursorY > 0) cursorY -= 1;          // Move up
+                    break;
+                case 'ArrowDown':
+                    if (cursorY < tilesY - 1) cursorY += 1; // Move down
+                    break;
+                case 'ArrowLeft':
+                    if (cursorX > 0) cursorX -= 1;          // Move left
+                    break;
+                case 'ArrowRight':
+                    if (cursorX < tilesX - 1) cursorX += 1; // Move right
+                    break;
+                case ' ':
+                    if (placedSprites[tileKey]) {
+                        if (placedSprites[tileKey].type != 'player') delete placedSprites[tileKey]; // Remove sprite if it exists
+                    } else {
+                        placeSprite(tileKey, currentSprite, type); // Place sprite
                     }
-                    if (placedSprites[tileKey].type === 'object') {
-                        editObject('object', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
-                        //placedSprites[tileKey].data.script = getObjectData(tileKey);
+                    break;
+                case 'Enter': // add layers later
+                    grabSprite(tileKey);
+                    if (placedSprites[tileKey]) {
+                        if (placedSprites[tileKey].type === 'sign') {
+                            editObject('text', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
+                            //placedSprites[tileKey].data.text = getObjectData(tileKey);
+                        }
+                        if (placedSprites[tileKey].type === 'object') {
+                            editObject('object', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
+                            //placedSprites[tileKey].data.script = getObjectData(tileKey);
+                        }
+                        console.log('grabbed:, ', placedSprites[tileKey]);
                     }
-                    console.log('grabbed:, ', placedSprites[tileKey]);
-                }
-                if (event.repeat) { return }
-                break;
-            case 'PageUp':
-                console.log('type: ', type);
-                if (event.repeat) { return }
-                break;
-            case 'Insert':
-                // nothing here yet
-                if (event.repeat) { return }
-                break;
-        }
-
-        switch (event.key.toLowerCase()) {
-            case 'e':
-                removeMainEvents();
-                editSprite(currentSprite); // Open the sprite editor from sprite-editor.js
-                if (event.repeat) { return }
-                break;
-            case 'c':
-                removeMainEvents();
-                pickColor(); // Open color picker from palette.js
-                if (event.repeat) { return }
-                break;
-            case '=':
-                if (currentSprite < tileSetLength) currentSprite += 1; // iterate through sprite sheet
-                console.log('current sprite: ' + currentSprite);
-                updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
-                break;
-            case '-':
-                if (currentSprite > 1) currentSprite -= 1;
-                console.log('current sprite: ' + currentSprite);
-                updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
-                break;
-            case 'b':
-                if (!event.ctrlKey) saveBoard(placedSprites); // save board (not sprite sheet)
-                if (event.repeat) { return }
-                break;
-            case 'i':
-                placeSprite(tileKey, currentSprite, 'sign'); // Place sprite
-                if (placedSprites[tileKey]) {
-                    editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
-                }
-                if (event.repeat) { return }
-                break;
-            case 'o':
-                placeSprite(tileKey, currentSprite, 'object'); // Place sprite
-                if (placedSprites[tileKey]) {
-                    editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
-                }
-                if (event.repeat) { return }
-                break;
-            case '1':
-                currentLayer = 1; // change layer for placing sprites
-                if (event.repeat) { return }
-                break;
-            case '2':
-                currentLayer = 2;
-                if (event.repeat) { return }
-                break;
-            case '3':
-                currentLayer = 3;
-                if (event.repeat) { return }
-                break;
-            case 'h': // for hiding or showing layers
-                if (hiddenLayers.has(currentLayer)) {
-                    //showLayer(currentLayer);
-                    hiddenLayers.delete(currentLayer);
-                    console.log('showing layer: ', currentLayer);
-                }
-                else {
-                    //hideLayer(currentLayer);
-                    hiddenLayers.add(currentLayer);
-                    console.log('hiding layer: ', currentLayer);
-                }
-                if (event.repeat) { return }
-                drawBoard(); //<------------------------------------- Draw function for entire board
-                return;
-            case 's': // Save board & sprite sheet
-                saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
-                break;
-            case 'l': // load board & sprite sheet
-                loadCombinedData(handleLoadedGame); // load board and sprite sheet from file.js
-                break;
-            case 'r': // reset board
-                if (confirm('Are you sure you want reset board?')) {
-                    placedSprites = {};
-                    console.log('Board reset');
-                    createPlayer();
-                    drawBoard(); //<------------------------------------- Draw function for entire board
-                } else {
-                    console.log('Board not reset');
-                }
-                break;
-            case 'f': // flood fill
-                mouse.mode = 'fill';
-                console.log('flood fill mode');
-                break;
-            case 'd':
-                mouse.mode = 'draw';
-                console.log('draw mode');
-                break;
-        }
-
-        if (event.ctrlKey || event.metaKey) {
-            // Handle key combinations for both Windows/Linux (Ctrl) and Mac (Cmd)
-            key.ctrl = true;
-            switch (event.key.toLowerCase()) { // Check the key
-                case "b": // Handle 'Ctrl + B' to load board (no sprite sheet)
-                    loadBoard(handleLoadedBoard); // from file.js
                     if (event.repeat) { return }
+                    break;
+                case 'PageUp':
+                    console.log('type: ', type);
+                    if (event.repeat) { return }
+                    break;
+                case 'Insert':
+                    // nothing here yet
+                    if (event.repeat) { return }
+                    break;
+            }
+
+            switch (event.key.toLowerCase()) {
+                case 'e':
+                    removeMainEvents();
+                    editSprite(currentSprite); // Open the sprite editor from sprite-editor.js
+                    if (event.repeat) { return }
+                    break;
+                case 'c':
+                    removeMainEvents();
+                    pickColor(); // Open color picker from palette.js
+                    if (event.repeat) { return }
+                    break;
+                case '=':
+                    if (currentSprite < tileSetLength) currentSprite += 1; // iterate through sprite sheet
+                    console.log('current sprite: ' + currentSprite);
+                    updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
+                    break;
+                case '-':
+                    if (currentSprite > 1) currentSprite -= 1;
+                    console.log('current sprite: ' + currentSprite);
+                    updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
+                    break;
+                case 'b':
+                    // open the board selector here
+                    boardSelect();
+                    break;
+                case 'i':
+                    placeSprite(tileKey, currentSprite, 'sign'); // Place sprite
+                    if (placedSprites[tileKey]) {
+                        editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
+                    }
+                    if (event.repeat) { return }
+                    break;
+                case 'o':
+                    placeSprite(tileKey, currentSprite, 'object'); // Place sprite
+                    if (placedSprites[tileKey]) {
+                        editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
+                    }
+                    if (event.repeat) { return }
+                    break;
+                case '1':
+                    currentLayer = 1; // change layer for placing sprites
+                    if (event.repeat) { return }
+                    break;
+                case '2':
+                    currentLayer = 2;
+                    if (event.repeat) { return }
+                    break;
+                case '3':
+                    currentLayer = 3;
+                    if (event.repeat) { return }
+                    break;
+                case 'h': // for hiding or showing layers
+                    if (hiddenLayers.has(currentLayer)) {
+                        //showLayer(currentLayer);
+                        hiddenLayers.delete(currentLayer);
+                        console.log('showing layer: ', currentLayer);
+                    }
+                    else {
+                        //hideLayer(currentLayer);
+                        hiddenLayers.add(currentLayer);
+                        console.log('hiding layer: ', currentLayer);
+                    }
+                    if (event.repeat) { return }
+                    drawBoard(); //<------------------------------------- Draw function for entire board
                     return;
+                case 's': // Save board & sprite sheet
+                    saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
+                    break;
+                case 'l': // load board & sprite sheet
+                    loadCombinedData(handleLoadedGame); // load board and sprite sheet from file.js
+                    break;
+                case 'r': // reset board
+                    if (confirm('Are you sure you want reset board?')) {
+                        placedSprites = {};
+                        console.log('Board reset');
+                        createPlayer();
+                        drawBoard(); //<------------------------------------- Draw function for entire board
+                    } else {
+                        console.log('Board not reset');
+                    }
+                    break;
+                case 'f': // flood fill
+                    mouse.mode = 'fill';
+                    console.log('flood fill mode');
+                    break;
+                case 'd':
+                    mouse.mode = 'draw';
+                    console.log('draw mode');
+                    break;
+                case 'z':
+                    // move player sprite to new location
+                    if (currentBoard !== 1) { // no player on title screen
+                        const playerKey = `${player.layer},${player.x},${player.y}`;
+                        placedSprites[`${currentLayer},${cursorX},${cursorY}`] = {
+                            sprite: 1,
+                            image: getSpriteImage(),
+                            color: [[0, 0, 255, .5], [255, 255, 255, 1]],
+                            type: 'player',
+                            direction: 'down',
+                            layer: currentLayer,
+                        };
+                        delete placedSprites[playerKey]; // remove player sprite from old location
+                    }
+                    break;
+            }
+
+            if (event.ctrlKey || event.metaKey) {
+                // Handle key combinations for both Windows/Linux (Ctrl) and Mac (Cmd)
+                key.ctrl = true;
+                switch (event.key.toLowerCase()) { // Check the key
+                    case 'b': // Handle 'Ctrl + B' to load board (no sprite sheet)
+                        loadBoard(handleLoadedBoard); // from file.js
+                        if (event.repeat) { return }
+                        return;
+                    case 'n':
+                        if (!event.ctrlKey) saveBoard(placedSprites); // save board (not sprite sheet)
+                        if (event.repeat) { return }
+                        break;
+                }
+            }
+        } // end of popup check
+
+        if (popup) {
+            switch (event.key) {
+                case 'Escape':
+                    document.getElementById('boardSelect').style.display = 'none';
+                    popup.active = false;
+                    overlay.style.display = 'none';
+                    canvas.focus();
+                    break;
             }
         }
-        //console.log('main hidden:', hiddenLayers);
-        //console.log(`key: cursor ${cursorX},${cursorY}`);
-        //drawBoard(); // Redraw the board and cursor
+
         DrawSingleTile(cursorX, cursorY); // <---------------------------------------------------- Draw Tile Function 2/2
         [mouse.oldX, mouse.oldY] = [cursorX, cursorY];
         toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
     }
 
+    // ######################################
+    // EVENT LISTENERS
+    // ######################################
+
     window.addMainEvents = function () {
         // Handle events for mouse
         canvas.addEventListener('mousedown', handleClick);
         canvas.addEventListener('mouseup', () => { mouse.down = false; });
-        canvas.addEventListener("mousemove", handleMouseMove);
+        canvas.addEventListener('mousemove', handleMouseMove);
         canvas.addEventListener('mouseleave', () => { mouse.down = false; });
         //canvas.addEventListener("mouseenter", () => { mouse.down = true; });
 
@@ -552,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.addEventListener('keydown', handleKeyboard);
         canvas.addEventListener('keyup', () => { Object.assign(key, { ctrl: false, shift: false, alt: false }); });
         colors = currentColors;
-        drawBoard(); //<------------------------------------- Draw function for entire board
+        drawBoard(); // Draw function for entire board
         canvas.focus();
     }
 
@@ -573,8 +722,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial board setup
-    createPlayer();
     addMainEvents();
+    createWorldFromBoards(); // Create the world object from the board list
+    createPlayer();
+    addBoardToWorld(); // Add the current board to the world object
+    world[currentBoard] = placedSprites; // Initialize the current board in the world object
     toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
-    drawBoard(); //<------------------------------------- Draw function for entire board
+    drawBoard();
 });
