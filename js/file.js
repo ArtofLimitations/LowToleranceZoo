@@ -27,31 +27,6 @@ export function saveSpriteSheet() { // Save Sprite Sheet only to JSON
     document.body.removeChild(link);
 }
 
-export function saveBoard(data, fileName = 'board') { // Save board only to JSON
-    const fileExtension = 'json';
-    let dataToSave = {};
-    //console.log(data, Array.isArray(data));
-
-    // Iterate over object keys and values
-    Object.entries(data).forEach(([key, value]) => {
-        dataToSave[key] = value; // Copy key-value pairs directly
-    });
-
-    // Convert the data to JSON
-    const jsonData = JSON.stringify(dataToSave, null, 2);
-    const blob = new Blob([jsonData], { type: 'application/json' });
-
-    // Create a download link
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `${fileName}.${fileExtension}`;
-
-    // Append the link to the DOM, click it to start download, and remove it afterward
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
 export function saveCombinedData(spritesheet, board, fileName = 'gameData') { // Save Combined Game Data (Board, SpriteSheet)
     let dataToSave = spritesheet.map(element => element[0]);
     const fileExtension = 'json';
@@ -68,6 +43,29 @@ export function saveCombinedData(spritesheet, board, fileName = 'gameData') { //
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `${fileName}.${fileExtension}`;
+
+    // Append the link to the DOM, click it to start download, and remove it afterward
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+export function saveWorld(spritesheet, boardList, world, filename = 'world') { // Save World (Board, SpriteSheet)
+    const fileExtension = 'json';
+    let worldData = {
+        spritesheet: spritesheet.map(element => element[0]),
+        boards: boardList,
+        world: world,
+    };
+
+    // Convert the data to JSON
+    const jsonData = JSON.stringify(worldData, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+
+    // Create a download link
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}.${fileExtension}`;
 
     // Append the link to the DOM, click it to start download, and remove it afterward
     document.body.appendChild(link);
@@ -111,43 +109,6 @@ export async function loadSpriteSheet(fileInput) { // Load Sprite Sheet
     }
 }
 
-export function loadBoard(callback) { // Load Board file
-    // Create an input element for file selection
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json';
-
-    // Trigger the file picker
-    input.addEventListener('change', (event) => {
-        const file = event.target.files[0]; // Get the selected file
-        if (!file) return;
-
-        const reader = new FileReader();
-
-        // Read the file contents
-        reader.onload = (e) => {
-            try {
-                // Parse the JSON data
-                const jsonData = JSON.parse(e.target.result);
-                console.log('Loaded Data:', jsonData);
-
-                // Pass the data to the provided callback function
-                if (callback && typeof callback === 'function') {
-                    callback(jsonData);
-                }
-            } catch (error) {
-                console.error('Error parsing JSON:', error);
-                alert('Invalid JSON file. Please upload a valid board file.');
-            }
-        };
-
-        reader.readAsText(file); // Read the file as text
-    });
-
-    // Simulate a click to open the file dialog
-    input.click();
-}
-
 export function loadCombinedData(callback) { // Load Combined Game Data (Board, SpriteSheet)
     // Create an input element for file selection
     const input = document.createElement('input');
@@ -188,10 +149,52 @@ export function loadCombinedData(callback) { // Load Combined Game Data (Board, 
     input.click();
 }
 
+export function loadWorld(callback) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+
+      // Trigger the file picker
+      input.addEventListener('change', (event) => {
+        const file = event.target.files[0]; // Get the selected file
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        // Read the file contents
+        reader.onload = (e) => {
+            try {
+                // Parse the JSON data
+                const combinedData = JSON.parse(e.target.result);
+                let spritesheet = combinedData.spritesheet;
+                const boardList = combinedData.boards;
+                const world = combinedData.world;
+
+                spritesheet = rebuildSpriteSheet(spritesheet);
+
+                // Pass the data to the provided callback function
+                if (callback && typeof callback === 'function') {
+                    callback(spritesheet, boardList, world);
+                }
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+                alert('Invalid JSON file. Please upload a valid board file.');
+            }
+        };
+
+        reader.readAsText(file); // Read the file as text
+    });
+
+    // Simulate a click to open the file dialog
+    input.click();
+
+
+}
+
 
 //saveCombinedData(spritesheet, board, 'gameData');
 
-// Buttons for testing
+/*/ Buttons for testing
 document.getElementById('saveSpriteSheet').addEventListener('click', saveSpriteSheet);
 
 document.getElementById('loadSpriteSheetButton').addEventListener('click', () => {
@@ -204,14 +207,4 @@ document.getElementById('loadSpriteSheet').addEventListener('change', (event) =>
         replaceSpriteSheet(data);
     });
 });
-
-document.getElementById('loadFileButton').addEventListener('click', () => {
-    document.getElementById('fileInput').click();
-});
-
-document.getElementById('fileInput').addEventListener('change', function () {
-    loadCombinedData(this, (spritesheet, board) => {
-        console.log('Loaded Spritesheet:', spritesheet);
-        console.log('Loaded Board:', board);
-    });
-});
+*/

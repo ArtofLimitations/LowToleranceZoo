@@ -59,8 +59,8 @@
                         </div>
                     </div><span class="fieldText">Tile<br>Type</span>
                 </div>
-                <div class="fieldRow"><span class="fieldCategory">Terrain</span></div>
-                <div class="fieldRow"><span class="fieldCategory">Item</span></div>
+                <div class="fieldRow"><span class="fieldCategory" id="terrainButton">Terrain</span></div>
+                <div class="fieldRow"><span class="fieldCategory" id="itemButton">Item</span></div>
                 <div class="fieldRow"><span class="fieldCategory">Creatures</span></div>
                 <div class="fieldRow"><span class="valueBox valueText" id="editMode"> Draw </span><span class="fieldText">Edit<br> Mode</span></div>
             </div>
@@ -106,6 +106,30 @@
         <div class="boardSelect" id="boardSelect"><p><strong>Select Board</strong></p>
             <div class="boardList" id="boardList"><ol id="boardListItems"><li>Title Board</li><li>Default</li></ol></div>
             <button class="material-symbols-outlined" id="addBoardButton" title="Add New Board">add</button>
+        </div>
+        <div class="extraTiles" id="extraTerrain">
+            <p><span class="char">■</span><strong>Terrain</strong></p>
+            <br>
+            <ul id="extraTilesList">
+                <li><span>W</span>Wall</li><span class="fieldText">Standard wall tile. Blocks movement.</span>
+                <li><span>S</span>Step Tile</li><span class="fieldText">Item like tile. Destroyed upon stepping on.</span>
+                <li><span>B</span>Break</li><span class="fieldText">Like a wall but breaks when hit.</span>
+                <li><span>P</span>Push</li><span class="fieldText">Can be pushed by player and objects</span>
+                <li><span>A</span>Animation Tile</li><span class="fieldText">Efficient animation tile. Pre-rendered and can't be changed by objects without destroying.</span>
+                <li><span>I</span>Invisible Wall</li><span class="fieldText">Blocks player and objects</span>
+            </ul>
+        </div>
+        <div class="extraTiles" id="extraItems">
+            <p><span class="char">♦</span><strong>Items</strong></p>
+            <br>
+            <ul id="extraTilesList">
+                <li><span>C</span>Coin</li>
+                <li><span>A</span>Ammo</li>
+                <li><span>K</span>Key</li>
+                <li><span>D</span>Door</li>
+                <li><span>P</span>Passage</li>
+                <li><span>I</span>Sign</li>
+            </ul>
         </div>
     </div>
     <canvas id="exportedSpriteCanvas" width="32" height="32" style="margin-top: 20px;"></canvas>

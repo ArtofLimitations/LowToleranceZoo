@@ -1,9 +1,9 @@
 import { toolbar, updateType } from './toolbar.js';
-import { drawSprite, adjustColor, createDataURL, convertToImageData } from './sprite.js';
+import { drawSprite, adjustColor } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
-import { saveBoard, loadBoard, saveCombinedData, loadCombinedData } from './file.js';
+import { saveCombinedData, loadCombinedData, saveWorld, loadWorld } from './file.js';
 import { editObject, getObjectData } from './object-editor.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let popup = { active: false, type: null };
     let boardList = [[1, 'Title Screen'], [2, 'Default']];
     let currentBoard = 2;
-    let world = {};                                                                       // default type for placed sprites
+    let world = {};                                                                         // default type for placed sprites
     let key = { ctrl: false, shift: false, alt: false, lastClick: 0, clickDelay: 100 };     // keyboard status object. click delay in ms
     let mouse = {
         x: cursorX, y: cursorY, oldX: cursorX, oldY: cursorY, down: false,
@@ -89,10 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('World:', world);
     }
 
-    function getBoardFromWorld() {
-        return world[currentBoard]; // Get the current board from the world object
-    }
-
     // ######################################
     // DRAWING FUNCTIONS
     // ######################################
@@ -100,6 +96,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSpriteImage() {
         const data = getDataFromSheet(currentSprite); // from sprite-sheet.js
         return data;
+    }
+
+    function rgba(colorArray) {
+        return `rgba(${colorArray[0]}, ${colorArray[1]}, ${colorArray[2]}, ${colorArray[3]})`;
     }
 
     // DRAW EVERY TILE
@@ -122,7 +122,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (x < tilesX && y < tilesY) {
                 const spriteInfo = placedSprites[`${l},${x},${y}`];
-                drawSprite(x, y, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color); // draw sprite from sprite.js with array data
+                //drawSprite(x, y, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color); // draw sprite from sprite.js with array data
+                if (spriteInfo) {
+                    if (spriteInfo.type === 'passage') {
+                        ctx.save()
+                        ctx.globalAlpha = 0.5
+                        ctx.fillStyle = rgba(colors[0]); // Set color for the passage
+                        ctx.fillRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY); // Draw the passage area
+                        ctx.fillStyle = rgba(colors[1]); // Set color for the passage
+                        ctx.fillRect(x * tileSizeX + tileSizeX / 4, y * tileSizeY + tileSizeX / 4, tileSizeX / 2, tileSizeY / 2); // Draw the passage area
+
+                        ctx.font = `${tileSizeY / 2}px Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = 'white'; // Text color
+                        ctx.fillText('P', x * tileSizeX + tileSizeX / 2, y * tileSizeY + tileSizeY / 2);
+                        ctx.restore();
+                    } else {
+                        drawSprite(x, y, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+                    }
+                }
             }
         }
     }
@@ -142,7 +161,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const spriteInfo = placedSprites[`${l},${sx},${sy}`];
             if (spriteInfo) {
-                drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+                if (spriteInfo.type === 'passage') {
+                    ctx.save()
+                    ctx.globalAlpha = 0.5
+                    ctx.fillStyle = rgba(colors[0]); // Set color for the passage
+                    ctx.fillRect(sx * tileSizeX, sy * tileSizeY, tileSizeX, tileSizeY); // Draw the passage area
+                    ctx.fillStyle = rgba(colors[1]); // Set color for the passage
+                    ctx.fillRect(sx * tileSizeX + tileSizeX / 4, sy * tileSizeY + tileSizeX / 4, tileSizeX / 2, tileSizeX / 2); // Draw the passage area
+
+                    ctx.font = `${tileSizeY / 2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = 'white'; // Text color
+                    ctx.fillText('P', sx * tileSizeX + tileSizeX / 2, sy * tileSizeY + tileSizeY / 2);
+                    ctx.restore();
+                } else {
+                    drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+                }
             }
         }
     }
@@ -151,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function DrawSingleTile(x, y) {
         ctx.clearRect(mouse.oldX * tileSizeX, mouse.oldY * tileSizeY, tileSizeX, tileSizeY);
-        //ctx.clearRect(x, y, tileSizeX, tileSizeY);
+        ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
         drawSpritesAt(mouse.oldX, mouse.oldY);
         drawSpritesAt(x, y);
         drawCursor();
@@ -271,12 +306,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const tileKey = key;
         placedSprites[tileKey] = {
             sprite: sprite,
-            image: getSpriteImage(),
+            //image: getSpriteImage(),
             color: colors,
             type: type,
             layer: currentLayer,
             oldKey: tileKey,
-            data: {
+            data: {},
+        };
+        if (type === 'object' || type === 'sign') {
+            placedSprites[tileKey].data = {
                 name: '',
                 speed: 2,
                 timer: 0,
@@ -285,6 +323,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 text: '',
             } // default data for placed sprites
         };
+        if (type === 'passage') {
+            placedSprites[tileKey].data = {
+                speed: 1,
+                board: currentBoard,
+            }
+        }
         if (type === 'object' || type === 'sign') placedSprites[tileKey].data.script = tileData.script; // update object.data.script if type = sign or object
     }
 
@@ -320,11 +364,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Perform Flood Fill
                     floodFill(cursorX, cursorY, {
                         sprite: currentSprite,
-                        image: getSpriteImage(),
+                        //image: getSpriteImage(),
                         color: colors,
                         type: type,
                         data: getObjectData()
                     }, useColorComparison);
+
+                    mouse.mode = 'draw'; // Reset mode after filling
                 }
                 break;
             case 1: // Middle mouse button (Adjust color)
@@ -393,24 +439,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // callback function for loading board POSSIBLY REMOVE
-    function handleLoadedBoard(data) {
-        console.log("Data loaded into application:", data);
-        placedSprites = data;
-
-        drawBoard(); //<------------------------------------- Draw function for entire board
-    }
-
     // callback function for loading game. Loads single boards
-    function handleLoadedGame(spriteSheetData, boardData) {
+    function handleLoadedBoard(spriteSheetData, boardData) {
         placedSprites = boardData;
-        addBoardToWorld(); // Add the current board to the world object
+        addBoardToWorld(true); // Add the current board to the world object
         replaceSpriteSheet(spriteSheetData);
 
         hiddenLayers = new Set();
 
         console.log('Loaded Board');
-        drawBoard(); //<------------------------------------- Draw function for entire board
+        drawBoard();
+    }
+
+    function handleLoadedWorld(spriteSheetData, boardListData, worldData) {
+        boardList = boardListData; // Load the board list
+        world = worldData; // Load the world data  
+        replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
+
+        hiddenLayers = new Set();
+        currentBoard = 1; // Set the current board to the first one
+        placedSprites = world[currentBoard]; // Get the current board from the world object
+
+        console.log('Loaded World');
+        drawBoard();
     }
 
     function handleToolbarClick(layer = currentLayer, hidden = hiddenLayers, spriteType = type) {
@@ -436,14 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // POPUP FUNCTIONS 
     // ######################################
 
-    function removeSelectedClass(listItems) {
-        const selectedItems = listItems.querySelectorAll('.selected');
-        selectedItems.forEach((item) => {
-            item.classList.remove('selected');
-        });
-    }
-
-    function boardSelect() { //  Board selector. This is a popup that allows the user to select a board from the list of boards.
+    function boardSelect(onlySelect = false, key = `${currentLayer},${mouse.x},${mouse.y}`) { //  Board selector. This is a popup that allows the user to select a board from the list of boards.
         popup.active = true;
         popup.type = 'boardSelect';
 
@@ -452,6 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const addButton = document.getElementById('addBoardButton');
         const selectContainer = document.getElementById('boardSelect');
         const listItems = document.getElementById('boardListItems');
+        let boardSelected = ''; // Variable to store the selected board
 
         listItems.innerHTML = ''; // Clear previous items
 
@@ -462,17 +507,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 listItem.classList.add('selected'); // Highlight the selected board
             }
             listItem.onclick = () => {
-                currentBoard = item[0]; // Set the selected board
-                console.log('Selected Board: ', currentBoard);
-                placedSprites = world[currentBoard]; // Get the selected board from the world object
+                if (!onlySelect) {
+                    currentBoard = item[0]; // Set the selected board
+                    console.log('Selected Board: ', currentBoard);
+                    placedSprites = world[currentBoard]; // Get the selected board from the world object
+                    drawBoard();
+                }
+                boardSelected = item[0]; // Store the selected board ID
 
                 popup.active = false;
-
                 overlay.style.display = 'none';
                 selectContainer.style.display = 'none';
                 canvas.focus();
 
-                drawBoard();
+                if (onlySelect) placedSprites[key].data.board = boardSelected; // Set the board ID for the passage
+                console.log('Selected Board ID: ', boardSelected); // Log the selected board ID
+                //if (onlySelect) return boardSelected; // Return the selected board ID if only selecting
             };
             listItems.appendChild(listItem);
         });
@@ -489,15 +539,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         selectContainer.style.display = 'block';
+
     }
 
     // ######################################
     // KEYBOARD HANDLING FUNCTIONS
     // ######################################
 
+    // Key mapping (now using key names instead of key codes)
+    let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F5: "F5", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10", F11: "F11", F12: "F12" };
+    let enterPressed = false; // Lock variable
+
     function handleKeyboard(event) {
         const tileKey = `${currentLayer},${cursorX},${cursorY}`;
         //console.log(event.key);
+
+        var keycode = event.code; // Use event.code
+        if (util[keycode]) {
+            event.preventDefault();
+        }
 
         if (!popup.active) { // use different key events for popups like the board selector
 
@@ -522,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         placeSprite(tileKey, currentSprite, type); // Place sprite
                     }
                     break;
-                case 'Enter': // add layers later
+                case 'Enter': // to grab sprite or modify tile
                     grabSprite(tileKey);
                     if (placedSprites[tileKey]) {
                         if (placedSprites[tileKey].type === 'sign') {
@@ -533,16 +593,59 @@ document.addEventListener('DOMContentLoaded', () => {
                             editObject('object', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
                             //placedSprites[tileKey].data.script = getObjectData(tileKey);
                         }
+                        if (placedSprites[tileKey].type === 'passage') { // need to set passage ID
+                            boardSelect(true, tileKey); // open board selector for selecting board ID Only (true)
+                            console.log('passage board: ', placedSprites[tileKey].data.board);
+                        }
                         console.log('grabbed:, ', placedSprites[tileKey]);
+                        enterPressed = true; // Lock it
                     }
                     if (event.repeat) { return }
                     break;
+                case 'Tab': // Paint Mode
+                    if (mouse.mode === 'paint') mouse.mode = 'draw';
+                    else mouse.mode = 'paint';
+                    console.log('paint mode');
                 case 'PageUp':
                     console.log('type: ', type);
                     if (event.repeat) { return }
                     break;
                 case 'Insert':
                     // nothing here yet
+                    if (event.repeat) { return }
+                    break;
+                case 'Delete': // delete all sprites in current layer
+                    if (confirm('Are you sure you want to delete all sprites in this layer?')) {
+                        for (let key in placedSprites) {
+                            const [layer] = key.split(',').map(Number); // Extract layer from key
+                            if (layer === currentLayer) {
+                                delete placedSprites[key];
+                            }
+                        }
+                        console.log('Deleted all sprites in layer:', currentLayer);
+                        drawBoard();
+                    }
+                    break;
+                case 'F1': //save world
+                    saveWorld(getSpriteSheet(), boardList, world); // save world from file.js
+                    if (event.repeat) { return }
+                    break;
+                case 'F2': //load world
+                    loadWorld(handleLoadedWorld); // load world from file.js
+                    if (event.repeat) { return }
+                    break;
+                case 'F9': // extra terrain tiles
+                    popup.active = true;
+                    popup.type = 'extraTerrain';
+                    overlay.style.display = 'block';
+                    document.getElementById('extraTerrain').style.display = 'flex';
+                    if (event.repeat) { return }
+                    break;
+                case 'F10': // extra item tiles
+                    popup.active = true;
+                    popup.type = 'extraItems';
+                    overlay.style.display = 'block';
+                    document.getElementById('extraItems').style.display = 'flex';
                     if (event.repeat) { return }
                     break;
             }
@@ -610,20 +713,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.log('hiding layer: ', currentLayer);
                     }
                     if (event.repeat) { return }
-                    drawBoard(); //<------------------------------------- Draw function for entire board
+                    drawBoard();
                     return;
                 case 's': // Save board & sprite sheet
                     saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
                     break;
                 case 'l': // load board & sprite sheet
-                    loadCombinedData(handleLoadedGame); // load board and sprite sheet from file.js
+                    loadCombinedData(handleLoadedBoard); // load board and sprite sheet from file.js
                     break;
                 case 'r': // reset board
                     if (confirm('Are you sure you want reset board?')) {
                         placedSprites = {};
                         console.log('Board reset');
                         createPlayer();
-                        drawBoard(); //<------------------------------------- Draw function for entire board
+                        drawBoard();
                     } else {
                         console.log('Board not reset');
                     }
@@ -648,7 +751,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             direction: 'down',
                             layer: currentLayer,
                         };
+                        [player.oldX, player.oldY] = [player.x, player.y]; // save old location
+                        [player.x, player.y] = [cursorX, cursorY]; // move player to new location
                         delete placedSprites[playerKey]; // remove player sprite from old location
+                        DrawSingleTile(player.oldX, player.oldY);
                     }
                     break;
             }
@@ -669,18 +775,48 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } // end of popup check
 
-        if (popup) {
+        if (popup.active) {
             switch (event.key) {
                 case 'Escape':
-                    document.getElementById('boardSelect').style.display = 'none';
-                    popup.active = false;
+                case 'Enter':
+                    if (enterPressed) break;
+                    switch (popup.type) {
+                        case 'extraTerrain':
+                            document.getElementById('extraTerrain').style.display = 'none';
+                            popup.active = false;
+                            break;
+                        case 'extraItems':
+                            document.getElementById('extraItems').style.display = 'none';
+                            popup.active = false;
+                            break;
+                        case 'boardSelect':
+                            document.getElementById('boardSelect').style.display = 'none';
+                            popup.active = false;
+                            break;
+                    }
                     overlay.style.display = 'none';
                     canvas.focus();
                     break;
             }
+
+            switch (event.key.toLowerCase()) {
+                case 'p':
+                    type = 'passage'; // Set type to passage
+                    placeSprite(tileKey, 0, 'passage'); // Place sprite
+                    document.getElementById('extraItems').style.display = 'none';
+                    popup.active = false;
+                    overlay.style.display = 'none';
+                    if (event.repeat) { return }
+                    break;
+            }
         }
 
-        DrawSingleTile(cursorX, cursorY); // <---------------------------------------------------- Draw Tile Function 2/2
+        if (mouse.mode === 'paint') {
+            if (placedSprites[tileKey] && placedSprites[tileKey].type === 'player');
+            else placeSprite(tileKey, currentSprite, type); // Place sprite
+        }
+
+        DrawSingleTile(cursorX, cursorY); // Draw the tile at the cursor position
         [mouse.oldX, mouse.oldY] = [cursorX, cursorY];
         toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
     }
@@ -697,9 +833,16 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.addEventListener('mouseleave', () => { mouse.down = false; });
         //canvas.addEventListener("mouseenter", () => { mouse.down = true; });
 
-        // handles keypresses
+        // handles keypress
         canvas.addEventListener('keydown', handleKeyboard);
-        canvas.addEventListener('keyup', () => { Object.assign(key, { ctrl: false, shift: false, alt: false }); });
+        canvas.addEventListener('keyup', (event) => {
+            Object.assign(key, { ctrl: false, shift: false, alt: false });
+
+            if (event.key === 'Enter') {
+                enterPressed = false; // Unlock when Enter is released
+            }
+        });
+
         colors = currentColors;
         drawBoard(); // Draw function for entire board
         canvas.focus();

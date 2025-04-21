@@ -17,12 +17,15 @@ const layerButtons = [null, document.getElementById('layer1Button'), document.ge
 const layerOpacity = document.getElementById('3-opacity');
 const boardLayers = [null, document.getElementById('layer1'), document.getElementById('layer2'), document.getElementById('layer3')];
 const spriteTypes = [document.getElementById('wall'), document.getElementById('item'), document.getElementById('break'), document.getElementById('push'), document.getElementById('other')];
+const terrainButton = document.getElementById('terrainButton');
+const itemButton = document.getElementById('itemButton');
 const editMode = document.getElementById('editMode');
 
 //const toolBarSize = 320; // Right side toolbar sized in tiles
 let colors = [[0, 0, 0, 1], [255, 255, 255, 1]];
 let mouseStatus = {};
 let oldData = [];
+let oldColors = [];
 let newCurrent = 0;
 let hidden = new Set();
 let callbackFunction = () => { };
@@ -74,6 +77,10 @@ spriteTypes.forEach((element) => {
   }
 });
 
+terrainButton.onclick = () => {
+  
+}
+
 export function toolbar(current, currentColors, layer, mouse, hiddenLayers, callback) { // Main toolbar function
   //console.log('Function called from toolbar.js');
   //const leftSide = canvas.width - toolBarSize;
@@ -88,7 +95,7 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
   spriteValue.innerHTML = current;
   let spriteData = getDataFromSheet(current);
 
-  if (spriteData !== oldData) { // fix for image not updating
+  if (spriteData !== oldData || colors !== oldColors) { // fix for image flashing
     // Handle the promise
     createDataURL(spriteData, colors[0], colors[1]).then((img) => {
       //console.log('Image created:', img);
@@ -101,7 +108,8 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
     });
   }
 
-  oldData = spriteData; // fix for image not updating
+  oldData = spriteData; // fix for image flashing
+  oldColors = colors; // fix for image flashing
   // if (getImageFromSheet(current) !== undefined) spriteImage.appendChild = dataURL;
 
   darkColor.style.background = `rgba(${colors[0][0]},${colors[0][1]}, ${colors[0][2]}, ${colors[0][3]})`;

@@ -1,4 +1,4 @@
-import { loadCombinedData } from './file.js';
+import { loadCombinedData, loadWorld } from './file.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet } from './weapons.js';
@@ -31,12 +31,18 @@ const tilesCtx = tilesCanvas.getContext('2d');
 const layerCanvases = {};            // Stores canvases for layers
 const layerContexts = {};            // Stores 2D contexts for layers
 let placedObjects = {};              // Stores objects on the board
+let placedPassages = {};             // Stores passages on the board
 //const namedColors = namedColorList;  // Named colors for easy reference
 
 // board variables
-let board = {};
+let currentBoard = 2;                // Current board number
+let boards = {};
 let loaded = false;
 let nightMode = true;
+
+// World variables
+let world = {}; // World object
+let worldPassages = {}; // Stores passages for all boards
 
 // Player
 let player = defaultPlayerStats; // Player object
@@ -125,9 +131,11 @@ function drawBoard() {
                 const [l, x, y] = key.split(',').map(Number);
                 return { l, x, y, ...placedSprites[key] };
             })
-            .filter(sprite => sprite.l === layer) // Get only sprites for this layer
+            .filter(sprite => sprite.l === layer && sprite.type !== 'passage') // Skip rendering passages
             .forEach(sprite => {
-                if (sprite.type !== 'player') drawSpriteToCanvas(ctx, sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
+                if (sprite.type !== 'player') {
+                    drawSpriteToCanvas(ctx, sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
+                }
             });
 
         //console.log(`Layer ${layer} generated`);
@@ -154,12 +162,12 @@ function renderLayersToMainCanvas() {
     for (const layer of sortedLayers) {
         if (layerCanvases[layer]) {
 
-            ctx.save()
+            //ctx.save()
             //if (layer === 3) ctx.filter = 'opacity(0.8)';
             //if (layer === 2) ctx.filter = 'blur(1px)';
             //if (layer === 3) ctx.globalCompositeOperation = "destination-over";
             ctx.drawImage(layerCanvases[layer], 0, 0);
-            ctx.restore();
+            //ctx.restore();
 
         } else {
             console.warn(`Layer ${layer} is missing!`); // Debugging
@@ -691,7 +699,6 @@ function canMoveTo(x, y, object = player) {
         if (isOverlappingTile(player, tile.x, tile.y) && object.type === 'object') {
             console.log('player detected!');
             return tryPushPlayer(player.x, player.y, object.direction, object.layer);
-            return false;
         }
 
         if (placedSprites[tileKey]) {
@@ -750,6 +757,24 @@ function canMoveTo(x, y, object = player) {
                 return tryPushTiles(tile.x, tile.y, object.direction, object.layer);
             }
         }
+
+        if (placedPassages[tileKey]) {
+            let tileType = placedPassages[tileKey].type;
+
+            if (tileType === 'passage' && object.type === 'player') {
+                // Check to see if the player is fully on the tile before moving
+                if (isOverlappingTile(player, tile.x, tile.y)) {
+                    // Handle passage logic here
+                    let targetBoard = placedPassages[tileKey].data.board;
+                    let passageColor = placedPassages[tileKey].color;
+                    let colorKey = passageColor.join(','); // Create a unique key for the color
+                    console.log('Switching to board:', targetBoard, 'with colorKey:', colorKey); // Debug log
+                    switchBoard(targetBoard, colorKey); // Pass the color key to switchBoard
+                    return false; // Prevent movement
+                }
+            }
+        }
+
         //ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Debugging color
         //ctx.fillRect(tile.x * tileSizeX, tile.y * tileSizeY, tileSizeX, tileSizeY); // Debugging
     }
@@ -902,6 +927,8 @@ function updatePlayer(deltaTime) {
         player.x = newX;
         player.y = newY;
 
+        //console.log('Player moved to:', { x: player.x, y: player.y });
+
         //let newTiles = getOverlappingTiles(player.x * 32, player.y * 32);
 
         //let uniqueTiles = [...new Set([...oldTiles, ...newTiles])];
@@ -917,8 +944,8 @@ function updatePlayer(deltaTime) {
 // ######## Events & loading functions #########
 // #############################################
 
-// Load board and replace spritesheet
-function handleLoadedGame(spriteSheetData, boardData) {
+// Load board and replace sprite sheet
+function handleLoadedBoard(spriteSheetData, boardData) {
 
     placedSprites = boardData;
 
@@ -938,6 +965,131 @@ function handleLoadedGame(spriteSheetData, boardData) {
     drawBoard(); // Generate all layers
     renderLayersToMainCanvas(); // Draw them onto the main canvas
 }
+
+function handleLoadedGame(spriteSheetData, boardList, worldData) {
+    boards = boardList; // Load the board list
+    world = worldData; // Load the world data  
+    replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
+
+    // Extract passages for all boards
+    for (const board in world) {
+        loadPassagesFromGameData(world[board], board);
+    }
+
+    console.log('Loaded world data:', worldData);
+
+    placedSprites = world[currentBoard]; // Get the current board from the world object
+    placedObjects = loadObjectsFromGameData(placedSprites);
+    placedPassages = worldPassages[currentBoard] || {}; // Load passages for the current board
+
+    loaded = true;
+    player = findPlayerSprite();
+    console.log('Found player:', player);
+    player = { ...playerStats, ...player };
+    console.log('Loaded player:', player);
+
+    nightMode = false;
+
+    console.log('Loaded World');
+    drawBoard();
+    renderLayersToMainCanvas(); // Draw them onto the main canvas
+}
+
+function loadPassagesFromGameData(gameData, board) {
+    if (!worldPassages[board]) {
+        worldPassages[board] = {}; // Initialize storage for the board if it doesn't exist
+    }
+
+    for (const key in gameData) {
+        const sprite = gameData[key];
+        if (sprite.type === 'passage') {
+            const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
+            worldPassages[board][`${layer},${x},${y}`] = sprite; // Store passage data for the board
+            console.log('Loaded passage:', { board, key, sprite });
+        }
+    }
+
+    return worldPassages[board]; // Return the passages for the current board
+}
+
+function switchBoard(board, colorKey) {
+    currentBoard = board;
+
+    placedSprites = world[currentBoard]; // Get the current board from the world object
+    placedObjects = loadObjectsFromGameData(placedSprites);
+    placedPassages = worldPassages[board] || {}; // Load passages for the current board
+
+    console.log('Switching to board:', board, 'with colorKey:', colorKey);
+    console.log('Placed passages:', placedPassages);
+
+    let foundPassage = false;
+
+    for (const key in placedPassages) {
+        const passage = placedPassages[key];
+        const passageColorKey = passage.color.join(','); // Create a unique key for the passage color
+
+        console.log('Player position before:', player.layer, player.x, player.y); // Debug log
+        console.log('Checking passage:', key, 'with colorKey:', passageColorKey);
+
+        if (passageColorKey === colorKey) { // Compare the color keys
+            const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
+
+            // Update player's position
+            const oldKey = `${player.layer},${player.x},${player.y}`;
+            const newKey = `${layer},${x},${y}`;
+
+            player.layer = layer;
+            player.x = x;
+            player.y = y;
+
+            // Update placedSprites
+            placedSprites[newKey] = player;
+            //placedSprites[newKey] = placedSprites[oldKey]; // Move player to the new key
+            //delete placedSprites[oldKey]; // Remove player from the old key
+
+            foundPassage = true;
+            console.log('Found matching passage at:', { layer, x, y });
+            break; // Exit loop after finding the first match
+        }
+    }
+
+    if (!foundPassage) {
+        console.warn('No matching passage found for colorKey:', colorKey);
+        player = findPlayerSprite(); // Fallback to find player sprite
+    } else {
+        console.log('Rendering player at new position:', { layer: player.layer, x: player.x, y: player.y });
+    }
+
+    drawBoard();
+    renderLayersToMainCanvas(); // Draw them onto the main canvas
+}
+
+/*function switchBoard(board, colorKey) {
+    currentBoard = board;
+
+    placedSprites = world[currentBoard]; // Get the current board from the world object
+    placedObjects = loadObjectsFromGameData(placedSprites);
+    placedPassages = loadPassagesFromGameData(placedSprites); // Load passages from the current board
+
+    //player = findPlayerSprite();
+    // lookup passage color in placedPassages for a match
+    for (const key in placedPassages) {
+        const passage = placedPassages[key];
+        const passageColorKey = passage.color.join(','); // Create a unique key for the passage color
+
+        if (passageColorKey === colorKey) { // Compare the color keys
+            const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
+            player.layer = layer;
+            player.x = x;
+            player.y = y;
+            console.log('Found matching passage at:', { layer, x, y });
+            break; // Exit loop after finding the first match
+        }
+    }
+
+    drawBoard();
+    renderLayersToMainCanvas(); // Draw them onto the main canvas
+}*/
 
 function findPlayerSprite() {
     for (const key in placedSprites) {
@@ -961,15 +1113,10 @@ document.addEventListener("keydown", (event) => {
         event.preventDefault();
     }
 
-    /*if (gamePaused && (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ')) {
-        document.getElementById('dialog-box').style.display = 'none';
-        gamePaused = false; // Resume the game loop
-        requestAnimationFrame(animateGame);
-        return;
-    }*/
+    //console.log(event.key, event.code); // Debugging
 
     if (event.key === 'l' && !gamePaused) { // load game
-        loadCombinedData(handleLoadedGame);
+        loadCombinedData(handleLoadedBoard);
     }
 
     if (event.key === 'r') {
@@ -982,8 +1129,17 @@ document.addEventListener("keydown", (event) => {
         if (!gamePaused) requestAnimationFrame(animateGame);
     }
 
-    if (event.key === ' ' && !gamePaused) { // Spacebar to shoot
+    if (event.key === ' ' && !gamePaused) { // Space bar to shoot
         bulletArray.push(createBullet(canvas, player.x + 0.5, player.y + 0.5, player.direction));
+    }
+
+    if (event.key === 'n') { // M to toggle night mode (TEMPORARY)
+        nightMode = !nightMode;
+        renderLayersToMainCanvas(); // Redraw layers to apply night mode
+    }
+
+    if (event.key === 'F3') { // loading whole worlds
+        loadWorld(handleLoadedGame);
     }
 
     updateDirection(); // Update direction based on keys held

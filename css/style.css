@@ -256,7 +256,8 @@ h3 {
   line-height: 2;
 }
 
-.lowToleranceToolbar .fieldText {
+.lowToleranceToolbar .fieldText, 
+.extraTiles .fieldText{
   color: #fff;
   font-size: 12px;
 }
@@ -657,6 +658,65 @@ h3 {
   background-color: #f0f0f0;
   margin-top: 8px;
   height: 32px;
+}
+
+.extraTiles {
+  display: none;
+  /* Hidden initially */
+  flex-wrap: wrap;
+  flex-direction: column;
+  align-content: center;
+  align-items: flex-start;
+  box-sizing: content-box;
+  position: relative;
+  top: 8px;
+  left: -8px;
+  width: 270px;
+  color: #fff;
+  float: right;
+  background-color: #0e2a68;
+  padding: 24px;
+  box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
+  z-index: 5;
+}
+
+.extraTiles p {
+  font-weight: 600;
+}
+
+.extraTiles ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.extraTiles ul li {
+  background-color: #13377c;
+  padding: 3px 50px;
+  margin: 8px;
+}
+
+.extraTiles ul li:hover {
+  background-color: #ffc800;
+  color: #fff;
+  box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
+}
+
+.extraTiles ul li span {
+  color: #be2915;
+  font-size: 16px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.extraTiles .char {
+  width: 32px;
+  height: 32px;
+  color: #6ad10a;
+  font-family: "zzt";
+  font-size: 24px;
+  margin-left: 8px;
+  margin-right: 4px;
 }
 
 .lowToleranceCanvas {
