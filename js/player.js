@@ -765,6 +765,7 @@ function canMoveTo(x, y, object = player) {
                 // Check to see if the player is fully on the tile before moving
                 if (isOverlappingTile(player, tile.x, tile.y)) {
                     // Handle passage logic here
+                    player.locked = true; // Lock player movement
                     let targetBoard = placedPassages[tileKey].data.board;
                     let passageColor = placedPassages[tileKey].color;
                     let colorKey = passageColor.join(','); // Create a unique key for the color
@@ -921,23 +922,41 @@ function updatePlayer(deltaTime) {
     }
 
     if (newX !== player.x || newY !== player.y) {
-        const oldKey = `${player.layer},${player.x},${player.y}`;
-        const newKey = `${player.layer},${newX},${newY}`;
+        if (!player.transported) {
+            const oldKey = `${player.layer},${player.x},${player.y}`;
+            const newKey = `${player.layer},${newX},${newY}`;
 
-        player.x = newX;
-        player.y = newY;
+            player.x = newX;
+            player.y = newY;
 
-        //console.log('Player moved to:', { x: player.x, y: player.y });
-
-        //let newTiles = getOverlappingTiles(player.x * 32, player.y * 32);
-
-        //let uniqueTiles = [...new Set([...oldTiles, ...newTiles])];
-
-        placedSprites[newKey] = placedSprites[oldKey];
-        delete placedSprites[oldKey];
-
+            placedSprites[newKey] = placedSprites[oldKey];
+            delete placedSprites[oldKey];
+        }
+        player.transported = false;
         renderLayersToMainCanvas();
     }
+}
+
+function movePlayer(newLayer, newX, newY) {
+    const oldKey = `${player.layer},${player.x},${player.y}`;
+    const newKey = `${newLayer},${newX},${newY}`;
+
+    // Update the global player object
+    player.layer = newLayer;
+    player.x = newX;
+    player.y = newY;
+    player.transported = true; // Mark player as moved
+
+    // Update placedSprites
+    if (placedSprites[oldKey]) {
+        placedSprites[newKey] = placedSprites[oldKey]; // Move player sprite to the new key
+        delete placedSprites[oldKey]; // Remove player sprite from the old key
+    }
+
+    console.log('Player moved to:', { layer: newLayer, x: newX, y: newY });
+
+    // Redraw the board
+    renderLayersToMainCanvas();
 }
 
 // #############################################
@@ -1016,11 +1035,37 @@ function switchBoard(board, colorKey) {
     currentBoard = board;
 
     placedSprites = world[currentBoard]; // Get the current board from the world object
+    const spritesCopy = { ...placedSprites }; // Create a shallow copy
+    placedObjects = loadObjectsFromGameData(spritesCopy);
+    placedPassages = loadPassagesFromGameData(world[currentBoard], currentBoard); // Load passages from the current board
+
+    // lookup passage color in placedPassages for a match
+    for (const key in placedPassages) {
+        const passage = placedPassages[key];
+        const passageColorKey = passage.color.join(','); // Create a unique key for the passage color
+
+        if (passageColorKey === colorKey) { // Compare the color keys
+            const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
+            movePlayer(layer, x, y); // Use movePlayer to update the player's position
+            break; // Exit loop after finding the first match
+        }
+    }
+    console.log(`Passages for board ${currentBoard}:`, placedPassages);
+    player.locked = false; // Unlock player movement
+
+    drawBoard();
+    renderLayersToMainCanvas(); // Draw them onto the main canvas
+}
+
+function _switchBoard(board, colorKey) {
+    currentBoard = board;
+
+    placedSprites = world[currentBoard]; // Get the current board from the world object
     placedObjects = loadObjectsFromGameData(placedSprites);
     placedPassages = worldPassages[board] || {}; // Load passages for the current board
 
-    console.log('Switching to board:', board, 'with colorKey:', colorKey);
-    console.log('Placed passages:', placedPassages);
+    //console.log('Switching to board:', board, 'with colorKey:', colorKey);
+    console.log('finding:', findPlayerSprite());
 
     let foundPassage = false;
 
@@ -1035,17 +1080,12 @@ function switchBoard(board, colorKey) {
             const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
 
             // Update player's position
-            const oldKey = `${player.layer},${player.x},${player.y}`;
-            const newKey = `${layer},${x},${y}`;
-
             player.layer = layer;
             player.x = x;
             player.y = y;
 
             // Update placedSprites
-            placedSprites[newKey] = player;
-            //placedSprites[newKey] = placedSprites[oldKey]; // Move player to the new key
-            //delete placedSprites[oldKey]; // Remove player from the old key
+            placedSprites[findPlayerSprite()] = placedSprites[`${layer},${x},${y}`]; // Move player to the new key
 
             foundPassage = true;
             console.log('Found matching passage at:', { layer, x, y });
@@ -1058,38 +1098,12 @@ function switchBoard(board, colorKey) {
         player = findPlayerSprite(); // Fallback to find player sprite
     } else {
         console.log('Rendering player at new position:', { layer: player.layer, x: player.x, y: player.y });
+        //placedSprites[newKey] = placedSprites[oldKey]; // Move player to the new key
     }
 
     drawBoard();
     renderLayersToMainCanvas(); // Draw them onto the main canvas
 }
-
-/*function switchBoard(board, colorKey) {
-    currentBoard = board;
-
-    placedSprites = world[currentBoard]; // Get the current board from the world object
-    placedObjects = loadObjectsFromGameData(placedSprites);
-    placedPassages = loadPassagesFromGameData(placedSprites); // Load passages from the current board
-
-    //player = findPlayerSprite();
-    // lookup passage color in placedPassages for a match
-    for (const key in placedPassages) {
-        const passage = placedPassages[key];
-        const passageColorKey = passage.color.join(','); // Create a unique key for the passage color
-
-        if (passageColorKey === colorKey) { // Compare the color keys
-            const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
-            player.layer = layer;
-            player.x = x;
-            player.y = y;
-            console.log('Found matching passage at:', { layer, x, y });
-            break; // Exit loop after finding the first match
-        }
-    }
-
-    drawBoard();
-    renderLayersToMainCanvas(); // Draw them onto the main canvas
-}*/
 
 function findPlayerSprite() {
     for (const key in placedSprites) {
@@ -1112,8 +1126,12 @@ document.addEventListener("keydown", (event) => {
     if (util[key]) {
         event.preventDefault();
     }
-
     //console.log(event.key, event.code); // Debugging
+    if (event.key === 'F3') { // loading whole worlds
+        loadWorld(handleLoadedGame);
+    }
+
+    if (player.locked) return; // Prevent input if player is locked
 
     if (event.key === 'l' && !gamePaused) { // load game
         loadCombinedData(handleLoadedBoard);
@@ -1138,8 +1156,8 @@ document.addEventListener("keydown", (event) => {
         renderLayersToMainCanvas(); // Redraw layers to apply night mode
     }
 
-    if (event.key === 'F3') { // loading whole worlds
-        loadWorld(handleLoadedGame);
+    if (event.key === 'f') { // show player location
+        console.log('Player location:', player.layer, player.x, player.y);
     }
 
     updateDirection(); // Update direction based on keys held

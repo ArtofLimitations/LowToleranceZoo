@@ -8,6 +8,8 @@ export let defaultPlayerStats = {
     oldY: 10,
     layer: 2,
     stepSize: 0.5,
+    transported: false,
+    locked: false,
     health: 100,
     attack: 10,
     defense: 5,
