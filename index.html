@@ -47,8 +47,8 @@
                         <div class="tabs">
                             <input type="radio" id="wall" name="tabs" checked="">
                             <label class="tab" for="wall">Wall</label>
-                            <input type="radio" id="item" name="tabs">
-                            <label class="tab" for="item">Item</label>
+                            <input type="radio" id="step" name="tabs">
+                            <label class="tab" for="step">Step</label>
                             <input type="radio" id="break" name="tabs">
                             <label class="tab" for="break">Break</label>
                             <input type="radio" id="push" name="tabs">
@@ -102,7 +102,8 @@
                         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
                 </div>
             </div>
-        </div>
+        </div><!--Pop-up elements-->
+        <div class="selectAmount" id="selectAmount"></div>
         <div class="boardSelect" id="boardSelect"><p><strong>Select Board</strong></p>
             <div class="boardList" id="boardList"><ol id="boardListItems"><li>Title Board</li><li>Default</li></ol></div>
             <button class="material-symbols-outlined" id="addBoardButton" title="Add New Board">add</button>
@@ -116,19 +117,19 @@
                 <li><span>B</span>Break</li><span class="fieldText">Like a wall but breaks when hit.</span>
                 <li><span>P</span>Push</li><span class="fieldText">Can be pushed by player and objects</span>
                 <li><span>A</span>Animation Tile</li><span class="fieldText">Efficient animation tile. Pre-rendered and can't be changed by objects without destroying.</span>
-                <li><span>I</span>Invisible Wall</li><span class="fieldText">Blocks player and objects</span>
+                <li><span>I</span>Invisible Wall</li><span class="fieldText">Blocks player and objects but not bullets.</span>
             </ul>
         </div>
         <div class="extraTiles" id="extraItems">
             <p><span class="char">♦</span><strong>Items</strong></p>
             <br>
             <ul id="extraTilesList">
-                <li><span>C</span>Coin</li>
-                <li><span>A</span>Ammo</li>
-                <li><span>K</span>Key</li>
-                <li><span>D</span>Door</li>
-                <li><span>P</span>Passage</li>
-                <li><span>I</span>Sign</li>
+                <li><span>C</span>Coin</li><span class="fieldText">Standard currency item.</span>
+                <li><span>A</span>Ammo</li><span class="fieldText">Standard ammo item.</span>
+                <li><span>K</span>Key</li><span class="fieldText">Key for unlocking same color door.</span>
+                <li><span>D</span>Door</li><span class="fieldText">Standard door item. Can be opened by player.</span>
+                <li><span>P</span>Passage</li><span class="fieldText">Move to another board. Use same color to dictate where player appears.</span>
+                <li><span>I</span>Sign</li><span class="fieldText">Enter text to display when touched. Use &lt;page&gt; to force pagination. Accepts some html (br, em, strong, b, i, center)</span>
             </ul>
         </div>
     </div>

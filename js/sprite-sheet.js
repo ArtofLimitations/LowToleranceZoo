@@ -18,6 +18,7 @@ export function getImageFromSheet(index) {
         return spriteSheet[index][1]; // was 1
     }
     else {
+        console.error(`Sprite index ${index} is undefined in spriteSheet.`);
         return undefined;
     }
     //console.log('sprite sheet at index: ' + spriteSheet[index][1]);

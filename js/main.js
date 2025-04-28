@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let tileSetLength = 300;             // Size of tileset
     let colors = currentColors;          // colors selected from palette
     let type = 'wall';
+    let currentAmount = 1;
     let tileData = { script: '' };
     let popup = { active: false, type: null };
     let boardList = [[1, 'Title Screen'], [2, 'Default']];
@@ -47,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         x: cursorX, y: cursorY, oldX: cursorX, oldY: cursorY, down: false,
         button: 0, mode: 'draw', lastClick: 0, clickDelay: 50
     };                                                                                    // mouse status object. click delay. see handleMouseMove function. click delay in ms
-    let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2 }                           // basic stats for player
+    let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2, oldLayer: 2 };                          // basic stats for player
 
     // ######################################
     //          LOW TOLERANCE ZOO
@@ -106,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawBoard() {
         ctx.clearRect(0, 0, tilesX * tileSizeX + 1, tilesY * tileSizeY); // +1 to get rid of the line next to toolbar
 
-        drawSprites();
+        drawSpritesAt();
         drawCursor();
     }
 
@@ -161,29 +162,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const spriteInfo = placedSprites[`${l},${sx},${sy}`];
             if (spriteInfo) {
-                if (spriteInfo.type === 'passage') {
-                    ctx.save()
-                    ctx.globalAlpha = 0.5
-                    ctx.fillStyle = rgba(colors[0]); // Set color for the passage
-                    ctx.fillRect(sx * tileSizeX, sy * tileSizeY, tileSizeX, tileSizeY); // Draw the passage area
-                    ctx.fillStyle = rgba(colors[1]); // Set color for the passage
-                    ctx.fillRect(sx * tileSizeX + tileSizeX / 4, sy * tileSizeY + tileSizeX / 4, tileSizeX / 2, tileSizeX / 2); // Draw the passage area
+                switch (spriteInfo.type) {
+                    case 'passage':
+                        ctx.save()
+                        ctx.globalAlpha = 0.5
+                        ctx.fillStyle = rgba(spriteInfo.color[0]); // Set color for the passage
+                        ctx.fillRect(sx * tileSizeX, sy * tileSizeY, tileSizeX, tileSizeY); // Draw the passage area
+                        ctx.fillStyle = rgba(spriteInfo.color[1]); // Set color for the passage
+                        ctx.fillRect(sx * tileSizeX + tileSizeX / 4, sy * tileSizeY + tileSizeX / 4, tileSizeX / 2, tileSizeX / 2); // Draw the passage area
 
-                    ctx.font = `${tileSizeY / 2}px Arial`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillStyle = 'white'; // Text color
-                    ctx.fillText('P', sx * tileSizeX + tileSizeX / 2, sy * tileSizeY + tileSizeY / 2);
-                    ctx.restore();
-                } else {
-                    drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
+                        ctx.font = `${tileSizeY / 2}px Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = 'white'; // Text color
+                        ctx.fillText('P', sx * tileSizeX + tileSizeX / 2, sy * tileSizeY + tileSizeY / 2);
+                        ctx.restore();
+                        break;
+                    case 'invisible':
+                        ctx.save()
+                        ctx.globalAlpha = 0.7;
+                        ctx.globalCompositeOperation = 'exclusion'; // Set composite mode to source-over
+                        ctx.fillStyle = 'rgb(241, 113, 163)'; // Set color of invisible tile
+                        ctx.fillRect(sx * tileSizeX, sy * tileSizeY, tileSizeX, tileSizeY);
+                        ctx.restore();
+                        break;
+                    default:
+                        drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
                 }
             }
         }
     }
 
     // DRAW SINGLE TILE
-
     function DrawSingleTile(x, y) {
         ctx.clearRect(mouse.oldX * tileSizeX, mouse.oldY * tileSizeY, tileSizeX, tileSizeY);
         ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
@@ -312,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
             layer: currentLayer,
             oldKey: tileKey,
             data: {},
-        };
+        }
         if (type === 'object' || type === 'sign') {
             placedSprites[tileKey].data = {
                 name: '',
@@ -321,13 +331,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 script: '',
                 scriptIndex: 0,
                 text: '',
-            } // default data for placed sprites
-        };
+            }; // default data for placed sprites
+        }
         if (type === 'passage') {
             placedSprites[tileKey].data = {
                 speed: 1,
                 board: currentBoard,
-            }
+            };
+        }
+        if (type === 'item' || type === 'coin' || type === 'ammo') {
+            placedSprites[tileKey].data = {
+                value: currentAmount,
+            };
         }
         if (type === 'object' || type === 'sign') placedSprites[tileKey].data.script = tileData.script; // update object.data.script if type = sign or object
     }
@@ -487,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // POPUP FUNCTIONS 
     // ######################################
 
-    function boardSelect(onlySelect = false, key = `${currentLayer},${mouse.x},${mouse.y}`) { //  Board selector. This is a popup that allows the user to select a board from the list of boards.
+    function boardSelect(onlySelect = false, key = `${currentLayer},${mouse.x},${mouse.y}`, selected) { //  Board selector. This is a popup that allows the user to select a board from the list of boards.
         popup.active = true;
         popup.type = 'boardSelect';
 
@@ -506,6 +521,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (item[0] === currentBoard) {
                 listItem.classList.add('selected'); // Highlight the selected board
             }
+            if (item[0] === selected) { // append <strong> Selected </strong> to the selected board
+                listItem.innerHTML = `${item[1]} <span class="selectedBoard">Selected</span>`;
+            }
+
             listItem.onclick = () => {
                 if (!onlySelect) {
                     currentBoard = item[0]; // Set the selected board
@@ -539,7 +558,131 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         selectContainer.style.display = 'block';
+    }
 
+    function selectAmount(string, current = 0, tileKey) { // popup to select a number for an item tile and return it
+        popup.active = true;
+        popup.type = 'selectAmount';
+
+        overlay.style.display = 'block';
+
+        const selectContainer = document.getElementById('selectAmount');
+        const inputField = document.createElement('input'); // Create a new input field
+        const confirmButton = document.createElement('button'); // Create a new button
+
+        selectContainer.style.display = 'flex';
+        selectContainer.innerHTML = `<strong>${string}</strong>`; // Set the title of the popup
+        selectContainer.appendChild(inputField); // Append the input field to the popup
+        selectContainer.appendChild(confirmButton); // Append the button to the popup
+        selectContainer.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') { // If Enter key is pressed
+                const amount = parseInt(inputField.value, 10); // Get the value from the input field
+                if (!isNaN(amount)) {
+                    currentAmount = amount; // Set the current amount to the input value
+                    placedSprites[tileKey].data.value = currentAmount; // Set the amount in the placed sprite data
+                    popup.active = false; // Close the popup
+                    overlay.style.display = 'none'; // Hide the overlay
+                    selectContainer.style.display = 'none'; // Hide the popup container
+                    canvas.focus(); // Focus back on the canvas
+                }
+            }
+        });
+
+        inputField.type = 'number'; // Set the type to number
+        inputField.value = current; // Set the current amount in the input field
+        inputField.classList.add('inputField'); // Add a class for styling
+        inputField.focus(); // Focus on the input field
+
+        confirmButton.textContent = 'Confirm'; // Set button text
+        confirmButton.classList.add('inputField'); // Add a class for styling
+        confirmButton.onclick = () => {
+            const amount = parseInt(inputField.value, 10); // Get the value from the input field
+            if (!isNaN(amount)) {
+                currentAmount = amount; // Set the current amount to the input value
+                placedSprites[tileKey].data.value = currentAmount; // Set the amount in the placed sprite data
+                popup.active = false; // Close the popup
+                overlay.style.display = 'none'; // Hide the overlay
+                selectContainer.style.display = 'none'; // Hide the popup container
+                canvas.focus(); // Focus back on the canvas
+            } else {
+                alert('Please enter a valid number!'); // Alert if not a number
+            }
+        };
+    }
+
+    const popupHandlers = {
+        extraItems: {
+            p: (tileKey) => {
+                type = 'passage'; // Set type to passage
+                placeSprite(tileKey, 0, 'passage'); // Place sprite
+                closePopup();
+            },
+            c: (tileKey) => {
+                type = 'coin'; // Set type to coin
+                placeSprite(tileKey, currentSprite, 'coin'); // Place sprite
+                closePopup();
+            },
+            a: (tileKey) => {
+                type = 'ammo'; // Set type to ammo
+                placeSprite(tileKey, currentSprite, 'ammo'); // Place sprite
+                closePopup();
+            },
+            i: (tileKey) => {
+                placeSprite(tileKey, currentSprite, 'sign'); // Place sprite
+                if (placedSprites[tileKey]) editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
+                closePopup();
+            }
+        },
+        extraTerrain: {
+            w: (tileKey) => {
+                type = 'wall'; // Set type to wall
+                placeSprite(tileKey, currentSprite, 'wall'); // Place sprite
+                closePopup();
+            },
+            s: (tileKey) => {
+                type = 'step'; // Set type to step tile
+                placeSprite(tileKey, currentSprite, 'step'); // Place sprite
+                closePopup();
+            },
+            b: (tileKey) => {
+                type = 'break'; // Set type to break tile
+                placeSprite(tileKey, currentSprite, 'break'); // Place sprite
+                closePopup();
+            },
+            p: (tileKey) => {
+                type = 'push'; // Set type to push tile
+                placeSprite(tileKey, currentSprite, 'push'); // Place sprite    
+                closePopup();
+            },
+            i: (tileKey) => {
+                type = 'invisible'; // Set type to invisible tile
+                placeSprite(tileKey, currentSprite, 'invisible'); // Place sprite
+                closePopup();
+            }
+        },
+        extraCreatures: {
+            // Add key handlers for extraCreatures here
+        },
+    };
+
+    function closePopup() {
+        if (!popup.type) return; // If no popup type is active, do nothing
+
+        // Hide the currently active popup
+        const activePopup = document.getElementById(popup.type);
+        if (activePopup) {
+            activePopup.style.display = 'none';
+        }
+
+        // Reset popup state
+        popup.active = false;
+        popup.type = null;
+
+        // Hide the overlay
+        overlay.style.display = 'none';
+
+        // Refocus the canvas
+        canvas.focus();
     }
 
     // ######################################
@@ -594,8 +737,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             //placedSprites[tileKey].data.script = getObjectData(tileKey);
                         }
                         if (placedSprites[tileKey].type === 'passage') { // need to set passage ID
-                            boardSelect(true, tileKey); // open board selector for selecting board ID Only (true)
+                            boardSelect(true, tileKey, placedSprites[tileKey].data.board); // open board selector for selecting board ID Only (true)
                             console.log('passage board: ', placedSprites[tileKey].data.board);
+                        }
+                        if (placedSprites[tileKey].type === 'coin' || placedSprites[tileKey].type === 'ammo') {
+
+                            if (!placedSprites[tileKey].data) {
+                                placedSprites[tileKey].data = {}; // Initialize the data object if it doesn't exist
+                            }
+                            placedSprites[tileKey].data.value = placedSprites[tileKey].data.value || 1; // Set default amount if not set
+
+                            selectAmount('Enter quantity:', placedSprites[tileKey].data.value, tileKey); // open item selector for selecting amount of items
+                            console.log('item amount: ', placedSprites[tileKey].data.value);
                         }
                         console.log('grabbed:, ', placedSprites[tileKey]);
                         enterPressed = true; // Lock it
@@ -675,7 +828,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // open the board selector here
                     boardSelect();
                     break;
-                case 'i':
+                case '.':
                     placeSprite(tileKey, currentSprite, 'sign'); // Place sprite
                     if (placedSprites[tileKey]) {
                         editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
@@ -751,8 +904,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             direction: 'down',
                             layer: currentLayer,
                         };
-                        [player.oldX, player.oldY] = [player.x, player.y]; // save old location
-                        [player.x, player.y] = [cursorX, cursorY]; // move player to new location
+                        [player.oldLayer, player.oldX, player.oldY] = [player.layer, player.x, player.y]; // save old location
+                        [player.layer, player.x, player.y] = [currentLayer, cursorX, cursorY]; // move player to new location
                         delete placedSprites[playerKey]; // remove player sprite from old location
                         DrawSingleTile(player.oldX, player.oldY);
                     }
@@ -799,16 +952,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
             }
 
-            switch (event.key.toLowerCase()) {
+            /*switch (event.key.toLowerCase()) {
                 case 'p':
-                    type = 'passage'; // Set type to passage
-                    placeSprite(tileKey, 0, 'passage'); // Place sprite
-                    document.getElementById('extraItems').style.display = 'none';
-                    popup.active = false;
-                    overlay.style.display = 'none';
-                    if (event.repeat) { return }
+                    if (popup.type === 'extraItems') {
+                        type = 'passage'; // Set type to passage
+                        placeSprite(tileKey, 0, 'passage'); // Place sprite
+                        document.getElementById('extraItems').style.display = 'none';
+                        popup.active = false;
+                        overlay.style.display = 'none';
+                        if (event.repeat) { return }
+                    }
                     break;
+                case 'c':
+                    if (popup.type === 'extraItems') {
+                        type = 'coin'; // Set type to coin
+                        placeSprite(tileKey, currentSprite, 'coin'); // Place sprite
+                        document.getElementById('extraItems').style.display = 'none';
+                        popup.active = false;
+                        overlay.style.display = 'none';
+                        if (event.repeat) { return }
+                    }
+                    break;
+            }*/
+
+            //if (popup.active) {
+            const handlers = popupHandlers[popup.type];
+            if (handlers && handlers[event.key.toLowerCase()]) {
+                handlers[event.key.toLowerCase()](tileKey); // Call the appropriate handler
+                if (event.repeat) return;
             }
+            //}
         }
 
         if (mouse.mode === 'paint') {

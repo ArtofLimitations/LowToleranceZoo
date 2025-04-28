@@ -55,3 +55,10 @@ export function createBullet (canvas, x, y, direction, speed = 16, color = 'whit
         }
     };
 }
+
+export function deactivateAllBullets(bullets) {
+    bullets.forEach(bullet => {
+        bullet.active = false; // Deactivate the bullet
+    });
+    console.log('All bullets deactivated.');
+}

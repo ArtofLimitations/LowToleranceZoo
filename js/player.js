@@ -1,7 +1,7 @@
 import { loadCombinedData, loadWorld } from './file.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
-import { createBullet } from './weapons.js';
+import { createBullet, deactivateAllBullets } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
 import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
@@ -42,11 +42,12 @@ let nightMode = true;
 
 // World variables
 let world = {}; // World object
+let worldObjects = {}; // Stores objects for all boards
 let worldPassages = {}; // Stores passages for all boards
 
 // Player
-let player = defaultPlayerStats; // Player object
-let playerStats = defaultPlayerStats;
+let player = structuredClone(defaultPlayerStats); // Player object
+let playerStats = structuredClone(defaultPlayerStats);
 //let stats = playerStats;
 const stepSize = player.stepSize; // Step size for player movement
 let gamePaused = false;
@@ -576,7 +577,7 @@ function getOverlappingTiles(x, y) {
     ];
 }
 
-function checkTiles(x, y, direction) {
+function checkTiles(x, y, direction = 'down') {
     let leftTile = Math.floor(x / tileSizeX);
     let topTile = Math.floor(y / tileSizeY);
     let rightTile = Math.ceil((x + tileSizeX - 1) / tileSizeX) - 1;
@@ -641,6 +642,13 @@ function _isOverlappingTile(object, tileX, tileY) {
     );
 }
 
+function isAlignedWithTile(object) {
+    const epsilon = 0.01; // Small tolerance for floating-point precision
+    const isAlignedX = Math.abs(object.x - Math.round(object.x)) < epsilon;
+    const isAlignedY = Math.abs(object.y - Math.round(object.y)) < epsilon;
+    return isAlignedX && isAlignedY;
+}
+
 function checkBulletTiles(x, y) {
     const bulletSize = 8; // Bullet collision area (8x8)
 
@@ -683,6 +691,9 @@ function checkBulletTiles(x, y) {
 
 function canMoveTo(x, y, object = player) {
 
+    //console.log('Checking collision for:', object.name, object.direction, 'at', x, y);
+    //console.log('tiles:', checkTiles(x * tileSizeX, y * tileSizeY, object.direction));
+
     let tiles = [];
     if (object.type === 'bullet') tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.oldX, object.oldY);
     else tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
@@ -714,8 +725,8 @@ function canMoveTo(x, y, object = player) {
                 return tryPushTiles(player.x, player.y, object.direction, object.layer);
             }
 
-            // Collision with walls or unbreakable objects
-            if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object') {
+            // Collision with walls or breakable objects
+            if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object' || tileType === 'invisible') {
                 // If it's a bullet hitting a breakable tile
                 if (object.type === 'bullet' && tileType === 'break') {
                     delete placedSprites[tileKey];
@@ -730,6 +741,10 @@ function canMoveTo(x, y, object = player) {
                         .replace(/(?:\r\n|\r|\n)/g, '<br>'));
                 }
 
+                if (object.type === 'bullet' && tileType === 'invisible') {
+                    return true;
+                }
+
                 if (tileType === 'object' && object.type === 'player') {
                     handleObjectTouch(tileKey);
                 }
@@ -738,9 +753,18 @@ function canMoveTo(x, y, object = player) {
             }
 
             // Picking up an item or destroying tile
-            if (tileType === 'item' && object.type === 'player') {
-                player.stats.coins++;
-                console.log('Coins:', player.stats.coins);
+            if (tileType === 'item' && object.type === 'player' || tileType === 'step' && object.type === 'player') {
+                //player.stats.coins++;
+                //console.log('Coins:', player.stats.coins);
+                delete placedSprites[tileKey];
+                updateTile(player.layer, tile.x, tile.y);
+                return true;
+            }
+
+            if (tileType === 'coin' && object.type === 'player' || tileType === 'ammo' && object.type === 'player') {
+                if (tileType === 'coin') player.stats.coins += placedSprites[tileKey].data.value;
+                if (tileType === 'ammo') player.stats.ammo  += placedSprites[tileKey].data.value;
+                console.log('Player stats:', player.stats);
                 delete placedSprites[tileKey];
                 updateTile(player.layer, tile.x, tile.y);
                 return true;
@@ -762,8 +786,13 @@ function canMoveTo(x, y, object = player) {
             let tileType = placedPassages[tileKey].type;
 
             if (tileType === 'passage' && object.type === 'player') {
+                // Ensure the player is perfectly aligned with the tile
+                if (!isAlignedWithTile(player)) {
+                    return false; // Prevent activation if not aligned
+                }
+
                 // Check to see if the player is fully on the tile before moving
-                if (isOverlappingTile(player, tile.x, tile.y)) {
+                if (!isOverlappingTile(player, tile.x, tile.y)) {
                     // Handle passage logic here
                     player.locked = true; // Lock player movement
                     let targetBoard = placedPassages[tileKey].data.board;
@@ -771,8 +800,9 @@ function canMoveTo(x, y, object = player) {
                     let colorKey = passageColor.join(','); // Create a unique key for the color
                     console.log('Switching to board:', targetBoard, 'with colorKey:', colorKey); // Debug log
                     switchBoard(targetBoard, colorKey); // Pass the color key to switchBoard
-                    return false; // Prevent movement
+                    return true; // Prevent movement
                 }
+                return false; // Prevent movement if not fully on the tile
             }
         }
 
@@ -868,7 +898,7 @@ function tryPushPlayer(startX, startY, direction, layer) {
 
     // Check if the tile ahead is empty
     const tiles = checkTiles(newX * tileSizeX, newY * tileSizeY, direction)
-    console.log(tiles);
+    //console.log(tiles);
     for (let tile of tiles) {
 
         let tileKey = `${layer},${tile.x},${tile.y}`;
@@ -938,8 +968,11 @@ function updatePlayer(deltaTime) {
 }
 
 function movePlayer(newLayer, newX, newY) {
+
     const oldKey = `${player.layer},${player.x},${player.y}`;
     const newKey = `${newLayer},${newX},${newY}`;
+
+    //console.log('Moving player:', { oldKey, newKey });
 
     // Update the global player object
     player.layer = newLayer;
@@ -951,9 +984,11 @@ function movePlayer(newLayer, newX, newY) {
     if (placedSprites[oldKey]) {
         placedSprites[newKey] = placedSprites[oldKey]; // Move player sprite to the new key
         delete placedSprites[oldKey]; // Remove player sprite from the old key
+    } else {
+        console.warn(`Old key ${oldKey} not found in placedSprites.`);
     }
 
-    console.log('Player moved to:', { layer: newLayer, x: newX, y: newY });
+    //console.log('Player moved to:', { layer: newLayer, x: newX, y: newY });
 
     // Redraw the board
     renderLayersToMainCanvas();
@@ -965,6 +1000,7 @@ function movePlayer(newLayer, newX, newY) {
 
 // Load board and replace sprite sheet
 function handleLoadedBoard(spriteSheetData, boardData) {
+    deactivateAllBullets(bulletArray); // Deactivate all bullets
 
     placedSprites = boardData;
 
@@ -986,28 +1022,31 @@ function handleLoadedBoard(spriteSheetData, boardData) {
 }
 
 function handleLoadedGame(spriteSheetData, boardList, worldData) {
+    deactivateAllBullets(bulletArray); // Deactivate all bullets
     boards = boardList; // Load the board list
-    world = worldData; // Load the world data  
+    world = worldData; // Load the world data
     replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
 
-    // Extract passages for all boards
+    // Extract passages and objects for all boards
     for (const board in world) {
-        loadPassagesFromGameData(world[board], board);
+        loadPassagesFromGameData(world[board], board); // Load passages
+        worldObjects[board] = loadObjectsFromGameData(world[board]); // Load objects
     }
 
     console.log('Loaded world data:', worldData);
+    console.log('Loaded world objects:', worldObjects);
 
     placedSprites = world[currentBoard]; // Get the current board from the world object
-    placedObjects = loadObjectsFromGameData(placedSprites);
+    placedObjects = worldObjects[currentBoard]; // Get objects for the current board
     placedPassages = worldPassages[currentBoard] || {}; // Load passages for the current board
 
     loaded = true;
     player = findPlayerSprite();
-    console.log('Found player:', player);
+    playerStats = structuredClone(defaultPlayerStats); // Reset player stats
     player = { ...playerStats, ...player };
-    console.log('Loaded player:', player);
 
     nightMode = false;
+    currentBoard = 2;
 
     console.log('Loaded World');
     drawBoard();
@@ -1032,14 +1071,28 @@ function loadPassagesFromGameData(gameData, board) {
 }
 
 function switchBoard(board, colorKey) {
-    currentBoard = board;
+    deactivateAllBullets(bulletArray); // Deactivate all bullets
 
-    placedSprites = world[currentBoard]; // Get the current board from the world object
-    const spritesCopy = { ...placedSprites }; // Create a shallow copy
-    placedObjects = loadObjectsFromGameData(spritesCopy);
-    placedPassages = loadPassagesFromGameData(world[currentBoard], currentBoard); // Load passages from the current board
+    placedSprites = world[board]; // Get the current board from the world object
+    placedObjects = worldObjects[board]; // Use preloaded objects
+    placedPassages = worldPassages[board] || {}; // Load passages for the current board
+ 
+    let playerSprite = findPlayerSprite();
+    player = { ...playerStats, ...playerSprite };
+    console.log('Player:', player.direction);
 
-    // lookup passage color in placedPassages for a match
+    console.log(`Switching to board ${board}`);
+    /*console.log('Placed sprites:', placedSprites);
+    console.log('Placed objects:', placedObjects);
+    console.log('Placed passages:', placedPassages);
+    for (const key in placedSprites) {
+        const sprite = placedSprites[key];
+        if (!sprite || sprite.sprite === undefined) {
+            console.error(`Invalid sprite at key ${key}:`, sprite, key.type);
+        }
+    }*/
+
+    // Lookup passage color in placedPassages for a match
     for (const key in placedPassages) {
         const passage = placedPassages[key];
         const passageColorKey = passage.color.join(','); // Create a unique key for the passage color
@@ -1048,11 +1101,14 @@ function switchBoard(board, colorKey) {
             const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
             movePlayer(layer, x, y); // Use movePlayer to update the player's position
             break; // Exit loop after finding the first match
+        } else {
+            playerSprite = findPlayerSprite();
+            player = { ...playerStats, ...playerSprite }; // Fallback to find player sprite
         }
     }
-    console.log(`Passages for board ${currentBoard}:`, placedPassages);
     player.locked = false; // Unlock player movement
 
+    currentBoard = board;
     drawBoard();
     renderLayersToMainCanvas(); // Draw them onto the main canvas
 }
@@ -1131,33 +1187,36 @@ document.addEventListener("keydown", (event) => {
         loadWorld(handleLoadedGame);
     }
 
-    if (player.locked) return; // Prevent input if player is locked
+    if (!player.locked) { // Prevent input if player is locked
 
-    if (event.key === 'l' && !gamePaused) { // load game
-        loadCombinedData(handleLoadedBoard);
-    }
+        if (event.key === 'l' && !gamePaused) { // load game
+            loadCombinedData(handleLoadedBoard);
+        }
 
-    if (event.key === 'r') {
-        drawBoard(); // Generate all layers
-        renderLayersToMainCanvas(); // Draw them onto the main canvas
-    }
+        if (event.key === 'r') {
+            drawBoard(); // Generate all layers
+            renderLayersToMainCanvas(); // Draw them onto the main canvas
+        }
 
-    if (event.key === 'p') {
-        gamePaused = !gamePaused;
-        if (!gamePaused) requestAnimationFrame(animateGame);
-    }
+        if (event.key === 'p') {
+            gamePaused = !gamePaused;
+            if (!gamePaused) requestAnimationFrame(animateGame);
+        }
 
-    if (event.key === ' ' && !gamePaused) { // Space bar to shoot
-        bulletArray.push(createBullet(canvas, player.x + 0.5, player.y + 0.5, player.direction));
-    }
+        if (event.key === ' ' && !gamePaused) { // Space bar to shoot
+            bulletArray.push(createBullet(canvas, player.x + 0.5, player.y + 0.5, player.direction));
+        }
 
-    if (event.key === 'n') { // M to toggle night mode (TEMPORARY)
-        nightMode = !nightMode;
-        renderLayersToMainCanvas(); // Redraw layers to apply night mode
-    }
+        if (event.key === 'n') { // M to toggle night mode (TEMPORARY)
+            nightMode = !nightMode;
+            renderLayersToMainCanvas(); // Redraw layers to apply night mode
+        }
 
-    if (event.key === 'f') { // show player location
-        console.log('Player location:', player.layer, player.x, player.y);
+        if (event.key === 'f') { // show player location
+            console.log('Placed sprites:', placedSprites); 
+            console.log('Player location:', player.layer, player.x, player.y);
+            console.log('Player stats:', player.stats);
+        }
     }
 
     updateDirection(); // Update direction based on keys held

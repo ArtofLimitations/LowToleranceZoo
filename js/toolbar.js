@@ -16,7 +16,7 @@ const spriteButton = document.getElementById('spriteButton');
 const layerButtons = [null, document.getElementById('layer1Button'), document.getElementById('layer2Button'), document.getElementById('layer3Button')];
 const layerOpacity = document.getElementById('3-opacity');
 const boardLayers = [null, document.getElementById('layer1'), document.getElementById('layer2'), document.getElementById('layer3')];
-const spriteTypes = [document.getElementById('wall'), document.getElementById('item'), document.getElementById('break'), document.getElementById('push'), document.getElementById('other')];
+const spriteTypes = [document.getElementById('wall'), document.getElementById('step'), document.getElementById('break'), document.getElementById('push'), document.getElementById('other')];
 const terrainButton = document.getElementById('terrainButton');
 const itemButton = document.getElementById('itemButton');
 const editMode = document.getElementById('editMode');
@@ -146,7 +146,7 @@ export function updateType (type) { // Update sprite type in toolbar
       element.checked = true;
     }
   });
-  if (type !== 'wall' && type !== 'item' && type !== 'break' && type !== 'push') {
+  if (type !== 'wall' && type !== 'step' && type !== 'break' && type !== 'push') {
     //spriteTypes.forEach((element) => {
       //element.checked = false;
     //})

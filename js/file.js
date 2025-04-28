@@ -164,6 +164,7 @@ export function loadWorld(callback) {
         // Read the file contents
         reader.onload = (e) => {
             try {
+                console.log('Loaded file:', file.name);
                 // Parse the JSON data
                 const combinedData = JSON.parse(e.target.result);
                 let spritesheet = combinedData.spritesheet;
