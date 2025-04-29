@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         x: cursorX, y: cursorY, oldX: cursorX, oldY: cursorY, down: false,
         button: 0, mode: 'draw', lastClick: 0, clickDelay: 50
     };                                                                                    // mouse status object. click delay. see handleMouseMove function. click delay in ms
-    let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2, oldLayer: 2 };                          // basic stats for player
+    let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2, oldLayer: 2 };             // basic stats for player
 
     // ######################################
     //          LOW TOLERANCE ZOO
@@ -171,19 +171,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         ctx.fillStyle = rgba(spriteInfo.color[1]); // Set color for the passage
                         ctx.fillRect(sx * tileSizeX + tileSizeX / 4, sy * tileSizeY + tileSizeX / 4, tileSizeX / 2, tileSizeX / 2); // Draw the passage area
 
-                        ctx.font = `${tileSizeY / 2}px Arial`;
+                        //ctx.font = `${tileSizeY / 2}px Arial`;
+                        ctx.font = `${tileSizeY}px Material Symbols Outlined`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillStyle = 'white'; // Text color
-                        ctx.fillText('P', sx * tileSizeX + tileSizeX / 2, sy * tileSizeY + tileSizeY / 2);
+                        ctx.fillText('tools_ladder', sx * tileSizeX + tileSizeX / 2, sy * tileSizeY + tileSizeY / 2);
                         ctx.restore();
                         break;
                     case 'invisible':
                         ctx.save()
                         ctx.globalAlpha = 0.7;
                         ctx.globalCompositeOperation = 'exclusion'; // Set composite mode to source-over
-                        ctx.fillStyle = 'rgb(241, 113, 163)'; // Set color of invisible tile
+                        ctx.fillStyle = 'rgb(255, 0, 55)'; // Set color of invisible tile
                         ctx.fillRect(sx * tileSizeX, sy * tileSizeY, tileSizeX, tileSizeY);
+
+                        ctx.font = `${tileSizeY}px Material Symbols Outlined`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = 'white'; // Text color
+                        ctx.fillText('texture', sx * tileSizeX + tileSizeX / 2, sy * tileSizeY + tileSizeY / 2);
                         ctx.restore();
                         break;
                     default:

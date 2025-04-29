@@ -208,13 +208,14 @@ function clearTile(x, y) {
 // ##########################################
 
 function updateObjects(deltaTime) {
+    //const objectsToUpdate = Object.values(placedObjects).filter(obj => !obj.resting && !obj.waiting);
 
     for (let key in placedObjects) {
         let obj = placedObjects[key];
 
         // Handle waiting state
         if (obj.waiting) {
-            obj.waitTime--;
+            obj.waitTime -= deltaTime;
             if (obj.waitTime <= 0) {
                 obj.waiting = false; // Done waiting
             }
@@ -251,7 +252,8 @@ function updateObjects(deltaTime) {
 
             obj.timeSinceLastMove = 0;
 
-            renderLayersToMainCanvas();
+            
+            renderLayersToMainCanvas(); // Render the main canvas after updating objects
         }
     }
 }
@@ -272,6 +274,40 @@ function executeObjectCommand(obj, action, args) {
             gamePaused = true; // Pause the game loop
             showDialog(args.join(" "), obj);
             break;
+            case "#send":
+                if (args.length === 1) {
+                    // Jump to a label within the same object
+                    const label = args[0];
+                    const index = resolveLabel(obj, label);
+                    if (index !== null) {
+                        obj.scriptIndex = index; // Move the script execution to the label
+                    } else {
+                        console.error(`Error: Label :${label} not found in script.`);
+                    }
+                } else if (args.length === 2 && args[0].startsWith("@")) {
+                    // Call another object's script at a specific label
+                    const targetName = args[0].slice(1); // Remove '@' to get the object name
+                    const label = args[1];
+            
+                    // Find the target object by name
+                    const targetObject = Object.values(placedObjects).find(o => o.name === targetName);
+                    if (!targetObject) {
+                        console.error(`Error: Object with name "${targetName}" not found.`);
+                        break;
+                    }
+            
+                    // Resolve the label in the target object's script
+                    const index = resolveLabel(targetObject, label);
+                    if (index !== null) {
+                        targetObject.scriptIndex = index; // Start execution at the label
+                        targetObject.resting = false; // Wake up the target object
+                    } else {
+                        console.error(`Error: Label :${label} not found in object "${targetName}".`);
+                    }
+                } else {
+                    console.error(`Error: Invalid #send command arguments: ${args.join(" ")}`);
+                }
+                break;
         case "#change":
             let spriteNumber = parseInt(args[0], 10);
             let dark, light;
@@ -367,7 +403,7 @@ function executeObjectCommand(obj, action, args) {
             break;
         case '#wait':
             obj.waiting = true; // Set waiting state
-            obj.waitTime = parseInt(args[0], 10); // Store remaining cycles
+            obj.waitTime = parseInt(args[0], 10) * 50; // Store remaining time in milliseconds
             break;
         case '#loop':
             obj.scriptIndex = obj.labels[':loop'] || 0;
