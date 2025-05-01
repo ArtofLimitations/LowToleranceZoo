@@ -39,8 +39,29 @@ export function replaceSpriteSheet(data) {
     spriteSheet = structuredClone(data);
 }
 
-export function rebuildSpriteSheet(data) {
+/*export function rebuildSpriteSheet(data) {
     let spriteSheet = [0];
     spriteSheet.splice(1, 0, ...data.slice(1).map(element => [element, convertToImageData(element, [0, 0, 0, 255], [255, 255, 255, 255])]));
+    return spriteSheet;
+}*/
+
+export function rebuildSpriteSheet(data, gridSize = 16) {
+    let spriteSheet = [0]; // Initialize with a placeholder for index 0
+
+    spriteSheet.splice(
+        1,
+        0,
+        ...data.slice(1).map(element => {
+            // Replace null values with a default grid
+            if (element === null) {
+                console.warn('Null value found in sprite sheet. Replacing with default grid.');
+                element = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
+            }
+
+            // Convert the element to image data
+            return [element, convertToImageData(element, [0, 0, 0, 255], [255, 255, 255, 255])];
+        })
+    );
+
     return spriteSheet;
 }

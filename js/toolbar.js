@@ -136,7 +136,6 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
   }
 
   editMode.innerText = mouseStatus.mode;
-
 }
 
 export function updateType (type) { // Update sprite type in toolbar

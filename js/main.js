@@ -1,5 +1,5 @@
 import { toolbar, updateType } from './toolbar.js';
-import { drawSprite, adjustColor } from './sprite.js';
+import { drawSprite, createDataURL, adjustColor } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
@@ -496,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('sprite type: ', type);
 
         toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
-        drawBoard(); //<------------------------------------- Draw function for entire board
+        drawBoard();
     }
 
     function handleObjectScript(data, key) {
@@ -508,6 +508,75 @@ document.addEventListener('DOMContentLoaded', () => {
     // ######################################
     // POPUP FUNCTIONS 
     // ######################################
+
+    function spriteSelect() { // Select from a list of sprites
+        popup.active = true;
+        popup.type = 'spriteSelect';
+
+        overlay.style.display = 'block';
+
+        const spriteContainer = document.getElementById('selectSpriteBox');
+
+        spriteContainer.style.display = 'flex';
+
+        createSpriteGallery(getSpriteSheet(), (index) => {
+            currentSprite = index; // Update the current sprite
+            console.log('Selected sprite:', index);
+            updateSpriteData(currentSprite); // Update the sprite data in the toolbar
+            popup.active = false; // Close the popup
+            overlay.style.display = 'none'; // Hide the overlay
+            spriteContainer.style.display = 'none'; // Hide the popup container
+            canvas.focus(); // Focus back on the canvas
+        });
+        // Append or update sprite sheet length in spriteContainer
+        let spriteSheetLength = spriteContainer.querySelector('.spriteSheetLength');
+        if (!spriteSheetLength) {
+            // If the element doesn't exist, create it
+            spriteSheetLength = document.createElement('div');
+            spriteSheetLength.classList.add('spriteSheetLength');
+            spriteContainer.appendChild(spriteSheetLength);
+        }
+
+        // Update the text content of the element
+        spriteSheetLength.textContent = `(${getSpriteSheet().length}/300)`;
+
+        document.addEventListener('keydown', (event) => {
+            if (popup.active && popup.type === 'spriteSelect' && event.key === 'Enter') {
+                popup.active = false; // Close the popup
+                overlay.style.display = 'none'; // Hide the overlay
+                spriteContainer.style.display = 'none'; // Hide the popup container
+                canvas.focus(); // Focus back on the canvas
+            }
+        });
+    }
+
+    function createSpriteGallery(spriteSheet, onSpriteClick) {
+        console.log('Creating sprite gallery...', spriteSheet);
+        const gallery = document.getElementById('spriteGallery');
+        gallery.innerHTML = ''; // Clear any existing content
+
+        for (let index = 1; index <= spriteSheet.length; index++) {
+            if (index === 0) return; // Skip the first sprite (empty sprite)
+            const spriteElement = document.createElement('div');
+            spriteElement.classList.add('sprite-item');
+            spriteElement.style.width = `${tileSizeX}px`;
+            spriteElement.style.height = `${tileSizeY}px`;
+            spriteElement.style.backgroundImage = createDataURL(getDataFromSheet(index), colors[0], colors[1]).then((img) => {
+                spriteElement.appendChild(img); // Append the image to the sprite element
+            });
+            spriteElement.style.backgroundSize = 'contain';
+            spriteElement.style.cursor = 'pointer';
+
+            // Add a click event to change the current sprite
+            spriteElement.onclick = () => {
+                currentSprite = index;
+                onSpriteClick(index); // Callback for additional actions
+                console.log(`Selected sprite: ${index}`);
+            };
+
+            gallery.appendChild(spriteElement);
+        };
+    }
 
     function boardSelect(onlySelect = false, key = `${currentLayer},${mouse.x},${mouse.y}`, selected) { //  Board selector. This is a popup that allows the user to select a board from the list of boards.
         popup.active = true;
@@ -621,7 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
         extraItems: {
             p: (tileKey) => {
                 type = 'passage'; // Set type to passage
-                placeSprite(tileKey, 0, 'passage'); // Place sprite
+                placeSprite(tileKey, currentSprite, 'passage'); // Place sprite
                 closePopup();
             },
             c: (tileKey) => {
@@ -772,6 +841,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
                 case 'Insert':
                     // nothing here yet
+                    console.log('placed sprites: ', placedSprites);
                     if (event.repeat) { return }
                     break;
                 case 'Delete': // delete all sprites in current layer
@@ -831,6 +901,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('current sprite: ' + currentSprite);
                     updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
                     break;
+                case 'l':
+                    // open the sprite sheet selector here
+                    spriteSelect(); // Open sprite sheet selector from sprite-sheet.js
+                    if (event.repeat) { return }
+                    break;
                 case 'b':
                     // open the board selector here
                     boardSelect();
@@ -883,10 +958,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
                 case 'r': // reset board
                     if (confirm('Are you sure you want reset board?')) {
-                        placedSprites = {};
+                        placedSprites = {}; // Clear the current board
+                        world[currentBoard] = placedSprites; // Update the world object with the reset board
                         console.log('Board reset');
-                        createPlayer();
-                        drawBoard();
+                        createPlayer(); // Recreate the player sprite
+                        drawBoard(); // Redraw the board
                     } else {
                         console.log('Board not reset');
                     }
@@ -958,30 +1034,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     canvas.focus();
                     break;
             }
-
-            /*switch (event.key.toLowerCase()) {
-                case 'p':
-                    if (popup.type === 'extraItems') {
-                        type = 'passage'; // Set type to passage
-                        placeSprite(tileKey, 0, 'passage'); // Place sprite
-                        document.getElementById('extraItems').style.display = 'none';
-                        popup.active = false;
-                        overlay.style.display = 'none';
-                        if (event.repeat) { return }
-                    }
-                    break;
-                case 'c':
-                    if (popup.type === 'extraItems') {
-                        type = 'coin'; // Set type to coin
-                        placeSprite(tileKey, currentSprite, 'coin'); // Place sprite
-                        document.getElementById('extraItems').style.display = 'none';
-                        popup.active = false;
-                        overlay.style.display = 'none';
-                        if (event.repeat) { return }
-                    }
-                    break;
-            }*/
-
             //if (popup.active) {
             const handlers = popupHandlers[popup.type];
             if (handlers && handlers[event.key.toLowerCase()]) {

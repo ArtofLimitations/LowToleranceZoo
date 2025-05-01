@@ -114,6 +114,19 @@ export function takeStat(stats, item, amount) {
     }
 }
 
+export function giveStat(stats, item, amount) {
+    if (amount <= 0) {
+        console.error("Invalid amount to give.");
+        return;
+    }
+
+    if (stats.hasOwnProperty(item)) {
+        stats[item] += amount;
+    } else {
+        console.error("Invalid item type.");
+    }
+}
+
 // Helper function to extract RGB values
 export function extractRGB(str) {
     let match = str.match(/\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(\.\d+)?)?\)/); // Capture RGB, ignore alpha

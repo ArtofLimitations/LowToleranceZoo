@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat } from './object-functions.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat, giveStat } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -79,6 +79,8 @@ export function animateGame(currentTime) {
         updateBullets();
         updateObjects(deltaTime);
         updatePlayer(deltaTime);
+
+        if (loaded) renderLayersToMainCanvas();
     }
 
     // Loop the animation
@@ -132,9 +134,9 @@ function drawBoard() {
                 const [l, x, y] = key.split(',').map(Number);
                 return { l, x, y, ...placedSprites[key] };
             })
-            .filter(sprite => sprite.l === layer && sprite.type !== 'passage') // Skip rendering passages
+            .filter(sprite => sprite.l === layer && sprite.type !== 'passage' && sprite.type !== 'invisible') // Skip rendering passages
             .forEach(sprite => {
-                if (sprite.type !== 'player') {
+                if (sprite.type !== 'player') { // Skip player and invisible sprites
                     drawSpriteToCanvas(ctx, sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
                 }
             });
@@ -208,52 +210,46 @@ function clearTile(x, y) {
 // ##########################################
 
 function updateObjects(deltaTime) {
-    //const objectsToUpdate = Object.values(placedObjects).filter(obj => !obj.resting && !obj.waiting);
+    const objectsToUpdate = Object.values(placedObjects).filter(obj => !obj.resting);
 
-    for (let key in placedObjects) {
-        let obj = placedObjects[key];
-
+    for (let obj of objectsToUpdate) {
         // Handle waiting state
         if (obj.waiting) {
-            obj.waitTime -= deltaTime;
+            //console.log(`Object ${obj.name || 'unknown'} is waiting. Time left: ${obj.waitTime}`);
+            obj.waitTime -= deltaTime; // Decrement waitTime
             if (obj.waitTime <= 0) {
-                obj.waiting = false; // Done waiting
+                obj.waiting = false; // Reset waiting state
             }
-            continue; // Skip executing new commands
+            continue; // Skip executing new commands while waiting
         }
-
+    
+        // Process objects that are not waiting
         obj.timeSinceLastMove += deltaTime;
         if (obj.timeSinceLastMove >= obj.moveInterval) {
-
-            if (obj.resting) continue; // Skip if object is resting
-
             let command = obj.script[obj.scriptIndex].split(' ');
             let action = command[0];
             let args = command.slice(1);
-
+    
             executeObjectCommand(obj, action, args); // Start executing #commands
-
+    
             // Move script index only if not waiting
             obj.scriptIndex++;
-
+    
             if (command[0] === "#loop") {
                 if (obj.labels[":loop"] !== undefined) {
                     obj.scriptIndex = obj.labels[":loop"]; // Jump to label position
                 } else {
                     console.error("Error: Missing ':loop' label in script.");
                 }
-                return;
+                continue;
             }
-
+    
             // Auto-stop if script ends without `#end`
             if (obj.scriptIndex >= obj.script.length) {
                 obj.resting = true;
             }
-
+    
             obj.timeSinceLastMove = 0;
-
-            
-            renderLayersToMainCanvas(); // Render the main canvas after updating objects
         }
     }
 }
@@ -403,7 +399,8 @@ function executeObjectCommand(obj, action, args) {
             break;
         case '#wait':
             obj.waiting = true; // Set waiting state
-            obj.waitTime = parseInt(args[0], 10) * 50; // Store remaining time in milliseconds
+            //obj.waitTime = parseInt(args[0], 10) * 10; // Store remaining time in milliseconds
+            obj.waitTime = (parseInt(args[0], 10) || 1) * 50; // Default to 50ms if no valid argument is provided
             break;
         case '#loop':
             obj.scriptIndex = obj.labels[':loop'] || 0;
@@ -435,14 +432,20 @@ function executeObjectCommand(obj, action, args) {
             if (isNaN(amount)) amount = 1; // Default to 1 if not specified
             takeStat(player, item, amount);
             console.log(`Took ${amount} ${item}(s)`);
-            console.log(player.health);
+            break;
+        case '#give':
+            let itemGive = args[0];
+            let amountGive = parseInt(args[1], 10);
+            if (isNaN(amountGive)) amountGive = 1; // Default to 1 if not specified
+            giveStat(player, itemGive, amountGive);
+            console.log(`Gave ${amountGive} ${itemGive}(s)`);
             break;
         case '#nightmode':
             nightMode = !nightMode;
             break;
         case '#die':
-            placedObjects[`${obj.layer},${obj.x},${obj.y}`];
-            placedSprites[`${obj.layer},${obj.x},${obj.y}`];
+            delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
+            delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
             updateTile(obj.layer, obj.x, obj.y);
             break;
         default:
@@ -500,6 +503,21 @@ function handleObjectTouch(tileKey) {
         } else {
             // Optionally skip or log that all labels were zapped
             console.warn("No active :touch labels found.");
+        }
+        obj.resting = false; // Wake up the object
+    }
+}
+
+function handleObjectShot(tileKey) {
+    let obj = placedObjects[tileKey];
+    if (obj && obj.labels[":shot"]) {
+        //obj.scriptIndex = obj.labels[":shot"];
+        let index = resolveLabel(obj, ":shot");
+        if (index !== null) {
+            obj.scriptIndex = index;
+        } else {
+            // Optionally skip or log that all labels were zapped
+            console.warn("No active :shot labels found.");
         }
         obj.resting = false; // Wake up the object
     }
@@ -785,9 +803,15 @@ function canMoveTo(x, y, object = player) {
                     handleObjectTouch(tileKey);
                 }
 
+                if (tileType === 'object' && object.type === 'bullet') {
+                    handleObjectShot(tileKey);
+                }
+    
+
                 return false;
             }
 
+            
             // Picking up an item or destroying tile
             if (tileType === 'item' && object.type === 'player' || tileType === 'step' && object.type === 'player') {
                 //player.stats.coins++;
@@ -1049,6 +1073,8 @@ function handleLoadedBoard(spriteSheetData, boardData) {
     player = findPlayerSprite();
     player = { ...playerStats, ...player };
 
+    nightMode = false;
+
     //stats = player.stats;
     console.log('Loaded Stats', playerStats);
     console.log(player);
@@ -1072,6 +1098,7 @@ function handleLoadedGame(spriteSheetData, boardList, worldData) {
     console.log('Loaded world data:', worldData);
     console.log('Loaded world objects:', worldObjects);
 
+    currentBoard = 2;
     placedSprites = world[currentBoard]; // Get the current board from the world object
     placedObjects = worldObjects[currentBoard]; // Get objects for the current board
     placedPassages = worldPassages[currentBoard] || {}; // Load passages for the current board
@@ -1082,7 +1109,6 @@ function handleLoadedGame(spriteSheetData, boardList, worldData) {
     player = { ...playerStats, ...player };
 
     nightMode = false;
-    currentBoard = 2;
 
     console.log('Loaded World');
     drawBoard();
@@ -1114,7 +1140,7 @@ function switchBoard(board, colorKey) {
     placedPassages = worldPassages[board] || {}; // Load passages for the current board
  
     let playerSprite = findPlayerSprite();
-    player = { ...playerStats, ...playerSprite };
+    player = { ...player, ...playerSprite };
     console.log('Player:', player.direction);
 
     console.log(`Switching to board ${board}`);
@@ -1139,7 +1165,7 @@ function switchBoard(board, colorKey) {
             break; // Exit loop after finding the first match
         } else {
             playerSprite = findPlayerSprite();
-            player = { ...playerStats, ...playerSprite }; // Fallback to find player sprite
+            player = { ...player, ...playerSprite }; // Fallback to find player sprite
         }
     }
     player.locked = false; // Unlock player movement
