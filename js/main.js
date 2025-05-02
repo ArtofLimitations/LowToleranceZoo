@@ -541,7 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
         spriteSheetLength.textContent = `(${getSpriteSheet().length}/300)`;
 
         document.addEventListener('keydown', (event) => {
-            if (popup.active && popup.type === 'spriteSelect' && event.key === 'Enter') {
+            if (popup.active && popup.type === 'spriteSelect' && event.key === 'Enter' || event.key === 'Escape') {
                 popup.active = false; // Close the popup
                 overlay.style.display = 'none'; // Hide the overlay
                 spriteContainer.style.display = 'none'; // Hide the popup container
@@ -860,7 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     saveWorld(getSpriteSheet(), boardList, world); // save world from file.js
                     if (event.repeat) { return }
                     break;
-                case 'F2': //load world
+                case 'F3': //load world
                     loadWorld(handleLoadedWorld); // load world from file.js
                     if (event.repeat) { return }
                     break;
@@ -901,7 +901,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('current sprite: ' + currentSprite);
                     updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
                     break;
-                case 'l':
+                case 'x':
                     // open the sprite sheet selector here
                     spriteSelect(); // Open sprite sheet selector from sprite-sheet.js
                     if (event.repeat) { return }

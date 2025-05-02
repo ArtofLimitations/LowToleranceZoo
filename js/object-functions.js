@@ -110,7 +110,7 @@ export function takeStat(stats, item, amount) {
         if (stats[item] > 0) stats[item] -= amount;
         if (stats[item] < 0) stats[item] === 0;
     } else {
-        console.error("Invalid item type.");
+        console.error("Invalid item type:", item);
     }
 }
 
@@ -120,10 +120,11 @@ export function giveStat(stats, item, amount) {
         return;
     }
 
-    if (stats.hasOwnProperty(item)) {
-        stats[item] += amount;
+    if (stats.stats.hasOwnProperty(item)) {
+        stats.stats[item] += amount; // Increment the stat
+        console.log(`Updated ${item}: ${stats.stats[item]}`);
     } else {
-        console.error("Invalid item type.");
+        console.error(`Invalid stat type: ${item}`);
     }
 }
 
@@ -167,5 +168,21 @@ export function convertDirections(direction) {
             return 'left';
         default:
             return -1; // Invalid direction
+    }
+}
+
+export function calculateBulletPosition(x, y, direction) {
+    switch (direction) {
+        case 'up':
+            return { x: x + 0.5, y: y - 0.5 };
+        case 'down':
+            return { x: x + 0.5, y: y + 1 };
+        case 'right':
+            return { x: x + 1, y: y + 0.5 };
+        case 'left':
+            return { x: x - 0.5, y: y + 0.5 };
+        default:
+            console.warn(`Invalid bullet direction: ${direction}`);
+            return { x, y }; // Return the original position if the direction is invalid
     }
 }

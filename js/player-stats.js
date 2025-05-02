@@ -10,7 +10,6 @@ export let defaultPlayerStats = {
     stepSize: 0.5,
     transported: false,
     locked: false,
-    health: 100,
     attack: 10,
     defense: 5,
     speed: 5,
@@ -24,7 +23,8 @@ export let defaultPlayerStats = {
         armor: null
     },
     stats: {
-        coins: 0,
+        health: 100,
+        coin: 0,
         ammo: 0,
         score: 0,
         lives: 3,

@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat, giveStat } from './object-functions.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat, giveStat, calculateBulletPosition } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -48,6 +48,7 @@ let worldPassages = {}; // Stores passages for all boards
 // Player
 let player = structuredClone(defaultPlayerStats); // Player object
 let playerStats = structuredClone(defaultPlayerStats);
+let showPlayer = false; // Show player - debugging
 //let stats = playerStats;
 const stepSize = player.stepSize; // Step size for player movement
 let gamePaused = false;
@@ -139,6 +140,10 @@ function drawBoard() {
                 if (sprite.type !== 'player') { // Skip player and invisible sprites
                     drawSpriteToCanvas(ctx, sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
                 }
+                if (showPlayer && sprite.type === 'player') {
+                    ctx.fillStyle = 'rgba(20, 0, 255, 0.5)'; // Semi-transparent red
+                    ctx.fillRect(sprite.x * tileSizeX, sprite.y * tileSizeY, tileSizeX, tileSizeY); // Draw a rectangle around the player
+                }
             });
 
         //console.log(`Layer ${layer} generated`);
@@ -222,19 +227,19 @@ function updateObjects(deltaTime) {
             }
             continue; // Skip executing new commands while waiting
         }
-    
+
         // Process objects that are not waiting
         obj.timeSinceLastMove += deltaTime;
         if (obj.timeSinceLastMove >= obj.moveInterval) {
             let command = obj.script[obj.scriptIndex].split(' ');
             let action = command[0];
             let args = command.slice(1);
-    
+
             executeObjectCommand(obj, action, args); // Start executing #commands
-    
+
             // Move script index only if not waiting
             obj.scriptIndex++;
-    
+
             if (command[0] === "#loop") {
                 if (obj.labels[":loop"] !== undefined) {
                     obj.scriptIndex = obj.labels[":loop"]; // Jump to label position
@@ -243,12 +248,12 @@ function updateObjects(deltaTime) {
                 }
                 continue;
             }
-    
+
             // Auto-stop if script ends without `#end`
             if (obj.scriptIndex >= obj.script.length) {
                 obj.resting = true;
             }
-    
+
             obj.timeSinceLastMove = 0;
         }
     }
@@ -270,40 +275,40 @@ function executeObjectCommand(obj, action, args) {
             gamePaused = true; // Pause the game loop
             showDialog(args.join(" "), obj);
             break;
-            case "#send":
-                if (args.length === 1) {
-                    // Jump to a label within the same object
-                    const label = args[0];
-                    const index = resolveLabel(obj, label);
-                    if (index !== null) {
-                        obj.scriptIndex = index; // Move the script execution to the label
-                    } else {
-                        console.error(`Error: Label :${label} not found in script.`);
-                    }
-                } else if (args.length === 2 && args[0].startsWith("@")) {
-                    // Call another object's script at a specific label
-                    const targetName = args[0].slice(1); // Remove '@' to get the object name
-                    const label = args[1];
-            
-                    // Find the target object by name
-                    const targetObject = Object.values(placedObjects).find(o => o.name === targetName);
-                    if (!targetObject) {
-                        console.error(`Error: Object with name "${targetName}" not found.`);
-                        break;
-                    }
-            
-                    // Resolve the label in the target object's script
-                    const index = resolveLabel(targetObject, label);
-                    if (index !== null) {
-                        targetObject.scriptIndex = index; // Start execution at the label
-                        targetObject.resting = false; // Wake up the target object
-                    } else {
-                        console.error(`Error: Label :${label} not found in object "${targetName}".`);
-                    }
+        case "#send":
+            if (args.length === 1) {
+                // Jump to a label within the same object
+                const label = args[0];
+                const index = resolveLabel(obj, label);
+                if (index !== null) {
+                    obj.scriptIndex = index; // Move the script execution to the label
                 } else {
-                    console.error(`Error: Invalid #send command arguments: ${args.join(" ")}`);
+                    console.error(`Error: Label :${label} not found in script.`);
                 }
-                break;
+            } else if (args.length === 2 && args[0].startsWith("@")) {
+                // Call another object's script at a specific label
+                const targetName = args[0].slice(1); // Remove '@' to get the object name
+                const label = args[1];
+
+                // Find the target object by name
+                const targetObject = Object.values(placedObjects).find(o => o.name === targetName);
+                if (!targetObject) {
+                    console.error(`Error: Object with name "${targetName}" not found.`);
+                    break;
+                }
+
+                // Resolve the label in the target object's script
+                const index = resolveLabel(targetObject, label);
+                if (index !== null) {
+                    targetObject.scriptIndex = index; // Start execution at the label
+                    targetObject.resting = false; // Wake up the target object
+                } else {
+                    console.error(`Error: Label :${label} not found in object "${targetName}".`);
+                }
+            } else {
+                console.error(`Error: Invalid #send command arguments: ${args.join(" ")}`);
+            }
+            break;
         case "#change":
             let spriteNumber = parseInt(args[0], 10);
             let dark, light;
@@ -329,6 +334,7 @@ function executeObjectCommand(obj, action, args) {
             renderLayersToMainCanvas(); // Ensure visual update
 
             break;
+        case '#color':
         case '#changecolor':
             if (args[0] === "undefined") { console.warn("No color provided"); return; }
             let color = extractRGB(args[0]); // Extract RGB values
@@ -338,6 +344,7 @@ function executeObjectCommand(obj, action, args) {
             updateTile(obj.layer, obj.x, obj.y); // Update tile with new color
             renderLayersToMainCanvas(); // Ensure visual update
             break;
+        case '#sprite':
         case '#changesprite':
             if (args[0] === "undefined" || isNaN(args[0])) { console.warn("No sprite provided or NaN"); return; }
             let spriteKeyChange = `${obj.layer},${obj.x},${obj.y}`;
@@ -367,7 +374,13 @@ function executeObjectCommand(obj, action, args) {
                 return;
             }
             let bulletDirection = convertDirections(args[0]);
-            let x = obj.x;
+            if (bulletDirection === -1) {
+                console.warn(`Invalid direction "${args[0]}" provided for bullet`);
+                return;
+            }
+
+            let { x, y } = calculateBulletPosition(obj.x, obj.y, bulletDirection);
+            /*let x = obj.x;
             let y = obj.y;
 
             if (bulletDirection === -1) console.warn(`Invalid direction "${args[0]}" provided for bullet`);
@@ -393,9 +406,13 @@ function executeObjectCommand(obj, action, args) {
                     x -= 0.5;
                     y += 0.5;
                     break;
-            }
+            }*/
+
             let bullet = createBullet(canvas, x, y, bulletDirection, 16, 'white', obj.name);
+            //bullet.origin = obj; // Track the object that fired the bullet
+            bullet.origin = `${obj.layer},${obj.x},${obj.y}`; // Track the object that fired the bullet
             bulletArray.push(bullet);
+            console.log(`Creating bullet at (${x}, ${y}) with direction ${bulletDirection}`);
             break;
         case '#wait':
             obj.waiting = true; // Set waiting state
@@ -493,33 +510,45 @@ function moveObject(obj, direction, layer) {
     //}
 }
 
-function handleObjectTouch(tileKey) {
+function handleObjectInteraction(tileKey, labelType) {
     let obj = placedObjects[tileKey];
-    if (obj && obj.labels[":touch"]) {
-        //obj.scriptIndex = obj.labels[":touch"];
-        let index = resolveLabel(obj, ":touch");
+    if (obj && obj.labels[labelType]) {
+        let index = resolveLabel(obj, labelType);
         if (index !== null) {
-            obj.scriptIndex = index;
-        } else {
-            // Optionally skip or log that all labels were zapped
-            console.warn("No active :touch labels found.");
-        }
-        obj.resting = false; // Wake up the object
-    }
-}
+            obj.scriptIndex = index; // Set the script index to the label
+            obj.resting = false; // Wake up the object
 
-function handleObjectShot(tileKey) {
-    let obj = placedObjects[tileKey];
-    if (obj && obj.labels[":shot"]) {
-        //obj.scriptIndex = obj.labels[":shot"];
-        let index = resolveLabel(obj, ":shot");
-        if (index !== null) {
-            obj.scriptIndex = index;
+            // Execute commands immediately, skipping delays
+            while (obj.scriptIndex < obj.script.length) {
+                let command = obj.script[obj.scriptIndex].split(' ');
+                let action = command[0];
+                let args = command.slice(1);
+
+                // Skip #wait commands and execute others
+                if (action === '#wait') {
+                    obj.waitTime = (parseInt(args[0], 10) || 1) * 50; // Set wait time
+                    obj.waiting = true; // Set waiting state
+                    obj.scriptIndex++; // Move to the next command
+                    break; // Exit the loop to allow waiting
+                }
+
+                executeObjectCommand(obj, action, args); // Execute the command
+
+                // Stop execution if the object is set to resting or waiting
+                if (obj.resting || obj.waiting) {
+                    break;
+                }
+
+                obj.scriptIndex++; // Move to the next command
+
+                // Handle #loop commands
+                if (action === '#loop') {
+                    obj.scriptIndex = obj.labels[':loop'] || 0; // Jump to the loop label
+                }
+            }
         } else {
-            // Optionally skip or log that all labels were zapped
-            console.warn("No active :shot labels found.");
+            console.warn(`No active ${labelType} labels found.`);
         }
-        obj.resting = false; // Wake up the object
     }
 }
 
@@ -769,6 +798,13 @@ function canMoveTo(x, y, object = player) {
         if (placedSprites[tileKey]) {
             let tileType = placedSprites[tileKey].type;
 
+            // Ignore collisions with the bullet's origin
+            //if (object.type === 'bullet' && object.origin === placedSprites[tileKey]) {
+            if (object.type === 'bullet' && object.origin === tileKey) {
+                console.log('Ignoring collision with origin:', tileKey);
+                continue; // Skip collision with the origin
+            }
+
             if (object.type === 'bullet' && object.origin === 'player' && tileType === 'player') {
                 return true;    // Bullet hit something (not itself or its owner)
             }
@@ -800,18 +836,18 @@ function canMoveTo(x, y, object = player) {
                 }
 
                 if (tileType === 'object' && object.type === 'player') {
-                    handleObjectTouch(tileKey);
+                    handleObjectInteraction(tileKey, ":touch");
                 }
 
                 if (tileType === 'object' && object.type === 'bullet') {
-                    handleObjectShot(tileKey);
+                    handleObjectInteraction(tileKey, ":shot");
                 }
-    
+
 
                 return false;
             }
 
-            
+
             // Picking up an item or destroying tile
             if (tileType === 'item' && object.type === 'player' || tileType === 'step' && object.type === 'player') {
                 //player.stats.coins++;
@@ -822,8 +858,8 @@ function canMoveTo(x, y, object = player) {
             }
 
             if (tileType === 'coin' && object.type === 'player' || tileType === 'ammo' && object.type === 'player') {
-                if (tileType === 'coin') player.stats.coins += placedSprites[tileKey].data.value;
-                if (tileType === 'ammo') player.stats.ammo  += placedSprites[tileKey].data.value;
+                if (tileType === 'coin') player.stats.coin += placedSprites[tileKey].data.value;
+                if (tileType === 'ammo') player.stats.ammo += placedSprites[tileKey].data.value;
                 console.log('Player stats:', player.stats);
                 delete placedSprites[tileKey];
                 updateTile(player.layer, tile.x, tile.y);
@@ -1051,7 +1087,7 @@ function movePlayer(newLayer, newX, newY) {
     //console.log('Player moved to:', { layer: newLayer, x: newX, y: newY });
 
     // Redraw the board
-    renderLayersToMainCanvas();
+    //renderLayersToMainCanvas();
 }
 
 // #############################################
@@ -1135,24 +1171,21 @@ function loadPassagesFromGameData(gameData, board) {
 function switchBoard(board, colorKey) {
     deactivateAllBullets(bulletArray); // Deactivate all bullets
 
+    placedSprites = {};
     placedSprites = world[board]; // Get the current board from the world object
     placedObjects = worldObjects[board]; // Use preloaded objects
     placedPassages = worldPassages[board] || {}; // Load passages for the current board
- 
+
     let playerSprite = findPlayerSprite();
+    if (!playerSprite) {
+        console.error('No player sprite found on the new board.');
+        return; // Exit if no player sprite is found
+    }
+
     player = { ...player, ...playerSprite };
     console.log('Player:', player.direction);
 
     console.log(`Switching to board ${board}`);
-    /*console.log('Placed sprites:', placedSprites);
-    console.log('Placed objects:', placedObjects);
-    console.log('Placed passages:', placedPassages);
-    for (const key in placedSprites) {
-        const sprite = placedSprites[key];
-        if (!sprite || sprite.sprite === undefined) {
-            console.error(`Invalid sprite at key ${key}:`, sprite, key.type);
-        }
-    }*/
 
     // Lookup passage color in placedPassages for a match
     for (const key in placedPassages) {
@@ -1162,10 +1195,7 @@ function switchBoard(board, colorKey) {
         if (passageColorKey === colorKey) { // Compare the color keys
             const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
             movePlayer(layer, x, y); // Use movePlayer to update the player's position
-            break; // Exit loop after finding the first match
-        } else {
-            playerSprite = findPlayerSprite();
-            player = { ...player, ...playerSprite }; // Fallback to find player sprite
+            break; // Exit loop after finding the first match 
         }
     }
     player.locked = false; // Unlock player movement
@@ -1231,6 +1261,7 @@ function findPlayerSprite() {
             return { layer, x, y, ...sprite }; // Return sprite with position data
         }
     }
+    console.warn('No player sprite found on the current board.');
     return null; // Return null if no player is found
 }
 
@@ -1275,9 +1306,11 @@ document.addEventListener("keydown", (event) => {
         }
 
         if (event.key === 'f') { // show player location
-            console.log('Placed sprites:', placedSprites); 
+            console.log('Placed sprites:', placedSprites);
             console.log('Player location:', player.layer, player.x, player.y);
+            console.log('Health:', player.health);
             console.log('Player stats:', player.stats);
+            showPlayer = true;
         }
     }
 
