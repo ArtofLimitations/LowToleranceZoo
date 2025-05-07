@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat, giveStat, calculateBulletPosition } from './object-functions.js';
+import { calculateSeekDirection, extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat, giveStat, calculateBulletPosition } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -173,7 +173,7 @@ function renderLayersToMainCanvas() {
             //ctx.save()
             //if (layer === 3) ctx.filter = 'opacity(0.8)';
             //if (layer === 2) ctx.filter = 'blur(1px)';
-            //if (layer === 3) ctx.globalCompositeOperation = "destination-over";
+            //if (layer === 3) ctx.globalCompositeOperation = 'destination-over';
             ctx.drawImage(layerCanvases[layer], 0, 0);
             //ctx.restore();
 
@@ -358,12 +358,17 @@ function executeObjectCommand(obj, action, args) {
             break;
         case '#move':
             let direction = args[0];
-            switch (args[0]) {
-                case 'north': direction = 'up'; break;
-                case 'south': direction = 'down'; break;
-                case 'east': direction = 'right'; break;
-                case 'west': direction = 'left'; break;
+
+            if (direction === 'seek') {
+                direction = calculateSeekDirection(obj, player); // Calculate the direction to the player
+            } else {
+                direction = convertDirections(args[0]);
             }
+            if (direction === -1) {
+                console.warn(`Invalid direction "${args[0]}" provided for #move`);
+                return;
+            }
+
             moveObject(obj, direction, obj.layer);
             break;
         case '#shoot':
@@ -380,34 +385,6 @@ function executeObjectCommand(obj, action, args) {
             }
 
             let { x, y } = calculateBulletPosition(obj.x, obj.y, bulletDirection);
-            /*let x = obj.x;
-            let y = obj.y;
-
-            if (bulletDirection === -1) console.warn(`Invalid direction "${args[0]}" provided for bullet`);
-
-            switch (bulletDirection) {
-                case 'up':
-                    bulletDirection = 'up';
-                    y -= 0.5;
-                    x += 0.5;
-                    break;
-                case 'down':
-                    bulletDirection = 'down';
-                    y += 1;
-                    x += 0.5;
-                    break;
-                case 'right':
-                    bulletDirection = 'right';
-                    x += 1;
-                    y += 0.5;
-                    break;
-                case 'left':
-                    bulletDirection = 'left';
-                    x -= 0.5;
-                    y += 0.5;
-                    break;
-            }*/
-
             let bullet = createBullet(canvas, x, y, bulletDirection, 16, 'white', obj.name);
             //bullet.origin = obj; // Track the object that fired the bullet
             bullet.origin = `${obj.layer},${obj.x},${obj.y}`; // Track the object that fired the bullet
@@ -472,6 +449,7 @@ function executeObjectCommand(obj, action, args) {
 
 function moveObject(obj, direction, layer) {
     const offsets = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+    //const offsets = { up: [0, -.5], down: [0, .5], left: [-.5, 0], right: [.5, 0] };
     const dir = convertDirections(direction);
 
     if (!offsets[dir]) {
@@ -485,10 +463,11 @@ function moveObject(obj, direction, layer) {
     const oldKey = `${layer},${obj.x},${obj.y}`;
     const newKey = `${layer},${newX},${newY}`;
 
-    if (placedObjects[newKey]) return; // Prevent movement if occupied by another object
-    //if (placedSprites[newKey]) {
-    if (canMoveTo(newX, newY, obj)) { // can the object move?
+    obj.direction = dir; // change the object's direction
 
+    if (placedObjects[newKey]) return; // Prevent movement if occupied by another object
+
+    if (canMoveTo(newX, newY, obj)) { // can the object move?
 
         placedSprites[newKey] = placedSprites[oldKey]; // Move sprite
         placedObjects[newKey] = obj;
@@ -500,14 +479,12 @@ function moveObject(obj, direction, layer) {
 
         obj.x = newX;
         obj.y = newY;
-        obj.direction = dir; // change the object's direction
 
         updateTile(layer, obj.x, obj.y); // Update new tile
     }
     else {
-        return; // no
+        return; // no can move
     }
-    //}
 }
 
 function handleObjectInteraction(tileKey, labelType) {
@@ -516,39 +493,12 @@ function handleObjectInteraction(tileKey, labelType) {
         let index = resolveLabel(obj, labelType);
         if (index !== null) {
             obj.scriptIndex = index; // Set the script index to the label
-            obj.resting = false; // Wake up the object
-
-            // Execute commands immediately, skipping delays
-            while (obj.scriptIndex < obj.script.length) {
-                let command = obj.script[obj.scriptIndex].split(' ');
-                let action = command[0];
-                let args = command.slice(1);
-
-                // Skip #wait commands and execute others
-                if (action === '#wait') {
-                    obj.waitTime = (parseInt(args[0], 10) || 1) * 50; // Set wait time
-                    obj.waiting = true; // Set waiting state
-                    obj.scriptIndex++; // Move to the next command
-                    break; // Exit the loop to allow waiting
-                }
-
-                executeObjectCommand(obj, action, args); // Execute the command
-
-                // Stop execution if the object is set to resting or waiting
-                if (obj.resting || obj.waiting) {
-                    break;
-                }
-
-                obj.scriptIndex++; // Move to the next command
-
-                // Handle #loop commands
-                if (action === '#loop') {
-                    obj.scriptIndex = obj.labels[':loop'] || 0; // Jump to the loop label
-                }
-            }
+            obj.waitTime = 0; // Reset wait time
+            obj.waiting = false; // Reset waiting state
         } else {
             console.warn(`No active ${labelType} labels found.`);
         }
+        obj.resting = false; // Wake up the object
     }
 }
 
@@ -699,30 +649,27 @@ function isOverlappingTile(object, tileX, tileY) {
         objTop >= tileBottom);
 }
 
-function _isOverlappingTile(object, tileX, tileY) {
-    const buffer = 0.01; // Small value to prevent edge-only contact
+function findClosestObject(x, y) {
+    let closestObject = null;
+    let closestDistance = Infinity;
 
-    const tileLeft = tileX * tileSizeX + buffer;
-    const tileTop = tileY * tileSizeY + buffer;
-    const tileRight = (tileX + 0.5) * tileSizeX - buffer;
-    const tileBottom = (tileY + 0.5) * tileSizeY - buffer;
+    for (const key in placedObjects) {
+        const obj = placedObjects[key];
 
-    //const objLeft = object.x * tileSizeX - object.width / 2 + buffer;
-    //const objTop = object.y * tileSizeY - object.height / 2 + buffer;
-    //const objRight = objLeft + object.width - 2 * buffer;
-    //const objBottom = objTop + object.height - 2 * buffer;
+        const objCenterX = obj.x + obj.width / tileSizeX / 2;
+        const objCenterY = obj.y + obj.height / tileSizeY / 2;
 
-    const objLeft = object.x * tileSizeX - object.width / 2 + buffer;
-    const objTop = object.y * tileSizeY - object.height / 2 + buffer;
-    const objRight = objLeft + object.width - 2 * buffer;
-    const objBottom = objTop + object.height - 2 * buffer;
+        const dx = objCenterX - x;
+        const dy = objCenterY - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-    return !(
-        objRight <= tileLeft ||
-        objLeft >= tileRight ||
-        objBottom <= tileTop ||
-        objTop >= tileBottom
-    );
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closestObject = obj;
+        }
+    }
+
+    return closestObject;
 }
 
 function isAlignedWithTile(object) {
@@ -732,7 +679,7 @@ function isAlignedWithTile(object) {
     return isAlignedX && isAlignedY;
 }
 
-function checkBulletTiles(x, y) {
+function _checkBulletTiles(x, y) {
     const bulletSize = 8; // Bullet collision area (8x8)
 
     let leftTile = Math.floor((x - bulletSize) / tileSizeX);
@@ -772,15 +719,73 @@ function checkBulletTiles(x, y) {
     return tiles;
 }
 
+function checkBulletTiles(bulletX, bulletY, bulletWidth = 8, bulletHeight = 8) {
+    const bulletLeft = bulletX - bulletWidth / 2;
+    const bulletTop = bulletY - bulletHeight / 2;
+    const bulletRight = bulletX + bulletWidth / 2;
+    const bulletBottom = bulletY + bulletHeight / 2;
+
+    const tiles = [];
+
+    // Check all tiles the bullet overlaps
+    const leftTile = Math.floor(bulletLeft / tileSizeX);
+    const topTile = Math.floor(bulletTop / tileSizeY);
+    const rightTile = Math.floor(bulletRight / tileSizeX);
+    const bottomTile = Math.floor(bulletBottom / tileSizeY);
+
+    for (let tx = leftTile; tx <= rightTile; tx++) {
+        for (let ty = topTile; ty <= bottomTile; ty++) {
+            tiles.push({ x: tx, y: ty });
+        }
+    }
+
+    // Check if the bullet overlaps with the player
+    if (isOverlappingTile(player, bulletX / tileSizeX, bulletY / tileSizeY)) {
+        console.log('Bullet overlaps with player!');
+        tiles.push({ x: player.x, y: player.y });
+    }
+
+    return tiles;
+}
+
+function isOverlappingAnyObject(bulletX, bulletY, bulletWidth = 8, bulletHeight = 8) {
+    const bulletLeft = bulletX - bulletWidth / 2;
+    const bulletTop = bulletY - bulletHeight / 2;
+    const bulletRight = bulletX + bulletWidth / 2;
+    const bulletBottom = bulletY + bulletHeight / 2;
+
+    for (const key in placedObjects) {
+        const obj = placedObjects[key];
+
+        const objLeft = obj.x * tileSizeX;
+        const objTop = obj.y * tileSizeY;
+        const objRight = objLeft + obj.width;
+        const objBottom = objTop + obj.height;
+
+        // Check if the bullet overlaps the object
+        if (!(bulletRight <= objLeft ||
+              bulletLeft >= objRight ||
+              bulletBottom <= objTop ||
+              bulletTop >= objBottom)) {
+            return obj; // Return the overlapping object
+        }
+    }
+
+    return null; // No overlapping object found
+}
+
 function canMoveTo(x, y, object = player) {
 
     //console.log('Checking collision for:', object.name, object.direction, 'at', x, y);
     //console.log('tiles:', checkTiles(x * tileSizeX, y * tileSizeY, object.direction));
 
     let tiles = [];
-    if (object.type === 'bullet') tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.oldX, object.oldY);
-    else tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
-    //tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction)
+    //if (object.type === 'bullet') tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.oldX, object.oldY);
+    if (object.type === 'bullet') {
+        tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.width || 8, object.height || 8);
+    } else {
+        tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
+    }
 
     for (let tile of tiles) {
 
@@ -790,13 +795,42 @@ function canMoveTo(x, y, object = player) {
             return false; // Out of bounds = collision
         }
 
-        if (isOverlappingTile(player, tile.x, tile.y) && object.type === 'object') {
+        if (isOverlappingTile(player, tile.x, tile.y) && object.type === 'object') { // Check if the player is overlapping with the object using a drop-in bounding box
             console.log('player detected!');
             return tryPushPlayer(player.x, player.y, object.direction, object.layer);
         }
 
         if (placedSprites[tileKey]) {
             let tileType = placedSprites[tileKey].type;
+
+            // Collision with walls or breakable objects
+            if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object' || tileType === 'invisible') {
+                // If it's a bullet hitting a breakable tile
+                if (object.type === 'bullet' && tileType === 'break') {
+                    delete placedSprites[tileKey];
+                    updateTile(object.layer, tile.x, tile.y);
+                }
+                // if it's a sign, show script
+                if (tileType === 'sign' && object.type === 'player') {
+                    gamePaused = true; // Pause the game loop
+                    showDialog(placedSprites[tileKey].data.script
+                        .replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                }
+
+                if (object.type === 'bullet' && tileType === 'invisible') {
+                    return true;
+                }
+
+                if (tileType === 'object' && object.type === 'player') {
+                    handleObjectInteraction(tileKey, ":touch");
+                }
+
+                if (tileType === 'object' && object.type === 'bullet') {
+                    handleObjectInteraction(tileKey, ":shot");
+                }
+
+                return false;
+            }
 
             // Ignore collisions with the bullet's origin
             //if (object.type === 'bullet' && object.origin === placedSprites[tileKey]) {
@@ -815,43 +849,8 @@ function canMoveTo(x, y, object = player) {
                 return tryPushTiles(player.x, player.y, object.direction, object.layer);
             }
 
-            // Collision with walls or breakable objects
-            if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object' || tileType === 'invisible') {
-                // If it's a bullet hitting a breakable tile
-                if (object.type === 'bullet' && tileType === 'break') {
-                    delete placedSprites[tileKey];
-                    updateTile(object.layer, tile.x, tile.y);
-                }
-                // if it's a sign, show script
-                if (tileType === 'sign' && object.type === 'player') {
-                    gamePaused = true; // Pause the game loop
-                    //dialogBox(placedSprites[tileKey].data.script
-                    //.replace(/(?:\r\n|\r|\n)/g, '<br>'));
-                    showDialog(placedSprites[tileKey].data.script
-                        .replace(/(?:\r\n|\r|\n)/g, '<br>'));
-                }
-
-                if (object.type === 'bullet' && tileType === 'invisible') {
-                    return true;
-                }
-
-                if (tileType === 'object' && object.type === 'player') {
-                    handleObjectInteraction(tileKey, ":touch");
-                }
-
-                if (tileType === 'object' && object.type === 'bullet') {
-                    handleObjectInteraction(tileKey, ":shot");
-                }
-
-
-                return false;
-            }
-
-
             // Picking up an item or destroying tile
             if (tileType === 'item' && object.type === 'player' || tileType === 'step' && object.type === 'player') {
-                //player.stats.coins++;
-                //console.log('Coins:', player.stats.coins);
                 delete placedSprites[tileKey];
                 updateTile(player.layer, tile.x, tile.y);
                 return true;
@@ -901,9 +900,6 @@ function canMoveTo(x, y, object = player) {
                 return false; // Prevent movement if not fully on the tile
             }
         }
-
-        //ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Debugging color
-        //ctx.fillRect(tile.x * tileSizeX, tile.y * tileSizeY, tileSizeX, tileSizeY); // Debugging
     }
 
     return true;
@@ -1030,7 +1026,7 @@ function updatePlayer(deltaTime) {
     let newY = player.y;
     // old x and y?
 
-    if (player.health === 0) youDied();
+    if (player.stats.health === 0) youDied();
 
     switch (true) {
         case keys['ArrowUp'] && canMoveTo(player.x, player.y - stepSize):
@@ -1125,6 +1121,9 @@ function handleLoadedGame(spriteSheetData, boardList, worldData) {
     world = worldData; // Load the world data
     replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
 
+    // Reset passages
+    worldPassages = {};
+
     // Extract passages and objects for all boards
     for (const board in world) {
         loadPassagesFromGameData(world[board], board); // Load passages
@@ -1174,7 +1173,11 @@ function switchBoard(board, colorKey) {
     placedSprites = {};
     placedSprites = world[board]; // Get the current board from the world object
     placedObjects = worldObjects[board]; // Use preloaded objects
+
+    // Clear and reload passages
+    placedPassages = {};
     placedPassages = worldPassages[board] || {}; // Load passages for the current board
+
 
     let playerSprite = findPlayerSprite();
     if (!playerSprite) {
@@ -1195,12 +1198,13 @@ function switchBoard(board, colorKey) {
         if (passageColorKey === colorKey) { // Compare the color keys
             const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
             movePlayer(layer, x, y); // Use movePlayer to update the player's position
-            break; // Exit loop after finding the first match 
+            break; // Exit loop after finding the first match
         }
     }
     player.locked = false; // Unlock player movement
 
     currentBoard = board;
+    removeUndefinedSprites(); // Remove undefined sprites from the current board
     drawBoard();
     renderLayersToMainCanvas(); // Draw them onto the main canvas
 }
@@ -1265,6 +1269,15 @@ function findPlayerSprite() {
     return null; // Return null if no player is found
 }
 
+function removeUndefinedSprites () {
+    for (const key in placedSprites) {
+        if (placedSprites[key] === undefined) {
+            delete placedSprites[key];
+            console.log('Removed undefined sprite at key:', key);
+        }
+    }
+}
+
 // Key mapping (now using key names instead of key codes)
 let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10", F11: "F11", F12: "F12" };
 
@@ -1308,7 +1321,7 @@ document.addEventListener("keydown", (event) => {
         if (event.key === 'f') { // show player location
             console.log('Placed sprites:', placedSprites);
             console.log('Player location:', player.layer, player.x, player.y);
-            console.log('Health:', player.health);
+            console.log('Health:', player.stats.health);
             console.log('Player stats:', player.stats);
             showPlayer = true;
         }

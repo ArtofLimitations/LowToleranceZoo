@@ -76,6 +76,21 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function findPlayerSprite() {
+        // Find player sprite on current board
+        for (const key in placedSprites) {
+            if (placedSprites[key].type === 'player') {
+                const [layer, x, y] = key.split(',').map(Number);
+                player.x = x;
+                player.y = y;
+                player.layer = layer;
+                player.oldX = x;
+                player.oldY = y;
+                break; // Exit loop after finding the player
+            }
+        }
+    }
+
     function addBoardToWorld(newBoard = false) {
         if (newBoard) world[currentBoard] = placedSprites; // Add the current board to the world object
         else world[currentBoard] = {}; // Initialize the current board in the world object
@@ -419,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mouse.down = true;
         mouse.button = event.button;
 
-        if (x <= tilesX * tileSizeX) { // possibly UPDATE
+        if (popup.active === false) { // possibly UPDATE
             handleTileClick(event);
             mouse.oldX = mouse.x;
             mouse.oldY = mouse.y;
@@ -451,7 +466,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     mouse.y >= 0 &&
                     mouse.x < tilesX &&
                     mouse.y < tilesY &&
-                    now - mouse.lastClick > mouse.clickDelay) {
+                    now - mouse.lastClick > mouse.clickDelay &&
+                    popup.active === false) {
                     handleTileClick(event);
                     mouse.lastClick = now; // Update the last click time
                 }
@@ -467,6 +483,8 @@ document.addEventListener('DOMContentLoaded', () => {
         addBoardToWorld(true); // Add the current board to the world object
         replaceSpriteSheet(spriteSheetData);
 
+        findPlayerSprite(); // Find the player sprite on the current board
+
         hiddenLayers = new Set();
 
         console.log('Loaded Board');
@@ -481,6 +499,8 @@ document.addEventListener('DOMContentLoaded', () => {
         hiddenLayers = new Set();
         currentBoard = 1; // Set the current board to the first one
         placedSprites = world[currentBoard]; // Get the current board from the world object
+
+        findPlayerSprite(); // Find the player sprite on the current board
 
         console.log('Loaded World');
         drawBoard();
@@ -606,6 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentBoard = item[0]; // Set the selected board
                     console.log('Selected Board: ', currentBoard);
                     placedSprites = world[currentBoard]; // Get the selected board from the world object
+                    findPlayerSprite(); // Find the player sprite on the selected board
                     drawBoard();
                 }
                 boardSelected = item[0]; // Store the selected board ID
@@ -651,7 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectContainer.appendChild(inputField); // Append the input field to the popup
         selectContainer.appendChild(confirmButton); // Append the button to the popup
         selectContainer.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') { // If Enter key is pressed
+            if (event.key === 'Enter' || event.key === 'Escape') { // If Enter key is pressed
                 const amount = parseInt(inputField.value, 10); // Get the value from the input field
                 if (!isNaN(amount)) {
                     currentAmount = amount; // Set the current amount to the input value
@@ -901,7 +922,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('current sprite: ' + currentSprite);
                     updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
                     break;
-                case 'x':
+                case 'v':
                     // open the sprite sheet selector here
                     spriteSelect(); // Open sprite sheet selector from sprite-sheet.js
                     if (event.repeat) { return }
@@ -1043,9 +1064,18 @@ document.addEventListener('DOMContentLoaded', () => {
             //}
         }
 
-        if (mouse.mode === 'paint') {
+        /*if (mouse.mode === 'paint') {
             if (placedSprites[tileKey] && placedSprites[tileKey].type === 'player');
             else placeSprite(tileKey, currentSprite, type); // Place sprite
+        }*/
+
+        if (mouse.mode === 'paint') {
+            const tileKey = `${currentLayer},${cursorX},${cursorY}`;
+
+            // Skip placing the player sprite
+            if (!(placedSprites[tileKey] && placedSprites[tileKey].type === 'player')) {
+                placeSprite(tileKey, currentSprite, type); // Place the sprite
+            }
         }
 
         DrawSingleTile(cursorX, cursorY); // Draw the tile at the cursor position

@@ -100,29 +100,29 @@ export function resolveLabel(obj, label) {
     return locations[zapped];
 }
 
-export function takeStat(stats, item, amount) {
+export function takeStat(player, item, amount) {
     if (amount <= 0) {
         console.error("Invalid amount to take.");
         return;
     }
 
-    if (stats.hasOwnProperty(item)) {
-        if (stats[item] > 0) stats[item] -= amount;
-        if (stats[item] < 0) stats[item] === 0;
+    if (player.stats.hasOwnProperty(item)) {
+        if (player.stats[item] > 0) player.stats[item] -= amount;
+        if (player.stats[item] < 0) player.stats[item] === 0;
     } else {
         console.error("Invalid item type:", item);
     }
 }
 
-export function giveStat(stats, item, amount) {
+export function giveStat(player, item, amount) {
     if (amount <= 0) {
         console.error("Invalid amount to give.");
         return;
     }
 
-    if (stats.stats.hasOwnProperty(item)) {
-        stats.stats[item] += amount; // Increment the stat
-        console.log(`Updated ${item}: ${stats.stats[item]}`);
+    if (player.stats.hasOwnProperty(item)) {
+        player.stats[item] += amount; // Increment the stat
+        console.log(`Updated ${item}: ${player.stats[item]}`);
     } else {
         console.error(`Invalid stat type: ${item}`);
     }
@@ -168,6 +168,18 @@ export function convertDirections(direction) {
             return 'left';
         default:
             return -1; // Invalid direction
+    }
+}
+
+export function calculateSeekDirection(obj, player) {
+    const dx = player.x - obj.x; // Difference in x-coordinates
+    const dy = player.y - obj.y; // Difference in y-coordinates
+
+    // Determine the primary direction based on the larger absolute difference
+    if (Math.abs(dx) > Math.abs(dy)) {
+        return dx > 0 ? 'right' : 'left'; // Move horizontally
+    } else {
+        return dy > 0 ? 'down' : 'up'; // Move vertically
     }
 }
 

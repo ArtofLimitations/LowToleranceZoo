@@ -80,4 +80,6 @@ export function editObject (type, script, key, callback) {
     text.value = script;
     container.style.display = 'block';
     addObjectEvents();
+    text.focus();
+    text.setSelectionRange(text.value.length, text.value.length); // Move cursor to end of text
 }
