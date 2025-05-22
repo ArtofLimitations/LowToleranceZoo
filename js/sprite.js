@@ -35,7 +35,7 @@ export function drawPlayerSprite (x, y, tileSizeX, tileSizeY, spriteNumber, colo
     const dark = colors[0];
     const light = colors[1];
     const image = convertToImageData(data, dark, light);
-    exportedCtx.putImageData(image, 0, 0)
+    exportedCtx.putImageData(image, 0, 0);
     ctx.drawImage(exportedCanvas, x * tileSizeX, y * tileSizeY, 32, 32);
 }
 

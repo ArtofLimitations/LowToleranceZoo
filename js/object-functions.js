@@ -5,6 +5,7 @@
 export function loadObjectsFromGameData(gameData) {
     let placedObjects = {}; // Reset objects
     const placedSprites = gameData;
+    let objectIdCounter = 1; // Initialize object ID counter
 
     for (let key in placedSprites) {
         let tile = placedSprites[key];
@@ -14,6 +15,7 @@ export function loadObjectsFromGameData(gameData) {
 
         if (tile.type === "object" && tile.data.script) {
             placedObjects[key] = {
+                id: `object-${objectIdCounter++}`, // Unique identifier
                 layer,
                 x,
                 y,
@@ -46,6 +48,41 @@ export function loadObjectsFromGameData(gameData) {
         }
     }
     return placedObjects;
+}
+
+export function gridLoadObjectsFromGameData(gameData, grid) {
+    for (let key in gameData) {
+        const tile = gameData[key];
+        const [layer, x, y] = key.split(',').map(Number);
+        let id = 1;
+
+        if (tile.type === 'object' && tile.data.script) {
+            const object = {
+                id: `object-${objectIdCounter++}`, // Unique identifier
+                layer,
+                x,
+                y,
+                width: 32,
+                height: 32,
+                sprite: tile.sprite,
+                color: tile.color,
+                type: 'object',
+                name: tile.data.name || "",
+                direction: 'down',
+                waiting: false,
+                waitTime: 0,
+                speed: tile.data.speed || 1,
+                timer: tile.data.timer || 0,
+                timeSinceLastMove: 0,
+                moveInterval: tile.data.moveInterval || 100,
+                script: parseScript(tile.data.script).script,
+                labels: parseScript(tile.data.script).labels,
+                resting: false
+            };
+
+            addObjectToGrid(grid, object, x, y);
+        }
+    }
 }
 
 function parseScript(text) {
