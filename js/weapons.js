@@ -3,16 +3,19 @@
 //const canvas = document.getElementById('lowToleranceCanvas');
 //const ctx = canvas.getContext('2d'); 
 
-export function createBullet (canvas, x, y, direction, speed = 16, color = 'white', origin = 'player') {
+export function createBullet (canvas, x, y, direction, speed = 16, color = 'white', origin = 'player', size = 8, damage = 1) {
     return {
         canvas: canvas,
         ctx: canvas.getContext('2d'),
         x: x * 32,
         y: y * 32,
+        width: size, // Width of the bullet
+        height: size, // Height of the bullet
         oldX: x,
         oldY: y,
         direction: direction, // Can be 'up', 'down', 'left', 'right'
         speed: speed, // Pixels per update
+        damage: damage, // Damage dealt by the bullet
         origin: origin, // Origin of the bullet
         color: color, // Color of the bullet
         active: true, // Bullet is active until it goes off-screen or hits something

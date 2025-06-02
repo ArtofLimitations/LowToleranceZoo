@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { calculateSeekDirection, extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat, giveStat, calculateBulletPosition } from './object-functions.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat, giveStat, calculateSeekDirection, calculateBulletPosition } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -33,28 +33,27 @@ const layerContexts = {};            // Stores 2D contexts for layers
 let placedObjects = {};              // Stores objects on the board
 let placedPassages = {};             // Stores passages on the board
 
-//const namedColors = namedColorList;  // Named colors for easy reference
+//const namedColors = namedColorList;// Named colors for easy reference
 
 // board variables
 let currentBoard = 2;                // Current board number
 let boards = {};
+let boardData = {};                  // Stores metadata for each board
 let loaded = false;
 let nightMode = true;
-let currentCollisionGrid = null; // Current collision grid
 
 // World variables
-let world = {}; // World object
-let worldObjects = {}; // Stores objects for all boards
-let worldPassages = {}; // Stores passages for all boards
-let collisionGrids = {}; // Stores collision grids for all boards
+let world = {};                      // World object
+let worldObjects = {};               // Stores objects for all boards
+let worldPassages = {};              // Stores passages for all boards
 
 // Player
 let player = structuredClone(defaultPlayerStats); // Player object
 let playerStats = structuredClone(defaultPlayerStats);
-let showPlayer = false; // Show player - debugging //let stats = playerStats;
+//let stats = playerStats;
 const stepSize = player.stepSize; // Step size for player movement
-let bulletArray = [];
 let gamePaused = false;
+let bulletArray = [];
 
 // File info
 export let filename = ''; // ############ File to load ###############
@@ -79,9 +78,9 @@ export function animateGame(currentTime) {
         lastTime = currentTime;
 
         //position += speed * (deltaTime / 1000) * 60;
-        updatePlayer(deltaTime);
-        updateObjects(deltaTime);
         updateBullets();
+        updateObjects(deltaTime);
+        updatePlayer(deltaTime);
 
         if (loaded) renderLayersToMainCanvas();
     }
@@ -91,308 +90,6 @@ export function animateGame(currentTime) {
 }
 
 // ############ End of main animation function ############ 
-
-// #################################################
-// ######### Game initialization function ##########
-// #################################################
-
-function initializeCollisionGrid(canvasWidth, canvasHeight, numLayers = 3) {
-    const gridWidth = Math.ceil(canvasWidth / 16); // Divide canvas width by 16
-    const gridHeight = Math.ceil(canvasHeight / 16); // Divide canvas height by 16
-
-    return {
-        layers: Array.from({ length: numLayers }, () =>
-            Array.from({ length: gridHeight }, () => Array(gridWidth).fill(0)) // Initialize 2D array with 0
-        ),
-        width: gridWidth,
-        height: gridHeight
-    };
-}
-
-function initializeBoardCollisionGrids(boards, canvasWidth, canvasHeight, numLayers = 3) {
-    const collisionGrids = {};
-
-    for (const board in boards) {
-        collisionGrids[board] = initializeCollisionGrid(canvasWidth, canvasHeight, numLayers);
-    }
-
-    return collisionGrids;
-}
-
-function populateCollisionGrid(collisionGrid, placedSprites) {
-    // Clear the collision grid first
-    for (let layer = 0; layer < collisionGrid.layers.length; layer++) {
-        for (let y = 0; y < collisionGrid.height; y++) {
-            for (let x = 0; x < collisionGrid.width; x++) {
-                collisionGrid.layers[layer][y][x] = 0; // Reset to no collision
-            }
-        }
-    }
-
-    // Populate the collision grid based on placedSprites
-    for (const key in placedSprites) {
-        const sprite = placedSprites[key];
-        const [layer, x, y] = key.split(',').map(Number);
-
-        // Mark all 4 cells occupied by the 32x32 sprite
-        for (let offsetY = 0; offsetY < 2; offsetY++) {
-            for (let offsetX = 0; offsetX < 2; offsetX++) {
-                const gridX = x * 2 + offsetX; // Convert 32x32 to 16x16 grid
-                const gridY = y * 2 + offsetY;
-
-                //console.log(`Populating collision grid at layer ${layer}, x: ${gridX}, y: ${gridY} for sprite type: ${sprite.type}`);
-
-                if (sprite.type === 'wall' || sprite.type === 'break' || sprite.type === 'door') {
-                    collisionGrid.layers[layer - 1][gridY][gridX] = 1; // Mark as a blocking tile
-                } else if (sprite.type === 'push') {
-                    collisionGrid.layers[layer - 1][gridY][gridX] = 2; // Mark as a pushable tile
-                } else if (sprite.type === 'step' || sprite.type === 'coin' || sprite.type === 'ammo' || sprite.type === 'key') {
-                    collisionGrid.layers[layer - 1][gridY][gridX] = 3; // Mark as a stepping tile
-                } else if (sprite.type === 'invisible') {
-                    collisionGrid.layers[layer - 1][gridY][gridX] = 4; // Mark as an invisible tile
-                } else if (sprite.type === 'sign' || sprite.type === 'object') {
-                    collisionGrid.layers[layer - 1][gridY][gridX] = 5; // Mark as a sign or object
-                } else if (sprite.type === 'player') {
-                    collisionGrid.layers[layer - 1][gridY][gridX] = 9; // Mark as player
-                } else {
-                    collisionGrid.layers[layer - 1][gridY][gridX] = 0; // No collision
-                }
-            }
-        }
-    }
-
-    console.log('Collision grid populated:', collisionGrid);
-}
-
-function updateGrid(collisionGrid, layer, x, y, value) {
-    // Update all 4 cells in the finer 16x16 grid for the 32x32 sprite
-    for (let offsetY = 0; offsetY < 2; offsetY++) {
-        for (let offsetX = 0; offsetX < 2; offsetX++) {
-            //const gridX = Math.floor(x * 2) + offsetX; // Convert to 16x16 grid
-            //const gridY = Math.floor(y * 2) + offsetY;
-            const gridX = x * 2 + offsetX; // Convert to 16x16 grid
-            const gridY = y * 2 + offsetY;
-            collisionGrid.layers[layer][gridY][gridX] = value; // Set the new value
-            //console.log(`Grid updated at layer=${layer}, gridX=${x * 2 + offsetX}, gridY=${y * 2 + offsetY}, value=${value}`);
-        }
-    }
-}
-
-function updatePlayerInGrid(collisionGrid, layer, x, y, value) {
-    // Update all 4 cells in the finer 16x16 grid for the 32x32 player sprite
-    for (let offsetY = 0; offsetY < 2; offsetY++) {
-        for (let offsetX = 0; offsetX < 2; offsetX++) {
-            const gridX = x * 2 + offsetX; // Convert to 16x16 grid
-            const gridY = y * 2 + offsetY;
-            collisionGrid.layers[layer][gridY][gridX] = value; // Set the new value
-            //console.log(`Grid updated at layer=${layer}, gridX=${x * 2 + offsetX}, gridY=${y * 2 + offsetY}, value=${value}`);
-        }
-    }
-}
-
-function canMoveTo(x, y, object = player) {
-    const grid = currentCollisionGrid
-    // Convert 32x32 coordinates to 16x16 grid coordinates
-    // Determine the grid area to check based on the object type
-    let gridLeft, gridTop, gridRight, gridBottom;
-
-    if (object.type === 'bullet') {
-        // For bullets, use a smaller collision area
-        const bulletSize = 8; // Bullet collision area (8x8)
-        gridLeft = Math.floor((x * 32 - bulletSize / 2) * 2 / 32); // Convert to 16x16 grid
-        gridTop = Math.floor((y * 32 - bulletSize / 2) * 2 / 32);
-        gridRight = Math.floor((x * 32 + bulletSize / 2) * 2 / 32);
-        gridBottom = Math.floor((y * 32 + bulletSize / 2) * 2 / 32);
-    } else {
-        // For other objects, use the full tile size
-        gridLeft = Math.floor(x * 2); // Multiply by 2 for finer grid
-        gridTop = Math.floor(y * 2);
-        gridRight = Math.floor((x + 1) * 2) - 1; // Include the right edge
-        gridBottom = Math.floor((y + 1) * 2) - 1; // Include the bottom edge
-        //gridLeft = x * 2; // Multiply by 2 for finer grid
-        //gridTop = y * 2;
-        //gridRight = (x + 1) * 2 - 1; // Include the right edge
-        //gridBottom = (y + 1) * 2 - 1; // Include the bottom edge
-    }
-
-    // Ensure the object has a valid layer
-    const layer = object.layer - 1 || 0; // Default to layer 0 if not specified
-
-    /*if (object.type === 'player') {
-        console.log(`Checking collision for player on layer ${layer}`);
-        console.log(`Checking tiles from (${gridLeft}, ${gridTop}) to (${gridRight}, ${gridBottom})`);
-    }*/
-
-    // Check all tiles that the sprite overlaps
-    for (let gridY = gridTop; gridY <= gridBottom; gridY++) {
-        for (let gridX = gridLeft; gridX <= gridRight; gridX++) {
-            // Check bounds
-            if (gridX < 0 || gridY < 0 || gridX >= grid.width || gridY >= grid.height) {
-                return false; // Out of bounds
-            }
-
-            // Check for collisions in the specified layer
-            const tileValue = grid.layers[layer][gridY][gridX];
-            // Convert gridX and gridY (16x16) to spriteX and spriteY (32x32)
-            const spriteX = Math.floor(gridX / 2);
-            const spriteY = Math.floor(gridY / 2);
-
-            const spriteKey = `${layer + 1},${spriteX},${spriteY}`;
-
-            switch (tileValue) {
-                case 0:
-                    continue; // No collision
-                case 1:
-                    if (object.type === 'bullet') {
-                        if (spriteKey in placedSprites) {
-                            const sprite = placedSprites[spriteKey];
-                            if (sprite.type === 'break') {
-                                object.active = false; // Deactivate the bullet
-                                delete placedSprites[spriteKey]; // Remove the sprite
-                                updateGrid(grid, layer, spriteX, spriteY, 0); // Update the grid
-                                updateTile(layer + 1, spriteX, spriteY); // Update the tile visually
-                                renderLayersToMainCanvas(); // Redraw the canvas
-                            }
-                        }
-                    }
-                    return false; // Blocked by wall
-                case 2:
-                    // Handle pushable object logic here
-                    return tryPushTiles(gridX / 2, gridY / 2, object.direction, layer + 1);
-                case 3:
-                    // Handle interactive tiles (e.g., coins, ammo, keys)
-                    if (object.type === 'bullet') continue; // Ignore bullets
-                    if (object.type === 'object') return false; // Block other objects
-                    handleInteractiveTile(gridX, gridY, layer);
-                    continue; // Stepping tile
-                case 4:
-                    if (object.type === 'bullet') continue; // Invisible tile does not block bullets
-                    else return false; // Block other objects
-                case 5:
-                    // Handle special interaction tiles (e.g., signs, objects)
-                    //const targetObject = placedObjects[spriteKey];
-                    const targetObject = placedObjects[`${layer + 1},${Math.floor(x)},${Math.floor(y)}`];
-                    // Handle collision with an object.
-                    if (targetObject) {
-                        if (object.type === 'object' && object.id === targetObject.id) {
-                            console.log('Collision with object:', targetObject.id); // debugging
-                            continue; // Ignore self-collision
-                        }
-
-                        if (object.type === 'bullet' && object.origin === targetObject.id) {
-                            console.log('Bullet hit its own object:', targetObject.id); // debugging
-                            continue; // Ignore bullets fired by the same object
-                        }
-                    }
-                    /*if (object.type === 'bullet') {
-                        const targetObject = placedObjects[`${layer},${Math.floor(x)},${Math.floor(y)}`];
-                        if (targetObject && object.origin === targetObject.id) {
-                            continue; // Ignore bullets fired by the same object
-                        }
-                    }*/
-                    handleSpecialTile(gridX, gridY, layer, object);
-                    return false; // Block other objects
-                case 9:
-                    // Handle collision with the player
-                    if (object.type === 'player') continue; // Ignore player collision with itself    
-                    if (object.type === 'bullet') {
-                        // Prevent the player from shooting themselves
-                        if (object.origin === 'player') {
-                            continue; // Ignore bullets fired by the player
-                        }
-
-                        // Bullet hits the player
-                        console.log('Bullet hit the player!');
-                        player.stats.health -= object.damage || 1; // Reduce player's health
-                        if (player.stats.health <= 0) {
-                            youDied(); // Trigger game over
-                        }
-                        return false; // Block further movement for the bullet
-                    }
-                    return handleObjectCollisionWithPlayer(object);
-                case -1:
-                    // Temporarily occupied tile (e.g., during a push)
-                    if (object.type === 'object') return true; // Allow objects to pass through
-                    
-                default:
-                    return false; // Unknown tile type
-            }
-
-        }
-    }
-
-    return true; // No collision
-}
-
-function handleInteractiveTile(gridX, gridY, layer) {
-    const spriteX = Math.floor(gridX / 2); // Convert to 32x32 grid
-    const spriteY = Math.floor(gridY / 2);
-    const spriteKey = `${layer + 1},${spriteX},${spriteY}`;
-
-    if (spriteKey in placedSprites) {
-        const sprite = placedSprites[spriteKey];
-        if (sprite.type === 'coin') {
-            player.stats.coin += sprite.data.value;
-            console.log(`Collected coin. Total coins: ${player.stats.coin}`);
-        }
-        if (sprite.type === 'ammo') {
-            player.stats.ammo += sprite.data.value;
-            console.log(`Collected ammo. Total ammo: ${player.stats.ammo}`);
-        }
-        if (sprite.type === 'key') {
-            player.stats.keys += sprite.data.value;
-            console.log(`Collected key. Total keys: ${player.stats.keys}`);
-        }
-
-        // Remove the sprite and update the grid
-        delete placedSprites[spriteKey];
-        updateGrid(currentCollisionGrid, layer, spriteX, spriteY, 0); // Set grid value to 0
-        updateTile(layer + 1, spriteX, spriteY); // Update the tile visually
-        renderLayersToMainCanvas(); // Redraw the canvas
-    }
-}
-
-function handleSpecialTile(gridX, gridY, layer, object) {
-    const spriteX = Math.floor(gridX / 2); // Convert to 32x32 grid
-    const spriteY = Math.floor(gridY / 2);
-    const spriteKey = `${layer + 1},${spriteX},${spriteY}`;
-
-    if (spriteKey in placedSprites) {
-        const sprite = placedSprites[spriteKey];
-        if (sprite.type === 'sign' && object.type === 'player') {
-            gamePaused = true; // Pause the game loop
-            showDialog(sprite.data.script.replace(/(?:\r\n|\r|\n)/g, '<br>'));
-        }
-        if (sprite.type === 'object') {
-            if (object.type === 'player') handleObjectInteraction(spriteKey, ':touch');
-            if (object.type === 'bullet') handleObjectInteraction(spriteKey, ':shot');
-        }
-    }
-}
-
-function handleObjectCollisionWithPlayer(object) {
-    if (object.type === 'enemy') {
-        player.stats.health -= object.damage || 1;
-        console.log(`Player hit by enemy! Health: ${player.stats.health}`);
-        if (player.stats.health <= 0) {
-            youDied();
-        }
-        return false; // Block movement
-    }
-
-    if (object.type === 'object') {
-        console.log(object.type, 'collided with player!');
-        return false; // Block movement
-    }
-
-    if (object.type === 'pushable') {
-        console.log('Player pushed by object!');
-        return tryPushPlayer(player.x, player.y, object.direction, player.layer);
-    }
-
-    return false; // Default: Block movement
-}
-
 
 // ###########################################
 // ############ Drawing functions ############
@@ -425,7 +122,7 @@ function getLayerCanvas(layer) {
     return layerContexts[layer];
 }
 
-function _drawBoard() {
+function drawBoard() {
     const sortedLayers = [1, 2, 3];
 
     for (const layer of sortedLayers) {
@@ -444,49 +141,9 @@ function _drawBoard() {
                 if (sprite.type !== 'player') { // Skip player and invisible sprites
                     drawSpriteToCanvas(ctx, sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
                 }
-                if (showPlayer && sprite.type === 'player') {
-                    ctx.fillStyle = 'rgba(20, 0, 255, 0.5)'; // Semi-transparent red
-                    ctx.fillRect(sprite.x * tileSizeX, sprite.y * tileSizeY, tileSizeX, tileSizeY); // Draw a rectangle around the player
-                }
             });
 
         //console.log(`Layer ${layer} generated`);
-    }
-}
-
-function drawBoard() {
-    const sortedLayers = [1, 2, 3];
-
-    for (const layer of sortedLayers) {
-        const ctx = getLayerCanvas(layer);
-
-        // CLEAR OFFSCREEN CANVAS BEFORE DRAWING
-        ctx.clearRect(0, 0, layerCanvases[layer].width, layerCanvases[layer].height);
-
-        // Draw all non-object sprites first
-        Object.keys(placedSprites)
-            .map(key => {
-                const [l, x, y] = key.split(',').map(Number);
-                return { l, x, y, ...placedSprites[key] };
-            })
-            .filter(sprite => sprite.l === layer && sprite.type !== 'object' && sprite.type !== 'passage' && sprite.type !== 'invisible' && sprite.type !== 'player') // Skip objects, passages, and invisible sprites
-            .forEach(sprite => {
-                drawSpriteToCanvas(ctx, sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
-            });
-
-        // Draw objects at the end
-        Object.keys(placedSprites)
-            .map(key => {
-                const [l, x, y] = key.split(',').map(Number);
-                return { l, x, y, ...placedSprites[key] };
-            })
-            .filter(sprite => sprite.l === layer && sprite.type === 'object') // Only objects
-            .forEach(sprite => {
-                drawSpriteToCanvas(ctx, sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
-            });
-
-        // Debugging: Log the layer rendering
-        console.log(`Layer ${layer} rendered`);
     }
 }
 
@@ -513,14 +170,13 @@ function renderLayersToMainCanvas() {
             //ctx.save()
             //if (layer === 3) ctx.filter = 'opacity(0.8)';
             //if (layer === 2) ctx.filter = 'blur(1px)';
-            //if (layer === 3) ctx.globalCompositeOperation = 'destination-over';
+            //if (layer === 3) ctx.globalCompositeOperation = "destination-over";
             ctx.drawImage(layerCanvases[layer], 0, 0);
             //ctx.restore();
 
         } else {
             console.warn(`Layer ${layer} is missing!`); // Debugging
         }
-
         if (layer === player.layer) {
             //console.log(player);
             ctx.save();
@@ -602,6 +258,11 @@ function updateObjects(deltaTime) {
 
 function executeObjectCommand(obj, action, args) {
 
+    // Skip comments: lines starting with '--' or '#rem'
+    if (action.startsWith('--') || action === '#rem') {
+        return;
+    }
+
     if (action.startsWith("@")) {
         // Set the object's name to everything after @
         obj.name = action.slice(1) + (args.length > 0 ? " " + args.join(" ") : "");
@@ -675,7 +336,6 @@ function executeObjectCommand(obj, action, args) {
             renderLayersToMainCanvas(); // Ensure visual update
 
             break;
-        case '#color':
         case '#changecolor':
             if (args[0] === "undefined") { console.warn("No color provided"); return; }
             let color = extractRGB(args[0]); // Extract RGB values
@@ -685,7 +345,6 @@ function executeObjectCommand(obj, action, args) {
             updateTile(obj.layer, obj.x, obj.y); // Update tile with new color
             renderLayersToMainCanvas(); // Ensure visual update
             break;
-        case '#sprite':
         case '#changesprite':
             if (args[0] === "undefined" || isNaN(args[0])) { console.warn("No sprite provided or NaN"); return; }
             let spriteKeyChange = `${obj.layer},${obj.x},${obj.y}`;
@@ -720,17 +379,35 @@ function executeObjectCommand(obj, action, args) {
                 return;
             }
             let bulletDirection = convertDirections(args[0]);
-            if (bulletDirection === -1) {
-                console.warn(`Invalid direction "${args[0]}" provided for bullet`);
-                return;
-            }
+            let x = obj.x;
+            let y = obj.y;
 
-            let { x, y } = calculateBulletPosition(obj.x, obj.y, bulletDirection);
+            if (bulletDirection === -1) console.warn(`Invalid direction "${args[0]}" provided for bullet`);
+
+            switch (bulletDirection) {
+                case 'up':
+                    bulletDirection = 'up';
+                    y -= 0.5;
+                    x += 0.5;
+                    break;
+                case 'down':
+                    bulletDirection = 'down';
+                    y += 1;
+                    x += 0.5;
+                    break;
+                case 'right':
+                    bulletDirection = 'right';
+                    x += 1;
+                    y += 0.5;
+                    break;
+                case 'left':
+                    bulletDirection = 'left';
+                    x -= 0.5;
+                    y += 0.5;
+                    break;
+            }
             let bullet = createBullet(canvas, x, y, bulletDirection, 16, 'white', obj.name);
-            //bullet.origin = obj; // Track the object that fired the bullet
-            bullet.origin = `${obj.layer},${obj.x},${obj.y}`; // Track the object that fired the bullet
             bulletArray.push(bullet);
-            console.log(`Creating bullet at (${x}, ${y}) with direction ${bulletDirection}`);
             break;
         case '#wait':
             obj.waiting = true; // Set waiting state
@@ -766,6 +443,7 @@ function executeObjectCommand(obj, action, args) {
             let amount = parseInt(args[1], 10);
             if (isNaN(amount)) amount = 1; // Default to 1 if not specified
             takeStat(player, item, amount);
+            if (player.stats.health <= 0) youDied(); // Check if player died after taking an item
             console.log(`Took ${amount} ${item}(s)`);
             break;
         case '#give':
@@ -788,53 +466,7 @@ function executeObjectCommand(obj, action, args) {
     }
 }
 
-function _moveObject(obj, direction, layer) {
-    const offsets = { up: [0, -0.5], down: [0, 0.5], left: [-0.5, 0], right: [0.5, 0] };
-    const dir = convertDirections(direction);
-
-    if (!offsets[dir]) {
-        console.warn(`Invalid direction: ${direction} for #move`);
-        return; // Invalid direction guard
-    }
-
-    const [dx, dy] = offsets[dir];
-    const [newX, newY] = [obj.x + dx, obj.y + dy];
-
-    obj.direction = dir; // Update the object's direction
-
-    // Remove the object from the collision grid at the old position
-    updateGrid(currentCollisionGrid, layer - 1, obj.x, obj.y, 0);
-
-    // Check if the object can move to the new position
-    if (canMoveTo(newX, newY, obj)) {
-
-
-        // Update the object's position
-        obj.x = newX;
-        obj.y = newY;
-
-        // Add the object to the collision grid at the new position
-        updateGrid(currentCollisionGrid, layer - 1, obj.x, obj.y, 5); // Use `5` for objects
-
-        // Update `placedObjects` and `placedSprites` keys
-        const oldKey = `${layer},${Math.floor(obj.x - dx)},${Math.floor(obj.y - dy)}`;
-        const newKey = `${layer},${Math.floor(obj.x)},${Math.floor(obj.y)}`;
-
-        placedObjects[newKey] = placedObjects[oldKey];
-        delete placedObjects[oldKey];
-
-        placedSprites[newKey] = placedSprites[oldKey];
-        delete placedSprites[oldKey];
-
-        // Update the visual representation of the object
-        updateTile(layer, Math.floor(obj.x), Math.floor(obj.y));
-    } else {
-        //console.log(`Object at (${obj.x}, ${obj.y}) cannot move to (${newX}, ${newY})`);
-    }
-}
-
 function moveObject(obj, direction, layer) {
-    //const offsets = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
     const offsets = { up: [0, -0.5], down: [0, 0.5], left: [-0.5, 0], right: [0.5, 0] };
     const dir = convertDirections(direction);
 
@@ -845,19 +477,13 @@ function moveObject(obj, direction, layer) {
 
     const [dx, dy] = offsets[dir];
     const [newX, newY] = [obj.x + dx, obj.y + dy];
-    //const [oldX, oldY] = [obj.x, obj.y];
 
     const oldKey = `${layer},${obj.x},${obj.y}`;
     const newKey = `${layer},${newX},${newY}`;
-    //const oldKey = `${layer},${Math.floor(obj.x)},${Math.floor(obj.y)}`;
-    //const newKey = `${layer},${Math.floor(newX)},${Math.floor(newY)}`;
-
     obj.direction = dir; // change the object's direction
 
-    //if (placedObjects[newKey]) return; // Prevent movement if occupied by another object
-    // Remove the object from the collision grid at the old position
-    updateGrid(currentCollisionGrid, layer - 1, obj.x, obj.y, 0); // Use -1 for temporary moving state
-
+    if (placedObjects[newKey] && placedObjects[newKey].id !== obj.id) return; // Prevent movement if occupied by another object
+    //if (placedSprites[newKey]) {
     if (canMoveTo(newX, newY, obj)) { // can the object move?
 
         placedSprites[newKey] = placedSprites[oldKey]; // Move sprite
@@ -871,33 +497,39 @@ function moveObject(obj, direction, layer) {
         obj.x = newX;
         obj.y = newY;
 
-        // Add the object to the collision grid at the new position
-        //updateGrid(currentCollisionGrid, layer - 1, oldX, oldY, 0); // Use `5` for objects
-        updateGrid(currentCollisionGrid, layer - 1, obj.x, obj.y, 5); // Use `5` for objects
-
-        // Update the visual representation of the object
-        //updateTile(layer, obj.x, obj.y); // Update new tile
-        //updateTile(layer, Math.floor(obj.x), Math.floor(obj.y));
-        updateTile(layer, obj.x, obj.y);
+        updateTile(layer, obj.x, obj.y); // Update new tile
     }
     else {
-        //console.warn(`Object ${obj.name || 'unknown'} cannot move to (${newX}, ${newY})`);
-        updateGrid(currentCollisionGrid, layer - 1, obj.x, obj.y, 5);
-        console.log(`Object at (${obj.x}, ${obj.y}) cannot move to (${newX}, ${newY})`);
-        return; // no can move
+        return; // no
+    }
+    //}
+}
+
+function handleObjectTouch(tileKey) {
+    let obj = placedObjects[tileKey];
+    if (obj && obj.labels[":touch"]) {
+        //obj.scriptIndex = obj.labels[":touch"];
+        let index = resolveLabel(obj, ":touch");
+        if (index !== null) {
+            obj.scriptIndex = index;
+        } else {
+            // Optionally skip or log that all labels were zapped
+            console.warn("No active :touch labels found.");
+        }
+        obj.resting = false; // Wake up the object
     }
 }
 
-function handleObjectInteraction(tileKey, labelType) {
+function handleObjectShot(tileKey) {
     let obj = placedObjects[tileKey];
-    if (obj && obj.labels[labelType]) {
-        let index = resolveLabel(obj, labelType);
+    if (obj && obj.labels[":shot"]) {
+        //obj.scriptIndex = obj.labels[":shot"];
+        let index = resolveLabel(obj, ":shot");
         if (index !== null) {
-            obj.scriptIndex = index; // Set the script index to the label
-            obj.waitTime = 0; // Reset wait time
-            obj.waiting = false; // Reset waiting state
+            obj.scriptIndex = index;
         } else {
-            console.warn(`No active ${labelType} labels found.`);
+            // Optionally skip or log that all labels were zapped
+            console.warn("No active :shot labels found.");
         }
         obj.resting = false; // Wake up the object
     }
@@ -997,20 +629,6 @@ function youDied() {
 // ############ Collision detection ############
 // #############################################
 
-function getOverlappingTiles(x, y) {
-    let leftTile = Math.floor(x / 32);
-    let topTile = Math.floor(y / 32);
-    let rightTile = Math.floor((x + 31) / 32);
-    let bottomTile = Math.floor((y + 31) / 32);
-
-    return [
-        { x: leftTile, y: topTile },
-        { x: rightTile, y: topTile },
-        { x: leftTile, y: bottomTile },
-        { x: rightTile, y: bottomTile }
-    ];
-}
-
 function checkTiles(x, y, direction = 'down') {
     let leftTile = Math.floor(x / tileSizeX);
     let topTile = Math.floor(y / tileSizeY);
@@ -1050,27 +668,13 @@ function isOverlappingTile(object, tileX, tileY) {
         objTop >= tileBottom);
 }
 
-function findClosestObject(x, y) {
-    let closestObject = null;
-    let closestDistance = Infinity;
-
-    for (const key in placedObjects) {
-        const obj = placedObjects[key];
-
-        const objCenterX = obj.x + obj.width / tileSizeX / 2;
-        const objCenterY = obj.y + obj.height / tileSizeY / 2;
-
-        const dx = objCenterX - x;
-        const dy = objCenterY - y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < closestDistance) {
-            closestDistance = distance;
-            closestObject = obj;
-        }
-    }
-
-    return closestObject;
+function isBoundingBoxOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+    return (
+        ax < bx + bw &&
+        ax + aw > bx &&
+        ay < by + bh &&
+        ay + ah > by
+    );
 }
 
 function isAlignedWithTile(object) {
@@ -1080,99 +684,156 @@ function isAlignedWithTile(object) {
     return isAlignedX && isAlignedY;
 }
 
-function _checkBulletTiles(x, y) {
-    const bulletSize = 8; // Bullet collision area (8x8)
+function canMoveTo(x, y, object = player) {
+    // Calculate the player's bounding box at the new position
 
-    let leftTile = Math.floor((x - bulletSize) / tileSizeX);
-    let topTile = Math.floor((y - bulletSize) / tileSizeY);
-    let rightTile = Math.floor((x + bulletSize) / tileSizeX);
-    let bottomTile = Math.floor((y + bulletSize) / tileSizeY);
+    let playerLeft = x * tileSizeX;
+    let playerTop = y * tileSizeY;
+    let playerWidth = object.width || tileSizeX;
+    let playerHeight = object.height || tileSizeY;
+    if (object.type === 'bullet') {
+        playerLeft = (x * tileSizeX) - object.width / 2;
+        playerTop = (y * tileSizeY) - object.height / 2;
+    }
 
-    const tileSet = new Set();
+    // --- Passage check: only for player, only at intended tile ---
+    if (object.type === 'player') {
+    const passageKey = `${object.layer},${Math.round(x)},${Math.round(y)}`;
+    const isOnPassage = placedPassages[passageKey] && placedPassages[passageKey].type === 'passage';
 
-    for (let tx = leftTile; tx <= rightTile; tx++) {
-        for (let ty = topTile; ty <= bottomTile; ty++) {
-            const offsets = [
-                [0, 0],
-                [-0.5, 0],
-                [0.5, 0],
-                [0, -0.5],
-                [0, 0.5]
-            ];
+    // Only trigger passage if:
+    // 1. Player is aligned with the tile (centered)
+    // 2. Player is NOT already fully overlapping the passage tile (prevents re-trigger)
+    // 3. Player is moving ONTO the passage tile (not off)
+    if (isOnPassage && isAlignedWithTile({ x, y })) {
+        console.log('Player is on a passage tile:', passageKey);
+        // Check if player was NOT already fully on this passage tile
+        // (i.e., player.x/y before move is not the same as x/y after move)
+        if (isOverlappingTile(object, Math.round(x), Math.round(y))) {
+            object.locked = true; // Lock player movement
+            let targetBoard = placedPassages[passageKey].data.board;
+            let passageColor = placedPassages[passageKey].color;
+            let colorKey = passageColor.join(',');
+            console.log('Switching to board:', targetBoard, 'with colorKey:', colorKey);
+            switchBoard(targetBoard, colorKey);
+            return true; // Prevent movement (board switch will move player)
+        }
+        // If player is already fully on the passage tile, allow stepping off
+        // (do NOT return false here, just continue to collision checks)
+    }
+}
 
-            for (const [dx, dy] of offsets) {
-                const fx = tx + dx;
-                const fy = ty + dy;
+    // Check for collision with all placedSprites (except the player itself)
+    for (const key in placedSprites) {
+        const sprite = placedSprites[key];
+        //if (sprite.type === 'player') continue; // Skip player sprite
 
-                if (fx >= 0 && fy >= 0) {
-                    tileSet.add(`${fx},${fy}`);
-                }
+        const [layer, objX, objY] = key.split(',').map(Number);
+
+        // Only check collision if on the same layer
+        if (layer !== object.layer) continue;
+
+        if (sprite.id && object.id && sprite.id === object.id) continue; // Skip collision with itself
+
+        const objLeft = objX * tileSizeX;
+        const objTop = objY * tileSizeY;
+        const objWidth = sprite.width || tileSizeX; // Use sprite width or default tile size
+        const objHeight = sprite.height || tileSizeY;
+
+        if (isBoundingBoxOverlap(
+            playerLeft, playerTop, playerWidth, playerHeight,
+            objLeft, objTop, objWidth, objHeight
+        )) {
+            if (sprite.type === 'object' && object.type === 'bullet') {
+                handleObjectShot(key); // Call your :shot handler
+                return false; // Bullet stops here
             }
+            // --- Handle bullet hitting player ---
+            if(sprite.type === 'player' && object.type === 'bullet' && object.origin !== 'player') {
+                console.log('Bullet hit player!');
+                player.stats.health -= object.damage || 1; // Reduce player health
+                console.log(`Player health: ${player.stats.health}`);
+                if (player.stats.health <= 0) youDied(); // Check if player died
+                return false; // Bullet stops here
+            }
+            // --- Handle player touching objects ---
+            if (sprite.type === 'object' && object.type === 'player') {
+                handleObjectTouch(key); // Call your :touch handler
+                // Optionally block or allow movement depending on your game logic
+                return false; // Block movement if you want the player to stop
+            }
+            if (sprite.type === 'sign' && object.type === 'player') {
+                gamePaused = true; // Pause the game loop
+                showDialog(placedSprites[key].data.script
+                    .replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                return false; // Block movement while dialog is open
+            }
+            if (sprite.type === 'player' && object.type === 'object') {
+                // Block object from moving into the player
+                console.log('Object cannot move into player!');
+                return false;
+            }
+            if (sprite.type === 'break' && object.type === 'bullet') {
+                // Destroy the break tile
+                delete placedSprites[key];
+                updateTile(layer, objX, objY);
+                return false; // Bullet stops here
+            }
+            if ((sprite.type === 'coin' || sprite.type === 'ammo' || sprite.type === 'key' || sprite.type === 'step') && object.type === 'player') {
+                if (sprite.type === 'coin') {
+                    player.stats.coin += sprite.data?.value || 1;
+                    console.log(`Collected coin. Total coins: ${player.stats.coin}`);
+                }
+                if (sprite.type === 'ammo') {
+                    player.stats.ammo += sprite.data?.value || 1;
+                    console.log(`Collected ammo. Total ammo: ${player.stats.ammo}`);
+                }
+                if (sprite.type === 'key') {
+                    player.stats.keys += sprite.data?.value || 1;
+                    console.log(`Collected key. Total keys: ${player.stats.keys}`);
+                }
+                delete placedSprites[key];
+                updateTile(layer, objX, objY);
+                renderLayersToMainCanvas();
+                return true;
+            }
+            if (
+                sprite.type === 'push' &&
+                (object.type === 'player' || object.type === 'object' || object.type === 'bullet')
+            ) {
+                const success = tryPushTiles(objX, objY, object.direction, layer);
+                if (success) return true;
+                return false;
+            }
+            if (sprite.type === 'invisible' && object.type === 'bullet') {
+                // Allow bullet to pass through invisible tiles
+                return true; // Allow bullet to pass
+            }
+            if (sprite.type === 'wall' || sprite.type === 'object' || sprite.type === 'break' || sprite.type === 'sign' || sprite.type === 'invisible') {
+                if (sprite.id && object.id && sprite.id === object.id) {
+                    console.log('Skipping self-collision for object id:', object.id);
+                    continue;
+                } else {
+                    console.log('Blocking due to object collision:', { spriteId: sprite.id, objectId: object.id });
+                    return false;
+                }
+                return false; // Block movement
+            }
+            // ...other logic...
+            
         }
     }
 
-    // Convert back into array of tile objects
-    const tiles = Array.from(tileSet).map(key => {
-        const [xStr, yStr] = key.split(',');
-        return { x: parseFloat(xStr), y: parseFloat(yStr) };
-    });
-
-    return tiles;
-}
-
-function checkBulletTiles(bulletX, bulletY, bulletWidth = 8, bulletHeight = 8) {
-    const bulletLeft = bulletX - bulletWidth / 2;
-    const bulletTop = bulletY - bulletHeight / 2;
-    const bulletRight = bulletX + bulletWidth / 2;
-    const bulletBottom = bulletY + bulletHeight / 2;
-
-    const tiles = [];
-
-    // Check all tiles the bullet overlaps
-    const leftTile = Math.floor(bulletLeft / tileSizeX);
-    const topTile = Math.floor(bulletTop / tileSizeY);
-    const rightTile = Math.floor(bulletRight / tileSizeX);
-    const bottomTile = Math.floor(bulletBottom / tileSizeY);
-
-    for (let tx = leftTile; tx <= rightTile; tx++) {
-        for (let ty = topTile; ty <= bottomTile; ty++) {
-            tiles.push({ x: tx, y: ty });
-        }
+    // Optionally: check for out-of-bounds
+    if (
+        playerLeft < 0 || playerTop < 0 ||
+        playerLeft + playerWidth > tilesX * tileSizeX ||
+        playerTop + playerHeight > tilesY * tileSizeY
+    ) {
+        return false;
     }
 
-    // Check if the bullet overlaps with the player
-    if (isOverlappingTile(player, bulletX / tileSizeX, bulletY / tileSizeY)) {
-        console.log('Bullet overlaps with player!');
-        tiles.push({ x: player.x, y: player.y });
-    }
-
-    return tiles;
-}
-
-function isOverlappingAnyObject(bulletX, bulletY, bulletWidth = 8, bulletHeight = 8) {
-    const bulletLeft = bulletX - bulletWidth / 2;
-    const bulletTop = bulletY - bulletHeight / 2;
-    const bulletRight = bulletX + bulletWidth / 2;
-    const bulletBottom = bulletY + bulletHeight / 2;
-
-    for (const key in placedObjects) {
-        const obj = placedObjects[key];
-
-        const objLeft = obj.x * tileSizeX;
-        const objTop = obj.y * tileSizeY;
-        const objRight = objLeft + obj.width;
-        const objBottom = objTop + obj.height;
-
-        // Check if the bullet overlaps the object
-        if (!(bulletRight <= objLeft ||
-            bulletLeft >= objRight ||
-            bulletBottom <= objTop ||
-            bulletTop >= objBottom)) {
-            return obj; // Return the overlapping object
-        }
-    }
-
-    return null; // No overlapping object found
+    return true; // No collision, movement allowed
 }
 
 function _canMoveTo(x, y, object = player) {
@@ -1181,12 +842,9 @@ function _canMoveTo(x, y, object = player) {
     //console.log('tiles:', checkTiles(x * tileSizeX, y * tileSizeY, object.direction));
 
     let tiles = [];
-    //if (object.type === 'bullet') tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.oldX, object.oldY);
-    if (object.type === 'bullet') {
-        tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.width || 8, object.height || 8);
-    } else {
-        tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
-    }
+    if (object.type === 'bullet') tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.oldX, object.oldY);
+    else tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
+    //tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction)
 
     for (let tile of tiles) {
 
@@ -1196,49 +854,13 @@ function _canMoveTo(x, y, object = player) {
             return false; // Out of bounds = collision
         }
 
-        if (isOverlappingTile(player, tile.x, tile.y) && object.type === 'object') { // Check if the player is overlapping with the object using a drop-in bounding box
+        if (isOverlappingTile(player, tile.x, tile.y) && object.type === 'object') {
             console.log('player detected!');
             return tryPushPlayer(player.x, player.y, object.direction, object.layer);
         }
 
         if (placedSprites[tileKey]) {
             let tileType = placedSprites[tileKey].type;
-
-            // Collision with walls or breakable objects
-            if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object' || tileType === 'invisible') {
-                // If it's a bullet hitting a breakable tile
-                if (object.type === 'bullet' && tileType === 'break') {
-                    delete placedSprites[tileKey];
-                    updateTile(object.layer, tile.x, tile.y);
-                }
-                // if it's a sign, show script
-                if (tileType === 'sign' && object.type === 'player') {
-                    gamePaused = true; // Pause the game loop
-                    showDialog(placedSprites[tileKey].data.script
-                        .replace(/(?:\r\n|\r|\n)/g, '<br>'));
-                }
-
-                if (object.type === 'bullet' && tileType === 'invisible') {
-                    return true;
-                }
-
-                if (tileType === 'object' && object.type === 'player') {
-                    handleObjectInteraction(tileKey, ":touch");
-                }
-
-                if (tileType === 'object' && object.type === 'bullet') {
-                    handleObjectInteraction(tileKey, ":shot");
-                }
-
-                return false;
-            }
-
-            // Ignore collisions with the bullet's origin
-            //if (object.type === 'bullet' && object.origin === placedSprites[tileKey]) {
-            if (object.type === 'bullet' && object.origin === tileKey) {
-                console.log('Ignoring collision with origin:', tileKey);
-                continue; // Skip collision with the origin
-            }
 
             if (object.type === 'bullet' && object.origin === 'player' && tileType === 'player') {
                 return true;    // Bullet hit something (not itself or its owner)
@@ -1250,15 +872,50 @@ function _canMoveTo(x, y, object = player) {
                 return tryPushTiles(player.x, player.y, object.direction, object.layer);
             }
 
+            // Collision with walls or breakable objects
+            if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object' || tileType === 'invisible') {
+                // If it's a bullet hitting a breakable tile
+                if (object.type === 'bullet' && tileType === 'break') {
+                    delete placedSprites[tileKey];
+                    updateTile(object.layer, tile.x, tile.y);
+                }
+                // if it's a sign, show script
+                if (tileType === 'sign' && object.type === 'player') {
+                    gamePaused = true; // Pause the game loop
+                    //dialogBox(placedSprites[tileKey].data.script
+                    //.replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                    showDialog(placedSprites[tileKey].data.script
+                        .replace(/(?:\r\n|\r|\n)/g, '<br>'));
+                }
+
+                if (object.type === 'bullet' && tileType === 'invisible') {
+                    return true;
+                }
+
+                if (tileType === 'object' && object.type === 'player') {
+                    handleObjectTouch(tileKey);
+                }
+
+                if (tileType === 'object' && object.type === 'bullet') {
+                    handleObjectShot(tileKey);
+                }
+
+
+                return false;
+            }
+
+
             // Picking up an item or destroying tile
             if (tileType === 'item' && object.type === 'player' || tileType === 'step' && object.type === 'player') {
+                //player.stats.coins++;
+                //console.log('Coins:', player.stats.coins);
                 delete placedSprites[tileKey];
                 updateTile(player.layer, tile.x, tile.y);
                 return true;
             }
 
             if (tileType === 'coin' && object.type === 'player' || tileType === 'ammo' && object.type === 'player') {
-                if (tileType === 'coin') player.stats.coin += placedSprites[tileKey].data.value;
+                if (tileType === 'coin') player.stats.coins += placedSprites[tileKey].data.value;
                 if (tileType === 'ammo') player.stats.ammo += placedSprites[tileKey].data.value;
                 console.log('Player stats:', player.stats);
                 delete placedSprites[tileKey];
@@ -1301,184 +958,15 @@ function _canMoveTo(x, y, object = player) {
                 return false; // Prevent movement if not fully on the tile
             }
         }
+
+        //ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Debugging color
+        //ctx.fillRect(tile.x * tileSizeX, tile.y * tileSizeY, tileSizeX, tileSizeY); // Debugging
     }
 
     return true;
 }
 
 function tryPushTiles(startX, startY, direction, layer) {
-    const pushTiles = [];
-    let x = Math.floor(startX); // Align to grid
-    let y = Math.floor(startY);
-
-    // Determine the direction offsets
-    let dx = 0, dy = 0;
-    switch (direction) {
-        case 'up': dy = -1; break;
-        case 'down': dy = 1; break;
-        case 'left': dx = -1; break;
-        case 'right': dx = 1; break;
-        default:
-            console.warn(`Invalid direction: ${direction}`);
-            return false;
-    }
-
-    console.log(`Direction: ${direction}, dx: ${dx}, dy: ${dy}`);
-    console.log(`Starting tile at (${x}, ${y})`);
-
-    // Collect all pushable tiles in the direction
-    while (true) {
-        const spriteX = Math.floor(x); // Convert to 32x32 grid
-        const spriteY = Math.floor(y);
-        const key = `${layer},${spriteX},${spriteY}`;
-        console.log(`Checking tile at (${x}, ${y}), key: ${key}`);
-
-        if (!placedSprites[key]) {
-            console.warn(`No sprite found at key: ${key}`);
-            break;
-        }
-        if (placedSprites[key].type !== 'push') {
-            console.warn(`Sprite at key ${key} is not pushable:`, placedSprites[key]);
-            break;
-        }
-
-        pushTiles.push({ x: spriteX, y: spriteY }); // Add the current tile to the list
-        x += dx; // Move to the next tile in the direction
-        y += dy;
-    }
-
-    if (pushTiles.length === 0) {
-        console.warn('No pushable tiles found');
-        return false;
-    }
-
-    // Determine the new position for the last tile
-    const lastTile = pushTiles[pushTiles.length - 1];
-    const newX = lastTile.x + dx;
-    const newY = lastTile.y + dy;
-
-    // Check if the new position is valid
-    const newKey = `${layer},${newX},${newY}`;
-    const newKey2 = `${layer},${Math.floor(newX)},${Math.floor(newY)}`;
-    if (newX < 0 || newY < 0 || newX >= tilesX || newY >= tilesY || placedSprites[newKey] || placedSprites[newKey2]) {
-        console.warn(`Cannot push tiles to (${newX}, ${newY}), key: ${newKey}`);
-        return false;
-    }
-
-    // Move all pushable tiles to their new positions
-    for (let i = pushTiles.length - 1; i >= 0; i--) {
-        const oldX = pushTiles[i].x;
-        const oldY = pushTiles[i].y;
-        const newX = oldX + dx;
-        const newY = oldY + dy;
-
-        const oldKey = `${layer},${oldX},${oldY}`;
-        const newKey = `${layer},${newX},${newY}`;
-
-        // Update placedSprites
-        placedSprites[newKey] = placedSprites[oldKey]; // Move the sprite
-        delete placedSprites[oldKey]; // Remove the old position
-
-        // Update the collision grid
-        updateGrid(currentCollisionGrid, layer - 1, oldX, oldY, 0); // Clear the old position
-        updateGrid(currentCollisionGrid, layer - 1, newX, newY, 2); // Mark the new position
-
-        // Update the visual representation of the tiles
-        updateTile(layer, oldX, oldY); // Clear the old tile visually
-        updateTile(layer, newX, newY); // Draw the new tile visually
-    }
-
-    return true; // Successfully pushed the tiles
-}
-
-function __tryPushTiles(startX, startY, direction, layer) {
-    const pushTiles = [];
-
-    let x = startX;
-    let y = startY;
-
-    // Determine the direction offsets
-    let dx = 0, dy = 0;
-    switch (direction) {
-        case 'up': dy = -0.5; break;
-        case 'down': dy = 0.5; break;
-        case 'left': dx = -0.5; break;
-        case 'right': dx = 0.5; break;
-        default:
-            console.warn(`Invalid direction: ${direction}`);
-            return false;
-    }
-
-    console.log(`Direction: ${direction}, dx: ${dx}, dy: ${dy}`);
-    console.log(`Checking tile at (${x}, ${y})`);
-
-    // Collect all pushable tiles in the direction
-    while (true) {
-        //const key = `${layer},${x},${y}`;
-        const spriteX = Math.floor(x); // Convert to 32x32 grid
-        const spriteY = Math.floor(y);
-        const key = `${layer},${spriteX},${spriteY}`;
-        console.log('Checking tile:', key);
-        //if (!placedSprites[key] || placedSprites[key].type !== 'push') break;
-
-        if (!placedSprites[key]) {
-            console.log(`No sprite found at key: ${key}`);
-            break;
-        }
-
-        if (placedSprites[key].type !== 'push') {
-            console.log(`Sprite at key ${key} is not pushable:`, placedSprites[key]);
-            break;
-        }
-
-        pushTiles.push({ x, y }); // Add the current tile to the list
-        x += dx; // Move to the next tile in the direction
-        y += dy;
-    }
-
-    if (pushTiles.length === 0) {
-        console.warn('No pushable tiles found');
-        return false;
-    }
-
-    // Determine the new position for the last tile
-    const lastTile = pushTiles[pushTiles.length - 1];
-    const newX = lastTile.x + dx;
-    const newY = lastTile.y + dy;
-
-    // Check if the new position is valid
-    const newKey = `${layer},${newX},${newY}`;
-    if (newX < 0 || newY < 0 || newX >= tilesX || newY >= tilesY || placedSprites[newKey]) {
-        return false; // Cannot push if out of bounds or blocked
-    }
-
-    // Move all pushable tiles to their new positions
-    for (let i = pushTiles.length - 1; i >= 0; i--) {
-        const oldX = pushTiles[i].x;
-        const oldY = pushTiles[i].y;
-        const newX = oldX + dx;
-        const newY = oldY + dy;
-
-        const oldKey = `${layer},${oldX},${oldY}`;
-        const newKey = `${layer},${newX},${newY}`;
-
-        // Update placedSprites
-        placedSprites[newKey] = placedSprites[oldKey]; // Move the sprite
-        delete placedSprites[oldKey]; // Remove the old position
-
-        // Update the collision grid
-        updateGrid(currentCollisionGrid, layer - 1, oldX, oldY, 0); // Clear the old position
-        updateGrid(currentCollisionGrid, layer - 1, newX, newY, 2); // Mark the new position
-
-        // Update the visual representation of the tiles
-        updateTile(layer, oldX, oldY); // Clear the old tile visually
-        updateTile(layer, newX, newY); // Draw the new tile visually
-    }
-
-    return true; // Successfully pushed the tiles
-}
-
-function _tryPushTiles(startX, startY, direction, layer) {
     let pushTiles = [];
     let x = startX;
     let y = startY;
@@ -1512,13 +1000,32 @@ function _tryPushTiles(startX, startY, direction, layer) {
         case 'right': newX += 1; break;
     }
 
-    if (isOverlappingTile(player, newX, newY)) return false;
+    // Prevent pushing into the player
+if (isOverlappingTile(player, newX, newY)) return false;
 
-    // Prevent pushing off the board
-    if (newX < 0 || newY < 0 || newX >= tilesX || newY >= tilesY) {
-        return false;
+// Prevent pushing off the board
+if (newX < 0 || newY < 0 || newX >= tilesX || newY >= tilesY) {
+    return false;
+}
+
+// Prevent pushing into any object (moving or not)
+for (const objKey in placedObjects) {
+    const obj = placedObjects[objKey];
+    if (obj.type !== 'object') continue; // Only block for objects
+    // Calculate object's bounding box
+    const objLeft = obj.x * tileSizeX;
+    const objTop = obj.y * tileSizeY;
+    const objWidth = obj.width || tileSizeX;
+    const objHeight = obj.height || tileSizeY;
+    // Calculate push block's destination bounding box
+    const pushLeft = newX * tileSizeX;
+    const pushTop = newY * tileSizeY;
+    const pushWidth = tileSizeX;
+    const pushHeight = tileSizeY;
+    if (isBoundingBoxOverlap(pushLeft, pushTop, pushWidth, pushHeight, objLeft, objTop, objWidth, objHeight)) {
+        return false; // Blocked by object (even if not grid-aligned)
     }
-
+}
     let pushKey = `${layer},${newX},${newY}`;
     if (placedSprites[pushKey]) {
         return false; // If blocked, return false (don't push)
@@ -1594,14 +1101,12 @@ function updatePlayer(deltaTime) {
     if (accumulatedTime < moveSpeed) return; // Wait for the next frame
     accumulatedTime = 0;
 
-    if (loaded === false) return; // Don't move if not loaded
-
     //let oldTiles = getOverlappingTiles(player.x * 32, player.y * 32);
     let newX = player.x;
     let newY = player.y;
     // old x and y?
 
-    if (player.stats.health === 0) youDied();
+    if (player.health === 0) youDied();
 
     switch (true) {
         case keys['ArrowUp'] && canMoveTo(player.x, player.y - stepSize):
@@ -1619,9 +1124,6 @@ function updatePlayer(deltaTime) {
     }
 
     if (newX !== player.x || newY !== player.y) {
-        // Remove the player from the grid at the current position
-        updatePlayerInGrid(currentCollisionGrid, player.layer - 1, player.x, player.y, 0);
-
         if (!player.transported) {
             const oldKey = `${player.layer},${player.x},${player.y}`;
             const newKey = `${player.layer},${newX},${newY}`;
@@ -1633,14 +1135,31 @@ function updatePlayer(deltaTime) {
             delete placedSprites[oldKey];
         }
         player.transported = false;
-
-        // Add the player to the grid at the new position
-        updatePlayerInGrid(currentCollisionGrid, player.layer - 1, player.x, player.y, 9); // Use `9` for player
         renderLayersToMainCanvas();
     }
 }
 
 function movePlayer(newLayer, newX, newY) {
+    // Remove player from old position
+    const oldKey = `${player.layer},${player.x},${player.y}`;
+    if (placedSprites[oldKey]) {
+        delete placedSprites[oldKey];
+    }
+
+    // Update player object
+    player.layer = newLayer;
+    player.x = newX;
+    player.y = newY;
+    player.transported = true;
+
+    // Add player to new position
+    const newKey = `${newLayer},${newX},${newY}`;
+    placedSprites[newKey] = { ...player, type: 'player' };
+
+    renderLayersToMainCanvas();
+}
+
+function _movePlayer(newLayer, newX, newY) {
 
     const oldKey = `${player.layer},${player.x},${player.y}`;
     const newKey = `${newLayer},${newX},${newY}`;
@@ -1664,7 +1183,7 @@ function movePlayer(newLayer, newX, newY) {
     //console.log('Player moved to:', { layer: newLayer, x: newX, y: newY });
 
     // Redraw the board
-    //renderLayersToMainCanvas();
+    renderLayersToMainCanvas();
 }
 
 // #############################################
@@ -1697,70 +1216,37 @@ function handleLoadedBoard(spriteSheetData, boardData) {
 }
 
 function handleLoadedGame(spriteSheetData, boardList, worldData) {
-    deactivateAllBullets(bulletArray); // Deactivate all bullets
+    deactivateAllBullets(bulletArray); // Deactivate all bullets  
     boards = boardList; // Load the board list
     world = worldData; // Load the world data
     replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
 
-    // Reset passages
-    worldPassages = {};
-
-    // Initialize collision grids for all boards
-    collisionGrids = initializeBoardCollisionGrids(world, canvas.width, canvas.height, 3);
-
-    // Extract passages, objects, and populate collision grids for all boards
-    for (const board in world) {
-        const boardData = world[board];
-
-        // Load passages
-        loadPassagesFromGameData(boardData, board);
-
-        // Load objects
-        worldObjects[board] = loadObjectsFromGameData(boardData);
-
-        // Populate the collision grid for this board
-        populateCollisionGrid(collisionGrids[board], boardData);
+    // Helper to get board name from boards array
+    function getBoardName(boardNum) {
+        const entry = boards.find(b => b[0] === Number(boardNum));
+        return entry ? entry[1] : `Board ${boardNum}`;
     }
-
-    console.log('Loaded world data:', worldData);
-    console.log('Loaded world objects:', worldObjects);
-    console.log('Collision grids:', collisionGrids);
-
-    // Set the current board
-    currentBoard = 2;
-    placedSprites = world[currentBoard]; // Get the current board from the world object
-    placedObjects = worldObjects[currentBoard]; // Get objects for the current board
-    placedPassages = worldPassages[currentBoard] || {}; // Load passages for the current board
-
-    // Populate the collision grid for the current board
-    currentCollisionGrid = collisionGrids[currentBoard];
-    populateCollisionGrid(currentCollisionGrid, placedSprites);
-
-    loaded = true;
-    player = findPlayerSprite();
-    playerStats = structuredClone(defaultPlayerStats); // Reset player stats
-    player = { ...playerStats, ...player };
-
-    nightMode = false;
-
-    console.log('Loaded World');
-    drawBoard();
-    renderLayersToMainCanvas(); // Draw them onto the main canvas
-}
-
-function _handleLoadedGame(spriteSheetData, boardList, worldData) {
-    deactivateAllBullets(bulletArray); // Deactivate all bullets
-    boards = boardList; // Load the board list
-    world = worldData; // Load the world data
-    replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
-
-    // Reset passages
-    worldPassages = {};
 
     // Extract passages and objects for all boards
     for (const board in world) {
-        loadPassagesFromGameData(world[board], board); // Load passages
-        worldObjects[board] = loadObjectsFromGameData(world[board]); // Load objects
+        loadPassagesFromGameData(world[board], board);
+        worldObjects[board] = loadObjectsFromGameData(world[board]);
+
+        boardData[board] = {
+            playerStart: (() => {
+                for (const key in world[board]) {
+                    if (world[board][key].type === 'player') {
+                        const [layer, x, y] = key.split(',').map(Number);
+                        return { layer, x, y };
+                    }
+                }
+                return null;
+            })(),
+            name: getBoardName(board), // Use the name from boards array
+            light: world[board].light !== undefined ? world[board].light : true,
+            nightMode: world[board].nightMode !== undefined ? world[board].nightMode : false,
+            // Add more board-specific properties as needed
+        };
     }
 
     console.log('Loaded world data:', worldData);
@@ -1803,25 +1289,11 @@ function loadPassagesFromGameData(gameData, board) {
 function switchBoard(board, colorKey) {
     deactivateAllBullets(bulletArray); // Deactivate all bullets
 
-    placedSprites = {};
     placedSprites = world[board]; // Get the current board from the world object
     placedObjects = worldObjects[board]; // Use preloaded objects
-
-    // Clear and reload passages
-    placedPassages = {};
     placedPassages = worldPassages[board] || {}; // Load passages for the current board
 
-
-    let playerSprite = findPlayerSprite();
-    if (!playerSprite) {
-        console.error('No player sprite found on the new board.');
-        return; // Exit if no player sprite is found
-    }
-
-    player = { ...player, ...playerSprite };
-    console.log('Player:', player.direction);
-
-    console.log(`Switching to board ${board}`);
+    let foundPassage = false;
 
     // Lookup passage color in placedPassages for a match
     for (const key in placedPassages) {
@@ -1831,13 +1303,30 @@ function switchBoard(board, colorKey) {
         if (passageColorKey === colorKey) { // Compare the color keys
             const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
             movePlayer(layer, x, y); // Use movePlayer to update the player's position
+            foundPassage = true;
             break; // Exit loop after finding the first match
         }
     }
+
+    // If no matching passage found, use playerStart from boardData
+    if (!foundPassage) {
+        const start = boardData[board]?.playerStart;
+        if (start) {
+            movePlayer(start.layer, start.x, start.y);
+        } else {
+            // Fallback: try to find the player sprite on the board
+            let playerSprite = findPlayerSprite();
+            if (playerSprite) {
+                movePlayer(playerSprite.layer, playerSprite.x, playerSprite.y);
+            } else {
+                console.warn('No player start position found for board', board);
+            }
+        }
+    }
+
     player.locked = false; // Unlock player movement
 
     currentBoard = board;
-    removeUndefinedSprites(); // Remove undefined sprites from the current board
     drawBoard();
     renderLayersToMainCanvas(); // Draw them onto the main canvas
 }
@@ -1898,17 +1387,7 @@ function findPlayerSprite() {
             return { layer, x, y, ...sprite }; // Return sprite with position data
         }
     }
-    console.warn('No player sprite found on the current board.');
     return null; // Return null if no player is found
-}
-
-function removeUndefinedSprites() {
-    for (const key in placedSprites) {
-        if (placedSprites[key] === undefined) {
-            delete placedSprites[key];
-            console.log('Removed undefined sprite at key:', key);
-        }
-    }
 }
 
 // Key mapping (now using key names instead of key codes)
@@ -1954,10 +1433,7 @@ document.addEventListener("keydown", (event) => {
         if (event.key === 'f') { // show player location
             console.log('Placed sprites:', placedSprites);
             console.log('Player location:', player.layer, player.x, player.y);
-            console.log('Health:', player.stats.health);
             console.log('Player stats:', player.stats);
-            console.log('Grid:', currentCollisionGrid);
-            showPlayer = true;
         }
     }
 

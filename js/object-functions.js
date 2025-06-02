@@ -44,6 +44,8 @@ export function loadObjectsFromGameData(gameData) {
             placedObjects[key].script = parsedScript.script;  // Store only the script array
             placedObjects[key].labels = parsedScript.labels;  // Store the labels separately
 
+            placedSprites[key].id = placedObjects[key].id; // Add ID to the sprite data too
+
             console.log(placedObjects[key].script);
         }
     }
