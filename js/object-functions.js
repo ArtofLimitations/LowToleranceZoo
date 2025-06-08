@@ -22,7 +22,8 @@ export function loadObjectsFromGameData(gameData) {
                 width: 32,
                 height: 32,
                 sprite: tile.sprite,
-                color: tile.color,
+                color: tile.color, // Objects color. This can be changed
+                defaultColor: tile.color, // Store default color. Can't be changed
                 type: 'object',
                 name: tile.data.name || "",
                 direction: 'down', // Default direction
@@ -90,6 +91,103 @@ export function gridLoadObjectsFromGameData(gameData, grid) {
 function parseScript(text) {
     let lines = text.trim().split("\n").map(line => line.trim());
     let script = [];
+    let labels = {};
+    let collectingText = false;
+    let textBlock = "";
+    let index = 0;
+
+    function pushTextBlock() {
+        if (textBlock.trim() !== "") {
+            script.push(`#text ${textBlock.trim()}`);
+            index++;
+            textBlock = "";
+        }
+    }
+
+    for (let line of lines) {
+        if (line === "#text") {
+            pushTextBlock();
+            collectingText = true;
+            continue;
+        }
+
+        // If collecting #text block, stop at next command/label
+        if (collectingText) {
+            if (
+                line.startsWith("#") ||
+                line.startsWith(":") ||
+                line.startsWith("$") ||
+                line.startsWith("!") ||
+                line.startsWith("--") ||
+                //line.startsWith("@") ||
+                line.startsWith("*")
+            ) {
+                pushTextBlock();
+                collectingText = false;
+                // Now process this line as normal below
+            } else {
+                textBlock += line + "\n";
+                continue;
+            }
+        }
+
+        // Handle object name lines
+        if (line.startsWith("@")) {
+            pushTextBlock();
+            script.push(line); // Add @name line to script
+            index++;
+            continue;
+        }
+
+        // Handle labels
+        if (line.startsWith(":")) {
+            pushTextBlock();
+            if (!labels[line]) labels[line] = [];
+            labels[line].push(index);
+            continue;
+        }
+
+        // Handle comments
+        if (
+            line.startsWith("--") ||
+            line.startsWith("$") ||
+            line.startsWith("!")
+        ) {
+            pushTextBlock();
+            continue; // Ignore comments
+        }
+
+        // Handle status message
+        if (line.startsWith("*")) {
+            pushTextBlock();
+            script.push(line); // Store as-is, let executor handle it
+            index++;
+            continue;
+        }
+
+        // Handle commands
+        if (line.startsWith("#")) {
+            pushTextBlock();
+            script.push(line);
+            index++;
+            continue;
+        }
+
+        // Handle dialog lines (not starting with any symbol)
+        if (line !== "") {
+            textBlock += line + "\n";
+        }
+    }
+
+    // Push any remaining text block at the end
+    pushTextBlock();
+
+    return { script, labels };
+}
+
+function _parseScript(text) {
+    let lines = text.trim().split("\n").map(line => line.trim());
+    let script = [];
     let labels = {}; // Store label positions as arrays
     let collectingText = false;
     let textBlock = "";
@@ -139,32 +237,24 @@ export function resolveLabel(obj, label) {
     return locations[zapped];
 }
 
-export function takeStat(player, item, amount) {
-    if (amount <= 0) {
-        console.error("Invalid amount to take.");
+export function adjustStat(player, item, amount) {
+    if (typeof amount !== 'number' || isNaN(amount) || amount === 0) {
+        console.error("Invalid amount to adjust.");
         return;
     }
 
-    if (player.stats.hasOwnProperty(item)) {
-        if (player.stats[item] > 0) player.stats[item] -= amount;
-        if (player.stats[item] < 0) player.stats[item] === 0;
-    } else {
-        console.error("Invalid item type:", item);
-    }
-}
-
-export function giveStat(player, item, amount) {
-    if (amount <= 0) {
-        console.error("Invalid amount to give.");
+    if (!player.stats.hasOwnProperty(item)) {
+        console.error("Invalid stat type:", item);
         return;
     }
 
-    if (player.stats.hasOwnProperty(item)) {
-        player.stats[item] += amount; // Increment the stat
-        console.log(`Updated ${item}: ${player.stats[item]}`);
-    } else {
-        console.error(`Invalid stat type: ${item}`);
-    }
+    player.stats[item] += amount;
+
+    // Prevent stat from going below 0
+    if (player.stats[item] < 0) player.stats[item] = 0;
+
+    // Optionally log the update
+    // console.log(`Adjusted ${item}: ${player.stats[item]}`);
 }
 
 // Helper function to extract RGB values

@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, takeStat, giveStat, calculateSeekDirection, calculateBulletPosition } from './object-functions.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -32,6 +32,9 @@ const layerCanvases = {};            // Stores canvases for layers
 const layerContexts = {};            // Stores 2D contexts for layers
 let placedObjects = {};              // Stores objects on the board
 let placedPassages = {};             // Stores passages on the board
+let gamePaused = false;
+let bulletArray = [];
+let objectInteractionActive = false;
 
 //const namedColors = namedColorList;// Named colors for easy reference
 
@@ -52,8 +55,6 @@ let player = structuredClone(defaultPlayerStats); // Player object
 let playerStats = structuredClone(defaultPlayerStats);
 //let stats = playerStats;
 const stepSize = player.stepSize; // Step size for player movement
-let gamePaused = false;
-let bulletArray = [];
 
 // File info
 export let filename = ''; // ############ File to load ###############
@@ -249,6 +250,7 @@ function updateObjects(deltaTime) {
             // Auto-stop if script ends without `#end`
             if (obj.scriptIndex >= obj.script.length) {
                 obj.resting = true;
+                objectInteractionActive = false; // Defensive: reset flag if script ends
             }
 
             obj.timeSinceLastMove = 0;
@@ -272,6 +274,7 @@ function executeObjectCommand(obj, action, args) {
     switch (action) {
         case '#end':
             obj.resting = true;
+            objectInteractionActive = false; // Reset interaction flag
             break;
         case "#text":
             gamePaused = true; // Pause the game loop
@@ -280,32 +283,29 @@ function executeObjectCommand(obj, action, args) {
         case "#send":
             if (args.length === 1) {
                 // Jump to a label within the same object
-                const label = args[0];
-                const index = resolveLabel(obj, label);
+                let label = args[0];
+                if (!label.startsWith(":")) label = ":" + label;
+                const index = resolveLabel(obj, label); // resolveLabel expects label without colon
                 if (index !== null) {
-                    obj.scriptIndex = index; // Move the script execution to the label
+                    obj.scriptIndex = index - 1;
                 } else {
-                    console.error(`Error: Label :${label} not found in script.`);
+                    console.error(`Error: Label ${label} not found in script.`);
                 }
             } else if (args.length === 2 && args[0].startsWith("@")) {
-                // Call another object's script at a specific label
-                const targetName = args[0].slice(1); // Remove '@' to get the object name
-                const label = args[1];
-
-                // Find the target object by name
+                const targetName = args[0].slice(1);
+                let label = args[1];
+                if (!label.startsWith(":")) label = ":" + label;
                 const targetObject = Object.values(placedObjects).find(o => o.name === targetName);
                 if (!targetObject) {
                     console.error(`Error: Object with name "${targetName}" not found.`);
                     break;
                 }
-
-                // Resolve the label in the target object's script
                 const index = resolveLabel(targetObject, label);
                 if (index !== null) {
-                    targetObject.scriptIndex = index; // Start execution at the label
-                    targetObject.resting = false; // Wake up the target object
+                    targetObject.scriptIndex = index;
+                    targetObject.resting = false;
                 } else {
-                    console.error(`Error: Label :${label} not found in object "${targetName}".`);
+                    console.error(`Error: Label ${label} not found in object "${targetName}".`);
                 }
             } else {
                 console.error(`Error: Invalid #send command arguments: ${args.join(" ")}`);
@@ -336,6 +336,7 @@ function executeObjectCommand(obj, action, args) {
             renderLayersToMainCanvas(); // Ensure visual update
 
             break;
+        case '#color':
         case '#changecolor':
             if (args[0] === "undefined") { console.warn("No color provided"); return; }
             let color = extractRGB(args[0]); // Extract RGB values
@@ -345,6 +346,7 @@ function executeObjectCommand(obj, action, args) {
             updateTile(obj.layer, obj.x, obj.y); // Update tile with new color
             renderLayersToMainCanvas(); // Ensure visual update
             break;
+        case '#sprite':
         case '#changesprite':
             if (args[0] === "undefined" || isNaN(args[0])) { console.warn("No sprite provided or NaN"); return; }
             let spriteKeyChange = `${obj.layer},${obj.x},${obj.y}`;
@@ -356,66 +358,170 @@ function executeObjectCommand(obj, action, args) {
         case "#timer":
             obj.timer = parseInt(args[0], 10); // Set timer
             break;
-        case '#move':
+        case '#move': {
             let direction = args[0];
+            let opp = false;
 
-            if (direction === 'seek') {
-                direction = calculateSeekDirection(obj, player); // Calculate the direction to the player
-            } else {
-                direction = convertDirections(args[0]);
+            // Check for 'opp' modifier
+            if (direction === 'opp') {
+                opp = true;
+                direction = args[1];
             }
+
+            // Handle random direction
+            if (direction === 'rndany' || direction === 'random') {
+                const dirs = ['up', 'down', 'left', 'right'];
+                direction = dirs[Math.floor(Math.random() * dirs.length)];
+            } else if (direction === 'seek') {
+                direction = calculateSeekDirection(obj, player);
+                if (opp) {
+                    // Reverse direction
+                    switch (direction) {
+                        case 'up': direction = 'down'; break;
+                        case 'down': direction = 'up'; break;
+                        case 'left': direction = 'right'; break;
+                        case 'right': direction = 'left'; break;
+                    }
+                }
+            } else {
+                direction = convertDirections(direction);
+                if (opp && direction !== -1) {
+                    // Reverse direction
+                    switch (direction) {
+                        case 'up': direction = 'down'; break;
+                        case 'down': direction = 'up'; break;
+                        case 'left': direction = 'right'; break;
+                        case 'right': direction = 'left'; break;
+                    }
+                }
+            }
+
             if (direction === -1) {
-                console.warn(`Invalid direction "${args[0]}" provided for #move`);
+                console.warn(`Invalid direction "${args.join(' ')}" provided for #move`);
                 return;
             }
 
             moveObject(obj, direction, obj.layer);
             break;
-        case '#shoot':
-            if (args[0] === 'undefined') { console.warn('No direction provided'); return; }
-            if (args[0] === 'seek') {
-                // Implement seeking logic here
-                console.warn('Seeking bullets not implemented yet');
+        }
+        case '#moveto':
+        case '#moveTo': {
+            // Support both "#moveto 5 16", "#moveto 5,16", "#moveto 5, 16", and optional "force"
+            let targetX, targetY;
+            let force = false;
+
+            // Check for 'force' as the last argument
+            if (args[args.length - 1] === 'force') {
+                force = true;
+                args = args.slice(0, -1); // Remove 'force' from args
+            }
+
+            if (args.length === 1 && args[0].includes(',')) {
+                [targetX, targetY] = args[0].split(',').map(s => parseInt(s.trim(), 10));
+            } else if (args.length >= 2) {
+                targetX = parseInt(args[0].replace(',', ''), 10);
+                targetY = parseInt(args[1].replace(',', ''), 10);
+            }
+            if (
+                isNaN(targetX) || isNaN(targetY) ||
+                targetX < 0 || targetY < 0 || targetX >= tilesX || targetY >= tilesY
+            ) {
+                console.warn('Invalid arguments for #moveTo. Expected two numbers.');
                 return;
             }
-            let bulletDirection = convertDirections(args[0]);
-            let x = obj.x;
-            let y = obj.y;
-
-            if (bulletDirection === -1) console.warn(`Invalid direction "${args[0]}" provided for bullet`);
-
-            switch (bulletDirection) {
-                case 'up':
-                    bulletDirection = 'up';
-                    y -= 0.5;
-                    x += 0.5;
-                    break;
-                case 'down':
-                    bulletDirection = 'down';
-                    y += 1;
-                    x += 0.5;
-                    break;
-                case 'right':
-                    bulletDirection = 'right';
-                    x += 1;
-                    y += 0.5;
-                    break;
-                case 'left':
-                    bulletDirection = 'left';
-                    x -= 0.5;
-                    y += 0.5;
-                    break;
+            let targetKey = `${obj.layer},${targetX},${targetY}`;
+            if (!force && placedObjects[targetKey] && placedObjects[targetKey].id !== obj.id || !force && placedSprites[targetKey] || placedSprites[targetKey] && placedSprites[targetKey].type === 'passage' || placedSprites[targetKey] && placedSprites[targetKey].type === 'player') {
+                console.warn(`Target tile (${targetX}, ${targetY}) is occupied by another object.`);
+                return; // Prevent moving to an occupied tile
             }
-            let bullet = createBullet(canvas, x, y, bulletDirection, 16, 'white', obj.name);
-            bulletArray.push(bullet);
+            // If force, destroy whatever is at the target location
+            if (force) {
+                if (placedObjects[targetKey]) delete placedObjects[targetKey];
+                if (placedSprites[targetKey]) delete placedSprites[targetKey];
+            }
+            // Move the object to the specified coordinates
+            let oldKey = `${obj.layer},${obj.x},${obj.y}`;
+            placedSprites[targetKey] = placedSprites[oldKey]; // Move sprite
+            placedObjects[targetKey] = obj;
+            delete placedObjects[oldKey];
+            delete placedSprites[oldKey];
+            updateTile(obj.layer, obj.x, obj.y); // Clear old tile
+            obj.x = targetX;
+            obj.y = targetY;
+            updateTile(obj.layer, obj.x, obj.y); // Update new tile
+            console.log(`Moved object to (${targetX}, ${targetY})${force ? ' with force' : ''}`);
             break;
+        }
+        case '#shoot': {
+            if (!args[0]) { console.warn('No direction provided'); return; }
+
+            let direction = args[0];
+            let opp = false;
+
+            // Handle 'opp' modifier
+            if (direction === 'opp') {
+                opp = true;
+                direction = args[1];
+            }
+
+            // Handle 'flow'
+            if (direction === 'flow') {
+                direction = obj.direction || 'right'; // Default to right if undefined
+                if (opp) {
+                    // Reverse direction
+                    switch (direction) {
+                        case 'up': direction = 'down'; break;
+                        case 'down': direction = 'up'; break;
+                        case 'left': direction = 'right'; break;
+                        case 'right': direction = 'left'; break;
+                    }
+                }
+            } else if (direction === 'seek') {
+                direction = calculateSeekDirection(obj, player);
+                if (opp) {
+                    switch (direction) {
+                        case 'up': direction = 'down'; break;
+                        case 'down': direction = 'up'; break;
+                        case 'left': direction = 'right'; break;
+                        case 'right': direction = 'left'; break;
+                    }
+                }
+            } else {
+                direction = convertDirections(direction);
+                if (opp && direction !== -1) {
+                    switch (direction) {
+                        case 'up': direction = 'down'; break;
+                        case 'down': direction = 'up'; break;
+                        case 'left': direction = 'right'; break;
+                        case 'right': direction = 'left'; break;
+                    }
+                }
+            }
+
+            if (direction === -1) {
+                console.warn(`Invalid direction "${args.join(' ')}" provided for #shoot`);
+                return;
+            }
+
+            let { x, y } = calculateBulletPosition(obj.x, obj.y, direction);
+            let bullet = createBullet(canvas, x, y, direction, 16, 'white', obj.name);
+            bullet.origin = `${obj.layer},${obj.x},${obj.y}`;
+            bulletArray.push(bullet);
+            console.log(`Creating bullet at (${x}, ${y}) with direction ${direction}`);
+            break;
+        }
         case '#wait':
             obj.waiting = true; // Set waiting state
             //obj.waitTime = parseInt(args[0], 10) * 10; // Store remaining time in milliseconds
             obj.waitTime = (parseInt(args[0], 10) || 1) * 50; // Default to 50ms if no valid argument is provided
             break;
+        case '#sleep':
+            obj.waiting = true;
+            obj.waitTime = (parseInt(args[0], 10) || 1) * 1000; // 1 = 1000ms
+            break;
         case '#loop':
             obj.scriptIndex = obj.labels[':loop'] || 0;
+            objectInteractionActive = false; // Reset interaction flag on loop
             break;
         case '#zap':
             const zapLabel = `:${args[0]}`;
@@ -438,20 +544,49 @@ function executeObjectCommand(obj, action, args) {
                 console.warn(`No active labels found for :${triggerLabel}`);
             }
             break;
-        case '#take':
+        case '#take': {
             let item = args[0];
             let amount = parseInt(args[1], 10);
             if (isNaN(amount)) amount = 1; // Default to 1 if not specified
-            takeStat(player, item, amount);
+
+            // Check for optional label as last argument
+            let label = null;
+            if (args.length > 2) {
+                label = args[args.length - 1];
+                // Only treat as label if it's not a number (to avoid confusion with multi-digit amounts)
+                if (!isNaN(label)) label = null;
+            }
+
+            // Check if player has enough of the stat
+            if (player.stats[item] === undefined || player.stats[item] < amount) {
+                if (label && obj.labels && obj.labels[`:${label}`] !== undefined) {
+                    obj.scriptIndex = obj.labels[`:${label}`] - 1;
+                    return;
+                }
+                // If no label, warn and return
+                console.warn(`Not enough ${item} to take. No label provided.`);
+                return;
+            }
+
+            adjustStat(player, item, -amount);
             if (player.stats.health <= 0) youDied(); // Check if player died after taking an item
             console.log(`Took ${amount} ${item}(s)`);
             break;
+        }
         case '#give':
             let itemGive = args[0];
             let amountGive = parseInt(args[1], 10);
             if (isNaN(amountGive)) amountGive = 1; // Default to 1 if not specified
-            giveStat(player, itemGive, amountGive);
+            adjustStat(player, itemGive, amountGive);
             console.log(`Gave ${amountGive} ${itemGive}(s)`);
+            break;
+        case "#cycle":
+            let cycleNum = parseInt(args[0], 10);
+            if (!isNaN(cycleNum) && cycleNum > 0) {
+                obj.moveInterval = cycleNum * 10;
+            } else {
+                console.warn("Invalid #cycle value:", args[0]);
+            }
             break;
         case '#nightmode':
             nightMode = !nightMode;
@@ -462,7 +597,16 @@ function executeObjectCommand(obj, action, args) {
             updateTile(obj.layer, obj.x, obj.y);
             break;
         default:
-            console.warn(`Unknown command: ${action}`);
+            // If not a command, check if it's a label in the script (with or without # or :)
+            let labelKey = action;
+            if (labelKey.startsWith("#")) labelKey = labelKey.slice(1);
+            if (!labelKey.startsWith(":")) labelKey = ":" + labelKey;
+            if (obj.labels && obj.labels[labelKey]) {
+                obj.scriptIndex = obj.labels[labelKey] - 1;
+                return;
+            }
+            objectInteractionActive = false; // Reset if nothing handled
+            console.warn(`Unknown command or label: ${action}`);
     }
 }
 
@@ -482,8 +626,7 @@ function moveObject(obj, direction, layer) {
     const newKey = `${layer},${newX},${newY}`;
     obj.direction = dir; // change the object's direction
 
-    if (placedObjects[newKey] && placedObjects[newKey].id !== obj.id) return; // Prevent movement if occupied by another object
-    //if (placedSprites[newKey]) {
+    //if (placedObjects[newKey] && placedObjects[newKey].id !== obj.id) return; // Prevent movement if occupied by another object
     if (canMoveTo(newX, newY, obj)) { // can the object move?
 
         placedSprites[newKey] = placedSprites[oldKey]; // Move sprite
@@ -500,41 +643,29 @@ function moveObject(obj, direction, layer) {
         updateTile(layer, obj.x, obj.y); // Update new tile
     }
     else {
+        // Trigger :thud label if present
+        //console.log('Trying :thud for', oldKey, placedObjects[oldKey]);
+        handleObjectInteraction(oldKey, ":thud");
         return; // no
     }
-    //}
 }
 
-function handleObjectTouch(tileKey) {
+function handleObjectInteraction(tileKey, labelType) {
+    if (objectInteractionActive) return; // Prevent re-entry
     let obj = placedObjects[tileKey];
-    if (obj && obj.labels[":touch"]) {
-        //obj.scriptIndex = obj.labels[":touch"];
-        let index = resolveLabel(obj, ":touch");
+    if (obj && obj.labels[labelType]) {
+        let index = resolveLabel(obj, labelType);
         if (index !== null) {
-            obj.scriptIndex = index;
+            objectInteractionActive = true; // Set flag
+            obj.scriptIndex = index; // Set the script index to the label
+            obj.waitTime = 0; // Reset wait time
+            obj.waiting = false; // Reset waiting state
         } else {
-            // Optionally skip or log that all labels were zapped
-            console.warn("No active :touch labels found.");
+            console.warn(`No active ${labelType} labels found.`);
         }
         obj.resting = false; // Wake up the object
     }
 }
-
-function handleObjectShot(tileKey) {
-    let obj = placedObjects[tileKey];
-    if (obj && obj.labels[":shot"]) {
-        //obj.scriptIndex = obj.labels[":shot"];
-        let index = resolveLabel(obj, ":shot");
-        if (index !== null) {
-            obj.scriptIndex = index;
-        } else {
-            // Optionally skip or log that all labels were zapped
-            console.warn("No active :shot labels found.");
-        }
-        obj.resting = false; // Wake up the object
-    }
-}
-
 // ##############################################
 // ############ Dialog box functions ############
 // ##############################################
@@ -605,6 +736,7 @@ function showDialog(text, object = null) {
             } else {
                 dialog.style.display = 'none';
                 gamePaused = false;
+                objectInteractionActive = false; // Allow next interaction
                 document.removeEventListener('keydown', nextPage);
                 requestAnimationFrame(animateGame);
             }
@@ -698,30 +830,30 @@ function canMoveTo(x, y, object = player) {
 
     // --- Passage check: only for player, only at intended tile ---
     if (object.type === 'player') {
-    const passageKey = `${object.layer},${Math.round(x)},${Math.round(y)}`;
-    const isOnPassage = placedPassages[passageKey] && placedPassages[passageKey].type === 'passage';
+        const passageKey = `${object.layer},${Math.round(x)},${Math.round(y)}`;
+        const isOnPassage = placedPassages[passageKey] && placedPassages[passageKey].type === 'passage';
 
-    // Only trigger passage if:
-    // 1. Player is aligned with the tile (centered)
-    // 2. Player is NOT already fully overlapping the passage tile (prevents re-trigger)
-    // 3. Player is moving ONTO the passage tile (not off)
-    if (isOnPassage && isAlignedWithTile({ x, y })) {
-        console.log('Player is on a passage tile:', passageKey);
-        // Check if player was NOT already fully on this passage tile
-        // (i.e., player.x/y before move is not the same as x/y after move)
-        if (isOverlappingTile(object, Math.round(x), Math.round(y))) {
-            object.locked = true; // Lock player movement
-            let targetBoard = placedPassages[passageKey].data.board;
-            let passageColor = placedPassages[passageKey].color;
-            let colorKey = passageColor.join(',');
-            console.log('Switching to board:', targetBoard, 'with colorKey:', colorKey);
-            switchBoard(targetBoard, colorKey);
-            return true; // Prevent movement (board switch will move player)
+        // Only trigger passage if:
+        // 1. Player is aligned with the tile (centered)
+        // 2. Player is NOT already fully overlapping the passage tile (prevents re-trigger)
+        // 3. Player is moving ONTO the passage tile (not off)
+        if (isOnPassage && isAlignedWithTile({ x, y })) {
+            console.log('Player is on a passage tile:', passageKey);
+            // Check if player was NOT already fully on this passage tile
+            // (i.e., player.x/y before move is not the same as x/y after move)
+            if (isOverlappingTile(object, Math.round(x), Math.round(y))) {
+                object.locked = true; // Lock player movement
+                let targetBoard = placedPassages[passageKey].data.board;
+                let passageColor = placedPassages[passageKey].color;
+                let colorKey = passageColor.join(',');
+                console.log('Switching to board:', targetBoard, 'with colorKey:', colorKey);
+                switchBoard(targetBoard, colorKey);
+                return true; // Prevent movement (board switch will move player)
+            }
+            // If player is already fully on the passage tile, allow stepping off
+            // (do NOT return false here, just continue to collision checks)
         }
-        // If player is already fully on the passage tile, allow stepping off
-        // (do NOT return false here, just continue to collision checks)
     }
-}
 
     // Check for collision with all placedSprites (except the player itself)
     for (const key in placedSprites) {
@@ -745,11 +877,11 @@ function canMoveTo(x, y, object = player) {
             objLeft, objTop, objWidth, objHeight
         )) {
             if (sprite.type === 'object' && object.type === 'bullet') {
-                handleObjectShot(key); // Call your :shot handler
+                handleObjectInteraction(key, ":shot");
                 return false; // Bullet stops here
             }
             // --- Handle bullet hitting player ---
-            if(sprite.type === 'player' && object.type === 'bullet' && object.origin !== 'player') {
+            if (sprite.type === 'player' && object.type === 'bullet' && object.origin !== 'player') {
                 console.log('Bullet hit player!');
                 player.stats.health -= object.damage || 1; // Reduce player health
                 console.log(`Player health: ${player.stats.health}`);
@@ -758,7 +890,8 @@ function canMoveTo(x, y, object = player) {
             }
             // --- Handle player touching objects ---
             if (sprite.type === 'object' && object.type === 'player') {
-                handleObjectTouch(key); // Call your :touch handler
+                //gamePaused = true; // Pause the game loop
+                handleObjectInteraction(key, ":touch");
                 // Optionally block or allow movement depending on your game logic
                 return false; // Block movement if you want the player to stop
             }
@@ -771,7 +904,13 @@ function canMoveTo(x, y, object = player) {
             if (sprite.type === 'player' && object.type === 'object') {
                 // Block object from moving into the player
                 console.log('Object cannot move into player!');
+                const objectKey = `${object.layer},${object.x},${object.y}`;
+                handleObjectInteraction(objectKey, ":bump"); // Trigger bump interaction for the object bumping into player
                 return false;
+            }
+            if ((sprite.type === 'coin' || sprite.type === 'ammo' || sprite.type === 'key') && object.type === 'object') {
+                // Do Not allow object to collect or destroy coins, ammo, or keys
+                return false; // Block object from collecting
             }
             if (sprite.type === 'break' && object.type === 'bullet') {
                 // Destroy the break tile
@@ -814,13 +953,13 @@ function canMoveTo(x, y, object = player) {
                     console.log('Skipping self-collision for object id:', object.id);
                     continue;
                 } else {
-                    console.log('Blocking due to object collision:', { spriteId: sprite.id, objectId: object.id });
+                    //console.log('Blocking due to object collision:', { spriteId: sprite.id, objectId: object.id });
                     return false;
                 }
                 return false; // Block movement
             }
             // ...other logic...
-            
+
         }
     }
 
@@ -834,136 +973,6 @@ function canMoveTo(x, y, object = player) {
     }
 
     return true; // No collision, movement allowed
-}
-
-function _canMoveTo(x, y, object = player) {
-
-    //console.log('Checking collision for:', object.name, object.direction, 'at', x, y);
-    //console.log('tiles:', checkTiles(x * tileSizeX, y * tileSizeY, object.direction));
-
-    let tiles = [];
-    if (object.type === 'bullet') tiles = checkBulletTiles(x * tileSizeX, y * tileSizeY, object.oldX, object.oldY);
-    else tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction);
-    //tiles = checkTiles(x * tileSizeX, y * tileSizeY, object.direction)
-
-    for (let tile of tiles) {
-
-        let tileKey = `${object.layer},${tile.x},${tile.y}`;
-
-        if (tile.x < 0 || tile.y < 0 || tile.y >= tilesY || tile.x >= tilesX) {
-            return false; // Out of bounds = collision
-        }
-
-        if (isOverlappingTile(player, tile.x, tile.y) && object.type === 'object') {
-            console.log('player detected!');
-            return tryPushPlayer(player.x, player.y, object.direction, object.layer);
-        }
-
-        if (placedSprites[tileKey]) {
-            let tileType = placedSprites[tileKey].type;
-
-            if (object.type === 'bullet' && object.origin === 'player' && tileType === 'player') {
-                return true;    // Bullet hit something (not itself or its owner)
-            }
-
-            //if (object === 'bullet' && tileType === 'object' && object.origin === 'object') return true; 
-            if (tileType === 'player' && object.type === 'object') {
-                console.log('object push. player: ', x, y);
-                return tryPushTiles(player.x, player.y, object.direction, object.layer);
-            }
-
-            // Collision with walls or breakable objects
-            if (tileType === 'wall' || tileType === 'break' || tileType === 'sign' || tileType === 'object' || tileType === 'invisible') {
-                // If it's a bullet hitting a breakable tile
-                if (object.type === 'bullet' && tileType === 'break') {
-                    delete placedSprites[tileKey];
-                    updateTile(object.layer, tile.x, tile.y);
-                }
-                // if it's a sign, show script
-                if (tileType === 'sign' && object.type === 'player') {
-                    gamePaused = true; // Pause the game loop
-                    //dialogBox(placedSprites[tileKey].data.script
-                    //.replace(/(?:\r\n|\r|\n)/g, '<br>'));
-                    showDialog(placedSprites[tileKey].data.script
-                        .replace(/(?:\r\n|\r|\n)/g, '<br>'));
-                }
-
-                if (object.type === 'bullet' && tileType === 'invisible') {
-                    return true;
-                }
-
-                if (tileType === 'object' && object.type === 'player') {
-                    handleObjectTouch(tileKey);
-                }
-
-                if (tileType === 'object' && object.type === 'bullet') {
-                    handleObjectShot(tileKey);
-                }
-
-
-                return false;
-            }
-
-
-            // Picking up an item or destroying tile
-            if (tileType === 'item' && object.type === 'player' || tileType === 'step' && object.type === 'player') {
-                //player.stats.coins++;
-                //console.log('Coins:', player.stats.coins);
-                delete placedSprites[tileKey];
-                updateTile(player.layer, tile.x, tile.y);
-                return true;
-            }
-
-            if (tileType === 'coin' && object.type === 'player' || tileType === 'ammo' && object.type === 'player') {
-                if (tileType === 'coin') player.stats.coins += placedSprites[tileKey].data.value;
-                if (tileType === 'ammo') player.stats.ammo += placedSprites[tileKey].data.value;
-                console.log('Player stats:', player.stats);
-                delete placedSprites[tileKey];
-                updateTile(player.layer, tile.x, tile.y);
-                return true;
-            }
-
-            if (object.type === 'bullet' && tileType === 'player') {
-                // Handle bullet hitting player
-                console.log('Hit player!');
-                return false; // Prevent movement
-            }
-
-            // If it's a pushable block
-            if (tileType === 'push') {
-                return tryPushTiles(tile.x, tile.y, object.direction, object.layer);
-            }
-        }
-
-        if (placedPassages[tileKey]) {
-            let tileType = placedPassages[tileKey].type;
-
-            if (tileType === 'passage' && object.type === 'player') {
-                // Ensure the player is perfectly aligned with the tile
-                if (!isAlignedWithTile(player)) {
-                    return false; // Prevent activation if not aligned
-                }
-
-                // Check to see if the player is fully on the tile before moving
-                if (!isOverlappingTile(player, tile.x, tile.y)) {
-                    // Handle passage logic here
-                    player.locked = true; // Lock player movement
-                    let targetBoard = placedPassages[tileKey].data.board;
-                    let passageColor = placedPassages[tileKey].color;
-                    let colorKey = passageColor.join(','); // Create a unique key for the color
-                    console.log('Switching to board:', targetBoard, 'with colorKey:', colorKey); // Debug log
-                    switchBoard(targetBoard, colorKey); // Pass the color key to switchBoard
-                    return true; // Prevent movement
-                }
-                return false; // Prevent movement if not fully on the tile
-            }
-        }
-
-        //ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Debugging color
-        //ctx.fillRect(tile.x * tileSizeX, tile.y * tileSizeY, tileSizeX, tileSizeY); // Debugging
-    }
-
-    return true;
 }
 
 function tryPushTiles(startX, startY, direction, layer) {
@@ -1001,31 +1010,31 @@ function tryPushTiles(startX, startY, direction, layer) {
     }
 
     // Prevent pushing into the player
-if (isOverlappingTile(player, newX, newY)) return false;
+    if (isOverlappingTile(player, newX, newY)) return false;
 
-// Prevent pushing off the board
-if (newX < 0 || newY < 0 || newX >= tilesX || newY >= tilesY) {
-    return false;
-}
-
-// Prevent pushing into any object (moving or not)
-for (const objKey in placedObjects) {
-    const obj = placedObjects[objKey];
-    if (obj.type !== 'object') continue; // Only block for objects
-    // Calculate object's bounding box
-    const objLeft = obj.x * tileSizeX;
-    const objTop = obj.y * tileSizeY;
-    const objWidth = obj.width || tileSizeX;
-    const objHeight = obj.height || tileSizeY;
-    // Calculate push block's destination bounding box
-    const pushLeft = newX * tileSizeX;
-    const pushTop = newY * tileSizeY;
-    const pushWidth = tileSizeX;
-    const pushHeight = tileSizeY;
-    if (isBoundingBoxOverlap(pushLeft, pushTop, pushWidth, pushHeight, objLeft, objTop, objWidth, objHeight)) {
-        return false; // Blocked by object (even if not grid-aligned)
+    // Prevent pushing off the board
+    if (newX < 0 || newY < 0 || newX >= tilesX || newY >= tilesY) {
+        return false;
     }
-}
+
+    // Prevent pushing into any object (moving or not)
+    for (const objKey in placedObjects) {
+        const obj = placedObjects[objKey];
+        if (obj.type !== 'object') continue; // Only block for objects
+        // Calculate object's bounding box
+        const objLeft = obj.x * tileSizeX;
+        const objTop = obj.y * tileSizeY;
+        const objWidth = obj.width || tileSizeX;
+        const objHeight = obj.height || tileSizeY;
+        // Calculate push block's destination bounding box
+        const pushLeft = newX * tileSizeX;
+        const pushTop = newY * tileSizeY;
+        const pushWidth = tileSizeX;
+        const pushHeight = tileSizeY;
+        if (isBoundingBoxOverlap(pushLeft, pushTop, pushWidth, pushHeight, objLeft, objTop, objWidth, objHeight)) {
+            return false; // Blocked by object (even if not grid-aligned)
+        }
+    }
     let pushKey = `${layer},${newX},${newY}`;
     if (placedSprites[pushKey]) {
         return false; // If blocked, return false (don't push)
@@ -1429,12 +1438,12 @@ document.addEventListener("keydown", (event) => {
             nightMode = !nightMode;
             renderLayersToMainCanvas(); // Redraw layers to apply night mode
         }
+    }
 
-        if (event.key === 'f') { // show player location
-            console.log('Placed sprites:', placedSprites);
-            console.log('Player location:', player.layer, player.x, player.y);
-            console.log('Player stats:', player.stats);
-        }
+    if (event.key === 'f') { // show player location
+        console.log('Placed sprites:', placedSprites);
+        console.log('Player location:', player.layer, player.x, player.y);
+        console.log('Player stats:', player.stats);
     }
 
     updateDirection(); // Update direction based on keys held

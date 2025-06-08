@@ -1,0 +1,43 @@
+Date : 2025-06-04 14:19:38
+Directory : c:\Users\Dustin\Documents\DevProjects\Z+\js
+Total : 16 files,  4168 codes, 424 comments, 743 blanks, all 5335 lines
+
+Languages
++------------+------------+------------+------------+------------+------------+
+| language   | files      | code       | comment    | blank      | total      |
++------------+------------+------------+------------+------------+------------+
+| JavaScript |         15 |      4,167 |        424 |        743 |      5,334 |
+| PostCSS    |          1 |          1 |          0 |          0 |          1 |
++------------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                       | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                          |         16 |      4,168 |        424 |        743 |      5,335 |
+| . (Files)                                                                  |         14 |      3,326 |        417 |        579 |      4,322 |
+| modules                                                                    |          2 |        842 |          7 |        164 |      1,013 |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| filename                                                                   | language   | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\animations.js                  | JavaScript |         30 |          2 |          6 |         38 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\file.js                        | JavaScript |        118 |         49 |         44 |        211 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\main.js                        | JavaScript |        919 |         90 |        128 |      1,137 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\modules\vanilla-picker.csp.css | PostCSS    |          1 |          0 |          0 |          1 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\modules\vanilla-picker.js      | JavaScript |        841 |          7 |        164 |      1,012 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\object-editor.js               | JavaScript |         70 |          3 |         12 |         85 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\object-functions.js            | JavaScript |        267 |         20 |         42 |        329 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\palette.js                     | JavaScript |        101 |         10 |         20 |        131 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\player-stats.js                | JavaScript |         33 |          0 |          0 |         33 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\player.js                      | JavaScript |      1,035 |        142 |        211 |      1,388 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\sprite-editor.js               | JavaScript |        318 |         30 |         32 |        380 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\sprite-sheet.js                | JavaScript |         45 |         11 |         11 |         67 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\sprite.js                      | JavaScript |        102 |         16 |         20 |        138 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\toolbar.js                     | JavaScript |        115 |         17 |         22 |        154 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\weapons.js                     | JavaScript |         47 |         12 |          8 |         67 |
+| c:\Users\Dustin\Documents\DevProjects\Z+\js\webgl.js                       | JavaScript |        126 |         15 |         23 |        164 |
+| Total                                                                      |            |      4,168 |        424 |        743 |      5,335 |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
