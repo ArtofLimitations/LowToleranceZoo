@@ -707,6 +707,46 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function selectPushType(current = 'ANY', tileKey) {
+        popup.active = true;
+        popup.type = 'selectPushType';
+
+        overlay.style.display = 'block';
+
+        const selectContainer = document.getElementById('selectAmount');
+        selectContainer.style.display = 'flex';
+        selectContainer.innerHTML = `<strong>Select Push Tile Type:</strong>`;
+
+        const options = ['EW', 'NS', 'ANY'];
+        options.forEach(option => {
+            const btn = document.createElement('button');
+            btn.textContent = option;
+            btn.className = 'inputField';
+            if (option === current) btn.style.fontWeight = 'bold';
+            btn.onclick = () => {
+                placedSprites[tileKey].data.pushType = option;
+                popup.active = false;
+                overlay.style.display = 'none';
+                selectContainer.style.display = 'none';
+                canvas.focus();
+            };
+            selectContainer.appendChild(btn);
+        });
+
+        // Allow Escape to close
+        selectContainer.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                popup.active = false;
+                overlay.style.display = 'none';
+                selectContainer.style.display = 'none';
+                canvas.focus();
+            }
+        });
+
+        selectContainer.tabIndex = 0;
+        selectContainer.focus();
+    }
+
     const popupHandlers = {
         extraItems: {
             p: (tileKey) => {
@@ -846,6 +886,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             selectAmount('Enter quantity:', placedSprites[tileKey].data.value, tileKey); // open item selector for selecting amount of items
                             console.log('item amount: ', placedSprites[tileKey].data.value);
+                        }
+                        if (placedSprites[tileKey].type === 'push') {
+                            selectPushType(placedSprites[tileKey].data.pushType || 'ANY', tileKey); // open push type selector for selecting push type
+                            console.log('push type: ', placedSprites[tileKey].data.pushType);
                         }
                         console.log('grabbed:, ', placedSprites[tileKey]);
                         enterPressed = true; // Lock it

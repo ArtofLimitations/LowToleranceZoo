@@ -26,16 +26,16 @@ const tilesX = 36;                   // Board width and height
 const tilesY = 25;
 const hiddenLayers = new Set();      // Set to hold hidden layers
 const keys = {};                     // Hold key states
-const tilesCanvas = new OffscreenCanvas(4 * tileSizeX, 4 * tileSizeY);
-const tilesCtx = tilesCanvas.getContext('2d');
+//const tilesCanvas = new OffscreenCanvas(4 * tileSizeX, 4 * tileSizeY);
+//const tilesCtx = tilesCanvas.getContext('2d');
+const offscreenTile = new OffscreenCanvas(tileSizeX, tileSizeY);
+const offscreenCtx = offscreenTile.getContext('2d');
 const layerCanvases = {};            // Stores canvases for layers
 const layerContexts = {};            // Stores 2D contexts for layers
 let placedObjects = {};              // Stores objects on the board
 let placedPassages = {};             // Stores passages on the board
 let gamePaused = false;
 let bulletArray = [];
-let objectInteractionActive = false;
-
 //const namedColors = namedColorList;// Named colors for easy reference
 
 // board variables
@@ -84,6 +84,15 @@ export function animateGame(currentTime) {
         updatePlayer(deltaTime);
 
         if (loaded) renderLayersToMainCanvas();
+        else drawDefaultTitleScreen();
+
+        if (player.flashRed) {
+            player.flashTimer -= deltaTime;
+            if (player.flashTimer <= 0) {
+                player.flashRed = false;
+                player.flashTimer = 0;
+            }
+        }
     }
 
     // Loop the animation
@@ -143,7 +152,6 @@ function drawBoard() {
                     drawSpriteToCanvas(ctx, sprite.x, sprite.y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
                 }
             });
-
         //console.log(`Layer ${layer} generated`);
     }
 }
@@ -181,9 +189,26 @@ function renderLayersToMainCanvas() {
         if (layer === player.layer) {
             //console.log(player);
             ctx.save();
-            ctx.shadowColor = "white";
-            ctx.shadowBlur = 10;
+            //ctx.shadowColor = "white";
+            //ctx.shadowBlur = 10;
             ctx.drawImage(getSprite(player.sprite, player.color), player.x * tileSizeX, player.y * tileSizeY);
+
+            // Draw red tint if flashing
+            if (player.flashRed) {
+                offscreenCtx.clearRect(0, 0, tileSizeX, tileSizeY);
+                offscreenCtx.drawImage(getSprite(player.sprite, player.color), 0, 0);
+
+                offscreenCtx.globalCompositeOperation = "source-in";
+                // Fade out: alpha is proportional to remaining time
+                let alpha = Math.max(0, player.flashTimer / 200); // 1 at start, 0 at end
+                offscreenCtx.globalAlpha = 0.6 * alpha; // 0.6 is max tint strength
+                offscreenCtx.fillStyle = "red";
+                offscreenCtx.fillRect(0, 0, tileSizeX, tileSizeY);
+                offscreenCtx.globalAlpha = 1.0;
+                offscreenCtx.globalCompositeOperation = "source-over";
+
+                ctx.drawImage(offscreenTile, player.x * tileSizeX, player.y * tileSizeY);
+            }
 
             bulletArray.forEach(bullet => {
                 bullet.draw();
@@ -192,11 +217,29 @@ function renderLayersToMainCanvas() {
         }
     }
     if (nightMode) {
+
+        // 1. Draw the dark overlay
         ctx.save();
         ctx.globalCompositeOperation = "overlay";
-        ctx.fillStyle = 'rgba(0, 0, 0, .7)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // "Cut out" light circles
+        ctx.globalCompositeOperation = "divide"; // Use 'divide' to cut out light areas
+        let cx = (player.x + 0.5) * tileSizeX;
+        let cy = (player.y + 0.5) * tileSizeY;
+        let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 96);
+        grad.addColorStop(0, "rgba(255,255,220,0.5)");   // Bright center
+        grad.addColorStop(1, "rgba(255,255,220,0)");     // Fully transparent at edge
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, 96, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // You can add more lights for torches, objects, etc. here
         ctx.restore();
+
     }
 }
 
@@ -206,6 +249,24 @@ function drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite, color) {
 
 function clearTile(x, y) {
     ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
+}
+
+function drawDefaultTitleScreen() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.font = "bold 32px Arial";
+    ctx.fillStyle = "#fff";
+    ctx.textBaseline = "top";
+    ctx.fillText("Low Tolerance Zoo", 16, 16);
+
+    ctx.font = "bold 20px Arial";
+    ctx.fillStyle = "#ff0";
+    ctx.fillText("Press F3 to load a world", 16, 64);
+
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#ccc";
+    ctx.fillText("ARROW keys to move | SPACE to shoot | P to pause | F for console stats | R force redraw", 16, 100);
+    ctx.restore();
 }
 
 // ##########################################
@@ -250,7 +311,6 @@ function updateObjects(deltaTime) {
             // Auto-stop if script ends without `#end`
             if (obj.scriptIndex >= obj.script.length) {
                 obj.resting = true;
-                objectInteractionActive = false; // Defensive: reset flag if script ends
             }
 
             obj.timeSinceLastMove = 0;
@@ -274,7 +334,6 @@ function executeObjectCommand(obj, action, args) {
     switch (action) {
         case '#end':
             obj.resting = true;
-            objectInteractionActive = false; // Reset interaction flag
             break;
         case "#text":
             gamePaused = true; // Pause the game loop
@@ -521,7 +580,11 @@ function executeObjectCommand(obj, action, args) {
             break;
         case '#loop':
             obj.scriptIndex = obj.labels[':loop'] || 0;
-            objectInteractionActive = false; // Reset interaction flag on loop
+            break;
+        case '#die':
+            delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
+            delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
+            updateTile(obj.layer, obj.x, obj.y);
             break;
         case '#zap':
             const zapLabel = `:${args[0]}`;
@@ -588,13 +651,29 @@ function executeObjectCommand(obj, action, args) {
                 console.warn("Invalid #cycle value:", args[0]);
             }
             break;
+        case '#hurt':
+            player.flashRed = true;
+            player.flashTimer = 200; // flash for 200ms
+            break;
+        case '#hidelayer':
+            let layerToHide = parseInt(args[0], 10);
+            if (isNaN(layerToHide) || layerToHide < 1 || layerToHide > 3) {
+                console.warn(`Invalid layer number: ${args[0]}`);
+                return;
+            }
+            if (hiddenLayers.has(layerToHide)) {
+                console.warn(`Layer ${layerToHide} is already hidden.`);
+                return; // Prevent hiding an already hidden layer
+            }
+            hiddenLayers.add(layerToHide);
+            console.log(`Hiding layer ${layerToHide}`);
+            // Clear the layer canvas
+            const ctx = getLayerCanvas(layerToHide);
+            ctx.clearRect(0, 0, layerCanvases[layerToHide].width, layerCanvases[layerToHide].height);
+            // Remove all sprites from the hidden layer
+
         case '#nightmode':
             nightMode = !nightMode;
-            break;
-        case '#die':
-            delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
-            delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
-            updateTile(obj.layer, obj.x, obj.y);
             break;
         default:
             // If not a command, check if it's a label in the script (with or without # or :)
@@ -605,7 +684,6 @@ function executeObjectCommand(obj, action, args) {
                 obj.scriptIndex = obj.labels[labelKey] - 1;
                 return;
             }
-            objectInteractionActive = false; // Reset if nothing handled
             console.warn(`Unknown command or label: ${action}`);
     }
 }
@@ -651,19 +729,36 @@ function moveObject(obj, direction, layer) {
 }
 
 function handleObjectInteraction(tileKey, labelType) {
-    if (objectInteractionActive) return; // Prevent re-entry
     let obj = placedObjects[tileKey];
     if (obj && obj.labels[labelType]) {
         let index = resolveLabel(obj, labelType);
         if (index !== null) {
-            objectInteractionActive = true; // Set flag
-            obj.scriptIndex = index; // Set the script index to the label
+            obj.scriptIndex = index - 1; // For player or other types, use index directly
             obj.waitTime = 0; // Reset wait time
             obj.waiting = false; // Reset waiting state
         } else {
             console.warn(`No active ${labelType} labels found.`);
         }
         obj.resting = false; // Wake up the object
+    }
+}
+
+function handlePlayerInteraction(tileKey, labelType) {
+    let obj = placedObjects[tileKey];
+    if (obj && obj.labels[labelType]) {
+        let index = resolveLabel(obj, labelType);
+        if (index !== null) {
+            if (obj.type === 'object') {
+                obj.scriptIndex = index; // For objects, so next tick runs the label's first command
+                obj.waitTime = 0;
+                obj.waiting = false;
+                obj.resting = false;
+            }
+            // Set the flag to prevent repeated triggers
+            player.justInteracted = true;
+        } else {
+            console.warn(`No active ${labelType} labels found.`);
+        }
     }
 }
 // ##############################################
@@ -736,7 +831,6 @@ function showDialog(text, object = null) {
             } else {
                 dialog.style.display = 'none';
                 gamePaused = false;
-                objectInteractionActive = false; // Allow next interaction
                 document.removeEventListener('keydown', nextPage);
                 requestAnimationFrame(animateGame);
             }
@@ -877,21 +971,23 @@ function canMoveTo(x, y, object = player) {
             objLeft, objTop, objWidth, objHeight
         )) {
             if (sprite.type === 'object' && object.type === 'bullet') {
-                handleObjectInteraction(key, ":shot");
+                handlePlayerInteraction(key, ":shot");
                 return false; // Bullet stops here
             }
             // --- Handle bullet hitting player ---
             if (sprite.type === 'player' && object.type === 'bullet' && object.origin !== 'player') {
                 console.log('Bullet hit player!');
                 player.stats.health -= object.damage || 1; // Reduce player health
-                console.log(`Player health: ${player.stats.health}`);
+                player.flashRed = true;
+                player.flashTimer = 200; // flash for 200ms
                 if (player.stats.health <= 0) youDied(); // Check if player died
                 return false; // Bullet stops here
             }
             // --- Handle player touching objects ---
             if (sprite.type === 'object' && object.type === 'player') {
-                //gamePaused = true; // Pause the game loop
-                handleObjectInteraction(key, ":touch");
+                if (!player.justInteracted) {
+                    handlePlayerInteraction(key, ":touch");
+                }
                 // Optionally block or allow movement depending on your game logic
                 return false; // Block movement if you want the player to stop
             }
@@ -983,7 +1079,18 @@ function tryPushTiles(startX, startY, direction, layer) {
     // Move in the specified direction and collect pushable tiles
     while (true) {
         let key = `${layer},${x},${y}`;
-        if (!placedSprites[key] || placedSprites[key].type !== 'push') break;
+        let sprite = placedSprites[key];
+        if (!sprite || sprite.type !== 'push') break;
+
+        // Check pushType
+        let pushType = (sprite.data && sprite.data.pushType) ? sprite.data.pushType : 'ANY';
+        if (
+            (pushType === 'EW' && !(direction === 'left' || direction === 'right')) ||
+            (pushType === 'NS' && !(direction === 'up' || direction === 'down'))
+        ) {
+            // Block pushing in disallowed direction
+            return false;
+        }
 
         pushTiles.push({ x, y }); // Add to list of pushable tiles
 
@@ -1036,8 +1143,11 @@ function tryPushTiles(startX, startY, direction, layer) {
         }
     }
     let pushKey = `${layer},${newX},${newY}`;
-    if (placedSprites[pushKey]) {
-        return false; // If blocked, return false (don't push)
+    if (
+        placedSprites[pushKey] ||
+        (placedPassages && placedPassages[pushKey] && placedPassages[pushKey].type === 'passage')
+    ) {
+        return false; // Block pushing into passages or any occupied tile
     }
 
     // Move all pushable tiles forward
@@ -1144,6 +1254,7 @@ function updatePlayer(deltaTime) {
             delete placedSprites[oldKey];
         }
         player.transported = false;
+        player.justInteracted = false; // Reset the flag after moving
         renderLayersToMainCanvas();
     }
 }
@@ -1215,6 +1326,12 @@ function handleLoadedBoard(spriteSheetData, boardData) {
     player = { ...playerStats, ...player };
 
     nightMode = false;
+    // Hide dialog and game over boxes
+    document.getElementById('dialog-box').style.display = 'none';
+    document.getElementById('game-over-box').style.display = 'none';
+    gamePaused = false;
+    player.locked = false;
+    // ...existing code...
 
     //stats = player.stats;
     console.log('Loaded Stats', playerStats);
@@ -1270,12 +1387,20 @@ function handleLoadedGame(spriteSheetData, boardList, worldData) {
     player = findPlayerSprite();
     playerStats = structuredClone(defaultPlayerStats); // Reset player stats
     player = { ...playerStats, ...player };
-
     nightMode = false;
+    gamePaused = false;
+    player.locked = false;
+    player.gameOver = false; // Reset game over state
+
+    // Hide dialog and game over boxes
+    document.getElementById('dialog-box').style.display = 'none';
+    document.getElementById('game-over-box').style.display = 'none';
+    canvas.focus(); // Ensure canvas is focused for input
 
     console.log('Loaded World');
     drawBoard();
     renderLayersToMainCanvas(); // Draw them onto the main canvas
+    requestAnimationFrame(animateGame);
 }
 
 function loadPassagesFromGameData(gameData, board) {
@@ -1444,6 +1569,7 @@ document.addEventListener("keydown", (event) => {
         console.log('Placed sprites:', placedSprites);
         console.log('Player location:', player.layer, player.x, player.y);
         console.log('Player stats:', player.stats);
+        console.log('Bullets active:', bulletArray.filter(b => b.active));
     }
 
     updateDirection(); // Update direction based on keys held
@@ -1452,6 +1578,14 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener('keyup', (event) => {
     keys[event.key] = false;
     updateDirection(); // Update direction when key is released
+    if (
+        event.key === 'ArrowUp' ||
+        event.key === 'ArrowDown' ||
+        event.key === 'ArrowLeft' ||
+        event.key === 'ArrowRight'
+    ) {
+        player.justInteracted = false;
+    }
 });
 
 // Function to determine the correct direction

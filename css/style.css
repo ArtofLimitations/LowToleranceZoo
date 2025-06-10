@@ -698,6 +698,18 @@ h3 {
   height: 32px;
 }
 
+.selectAmount button {
+  background-color: #f0f0f0;
+  margin-top: 8px;
+  height: 32px;
+}
+
+.selectAmount button:hover {
+  background-color: #ffc800;
+  color: #222;
+  box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
+}
+
 .extraTiles {
   display: none;
   /* Hidden initially */
