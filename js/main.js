@@ -3,7 +3,7 @@ import { drawSprite, createDataURL, adjustColor } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor } from './palette.js';
-import { saveCombinedData, loadCombinedData, saveWorld, loadWorld } from './file.js';
+import { saveCombinedData, loadCombinedData, saveWorld, loadWorld, loadSpriteSheetDialog } from './file.js';
 import { editObject, getObjectData } from './object-editor.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -965,6 +965,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (currentSprite > 1) currentSprite -= 1;
                     console.log('current sprite: ' + currentSprite);
                     updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
+                    break;
+                case '+':
+                    loadSpriteSheetDialog((spriteSheet) => {
+                        replaceSpriteSheet(spriteSheet); // Update the in-memory spritesheet
+                        drawBoard(); // Redraw to reflect new sprites
+                        console.log('Spritesheet loaded!');
+                    });
                     break;
                 case 'v':
                     // open the sprite sheet selector here

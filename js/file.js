@@ -109,6 +109,34 @@ export async function loadSpriteSheet(fileInput) { // Load Sprite Sheet
     }
 }
 
+export function loadSpriteSheetDialog(callback) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+
+    input.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                // Use your existing loader logic
+                const spriteSheet = await loadSpriteSheet({ files: [file] });
+                if (callback && typeof callback === 'function') {
+                    callback(spriteSheet);
+                }
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+                alert('Invalid JSON file. Please upload a valid spritesheet file.');
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    input.click();
+}
+
 export function loadCombinedData(callback) { // Load Combined Game Data (Board, SpriteSheet)
     // Create an input element for file selection
     const input = document.createElement('input');

@@ -26,8 +26,6 @@ const tilesX = 36;                   // Board width and height
 const tilesY = 25;
 const hiddenLayers = new Set();      // Set to hold hidden layers
 const keys = {};                     // Hold key states
-//const tilesCanvas = new OffscreenCanvas(4 * tileSizeX, 4 * tileSizeY);
-//const tilesCtx = tilesCanvas.getContext('2d');
 const offscreenTile = new OffscreenCanvas(tileSizeX, tileSizeY);
 const offscreenCtx = offscreenTile.getContext('2d');
 const layerCanvases = {};            // Stores canvases for layers
@@ -36,6 +34,8 @@ let placedObjects = {};              // Stores objects on the board
 let placedPassages = {};             // Stores passages on the board
 let gamePaused = false;
 let bulletArray = [];
+const scriptGlobals = {};            // Global variables for scripts
+const spriteCache = {};              // Cache for sprites to avoid redundant redrawing
 //const namedColors = namedColorList;// Named colors for easy reference
 
 // board variables
@@ -50,19 +50,19 @@ let world = {};                      // World object
 let worldObjects = {};               // Stores objects for all boards
 let worldPassages = {};              // Stores passages for all boards
 
-// Player
+// Player variables
 let player = structuredClone(defaultPlayerStats); // Player object
 let playerStats = structuredClone(defaultPlayerStats);
 //let stats = playerStats;
-const stepSize = player.stepSize; // Step size for player movement
+const stepSize = player.stepSize;    // Step size for player movement
 
 // File info
 export let filename = ''; // ############ File to load ###############
 
 // Timing
 let fps = 60;
-let lastTime = 0;   // Timing variables
-let moveSpeed = 80; // Pixels per second
+let lastTime = 0;                    // Timing variables
+let moveSpeed = 80;                  // Pixels per second
 let accumulatedTime = 0;
 
 // #################################################
@@ -166,31 +166,27 @@ function updateTile(layer, x, y) {
     if (placedSprites[spriteKey]) {
         const sprite = placedSprites[spriteKey];
         drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
-    }
+    } 
 }
 
 function renderLayersToMainCanvas() {
+    console.time('renderLayersToMainCanvas'); // Start timing
     ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the main canvas
     const sortedLayers = [1, 2, 3];
 
     for (const layer of sortedLayers) {
+        if (hiddenLayers.has(layer)) continue; // <-- Skip hidden layers
+
         if (layerCanvases[layer]) {
-
-            //ctx.save()
-            //if (layer === 3) ctx.filter = 'opacity(0.8)';
-            //if (layer === 2) ctx.filter = 'blur(1px)';
-            //if (layer === 3) ctx.globalCompositeOperation = "destination-over";
             ctx.drawImage(layerCanvases[layer], 0, 0);
-            //ctx.restore();
-
         } else {
             console.warn(`Layer ${layer} is missing!`); // Debugging
         }
         if (layer === player.layer) {
             //console.log(player);
             ctx.save();
-            //ctx.shadowColor = "white";
-            //ctx.shadowBlur = 10;
+            ctx.shadowColor = "white";
+            ctx.shadowBlur = 10;
             ctx.drawImage(getSprite(player.sprite, player.color), player.x * tileSizeX, player.y * tileSizeY);
 
             // Draw red tint if flashing
@@ -201,7 +197,7 @@ function renderLayersToMainCanvas() {
                 offscreenCtx.globalCompositeOperation = "source-in";
                 // Fade out: alpha is proportional to remaining time
                 let alpha = Math.max(0, player.flashTimer / 200); // 1 at start, 0 at end
-                offscreenCtx.globalAlpha = 0.6 * alpha; // 0.6 is max tint strength
+                offscreenCtx.globalAlpha = 0.5 * alpha; // 0.6 is max tint strength
                 offscreenCtx.fillStyle = "red";
                 offscreenCtx.fillRect(0, 0, tileSizeX, tileSizeY);
                 offscreenCtx.globalAlpha = 1.0;
@@ -241,6 +237,7 @@ function renderLayersToMainCanvas() {
         ctx.restore();
 
     }
+    console.timeEnd('renderLayersToMainCanvas'); // End timing
 }
 
 function drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite, color) {
@@ -249,6 +246,11 @@ function drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite, color) {
 
 function clearTile(x, y) {
     ctx.clearRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY);
+}
+
+function getSpriteCacheKey(spriteNum, color) {
+    // Flatten color array for key (handles both [r,g,b,a],[r,g,b,a])
+    return `${spriteNum}_${color.flat().join(',')}`;
 }
 
 function drawDefaultTitleScreen() {
@@ -319,6 +321,8 @@ function updateObjects(deltaTime) {
 }
 
 function executeObjectCommand(obj, action, args) {
+
+    args = substituteGlobals(args); // Replace global variables in args
 
     // Skip comments: lines starting with '--' or '#rem'
     if (action.startsWith('--') || action === '#rem') {
@@ -417,6 +421,9 @@ function executeObjectCommand(obj, action, args) {
         case "#timer":
             obj.timer = parseInt(args[0], 10); // Set timer
             break;
+        case '#step':
+            // Set a flag or override step size for full-tile movement
+            obj.fullStep = true;
         case '#move': {
             let direction = args[0];
             let opp = false;
@@ -460,7 +467,11 @@ function executeObjectCommand(obj, action, args) {
                 return;
             }
 
-            moveObject(obj, direction, obj.layer);
+            // Use full-tile step if #step, otherwise default
+            let step = obj.fullStep ? 1 : 0.5;
+            obj.fullStep = false; // Reset flag
+
+            moveObject(obj, direction, obj.layer, step);
             break;
         }
         case '#moveto':
@@ -578,6 +589,17 @@ function executeObjectCommand(obj, action, args) {
             obj.waiting = true;
             obj.waitTime = (parseInt(args[0], 10) || 1) * 1000; // 1 = 1000ms
             break;
+        case "#let":
+            // Usage: #let $var = value
+            let varName = args[0];
+            if (!varName.startsWith('$')) {
+                console.warn("Global variable names must start with $");
+                return;
+            }
+            // Join the rest as the value, remove quotes if present
+            let value = args.slice(2).join(" ").replace(/^"|"$/g, '');
+            scriptGlobals[varName] = value;
+            break;
         case '#loop':
             obj.scriptIndex = obj.labels[':loop'] || 0;
             break;
@@ -621,7 +643,7 @@ function executeObjectCommand(obj, action, args) {
             }
 
             // Check if player has enough of the stat
-            if (player.stats[item] === undefined || player.stats[item] < amount) {
+            if (player.stats[item] === undefined || player.stats[item] < amount && item !== 'health') {
                 if (label && obj.labels && obj.labels[`:${label}`] !== undefined) {
                     obj.scriptIndex = obj.labels[`:${label}`] - 1;
                     return;
@@ -663,15 +685,20 @@ function executeObjectCommand(obj, action, args) {
             }
             if (hiddenLayers.has(layerToHide)) {
                 console.warn(`Layer ${layerToHide} is already hidden.`);
-                return; // Prevent hiding an already hidden layer
+                return;
             }
             hiddenLayers.add(layerToHide);
-            console.log(`Hiding layer ${layerToHide}`);
-            // Clear the layer canvas
-            const ctx = getLayerCanvas(layerToHide);
-            ctx.clearRect(0, 0, layerCanvases[layerToHide].width, layerCanvases[layerToHide].height);
-            // Remove all sprites from the hidden layer
-
+            renderLayersToMainCanvas(); // <-- Add this
+            break;
+        case '#showlayer':
+            let layerToShow = parseInt(args[0], 10);
+            if (isNaN(layerToShow) || layerToShow < 1 || layerToShow > 3) {
+                console.warn(`Invalid layer number: ${args[0]}`);
+                return;
+            }
+            hiddenLayers.delete(layerToShow);
+            renderLayersToMainCanvas();
+            break;
         case '#nightmode':
             nightMode = !nightMode;
             break;
@@ -688,8 +715,8 @@ function executeObjectCommand(obj, action, args) {
     }
 }
 
-function moveObject(obj, direction, layer) {
-    const offsets = { up: [0, -0.5], down: [0, 0.5], left: [-0.5, 0], right: [0.5, 0] };
+function moveObject(obj, direction, layer, step = 0.5) {
+    const offsets = { up: [0, -step], down: [0, step], left: [-step, 0], right: [step, 0] };
     const dir = convertDirections(direction);
 
     if (!offsets[dir]) {
@@ -761,6 +788,15 @@ function handlePlayerInteraction(tileKey, labelType) {
         }
     }
 }
+
+function substituteGlobals(args) {
+    return args.map(arg =>
+        arg.startsWith('$') && scriptGlobals[arg] !== undefined
+            ? scriptGlobals[arg]
+            : arg
+    );
+}
+
 // ##############################################
 // ############ Dialog box functions ############
 // ##############################################
@@ -1404,9 +1440,9 @@ function handleLoadedGame(spriteSheetData, boardList, worldData) {
 }
 
 function loadPassagesFromGameData(gameData, board) {
-    if (!worldPassages[board]) {
-        worldPassages[board] = {}; // Initialize storage for the board if it doesn't exist
-    }
+    //if (!worldPassages[board]) {
+    worldPassages[board] = {}; // Initialize storage for the board if it doesn't exist
+    //}
 
     for (const key in gameData) {
         const sprite = gameData[key];
