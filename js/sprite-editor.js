@@ -13,6 +13,7 @@ const gridSize = 16;
 const sidebar = 64;
 const pixelSize = (spriteCanvas.width - sidebar) / gridSize;
 const colors = ['white', 'black'];                                                // Only two colors: white and black
+const maxSprites = 300; // Maximum number of sprites, can be changed later
 let currentColor = 1;
 let currentSprite = 1;
 let clipboard = [];
@@ -210,7 +211,7 @@ function invertColor() {
     console.log('inverted');
     return spriteData.map(row => row.map(value => value === 0 ? 1 : value === 1 ? 0 : value));
 }
- 
+
 // Nudges the sprite data in the specified direction.
 function nudgeSprite(spriteData, direction) {
     const size = gridSize; // Assuming a 16x16 array
@@ -301,6 +302,22 @@ function handleKeyboard(event) {
         case 'i':
             console.log(invertColor());
             spriteData = invertColor();
+            drawGrid();
+            break;
+        case '+':
+        case '=':
+        case 'NumpadAdd':
+            if (currentSprite < maxSprites) {
+                currentSprite++;
+                updateSpriteData(currentSprite);
+                drawGrid();
+            }
+            break;
+        case '-':
+        case '_':
+        case 'NumpadSubtract':
+            if (currentSprite > 1) currentSprite--;
+            updateSpriteData(currentSprite);
             drawGrid();
             break;
         case 'Escape':

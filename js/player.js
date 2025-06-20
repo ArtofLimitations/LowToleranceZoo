@@ -166,16 +166,21 @@ function updateTile(layer, x, y) {
     if (placedSprites[spriteKey]) {
         const sprite = placedSprites[spriteKey];
         drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
-    } 
+    }
 }
 
 function renderLayersToMainCanvas() {
-    console.time('renderLayersToMainCanvas'); // Start timing
+    //console.time('renderLayersToMainCanvas'); // Start timing
     ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the main canvas
     const sortedLayers = [1, 2, 3];
 
     for (const layer of sortedLayers) {
-        if (hiddenLayers.has(layer)) continue; // <-- Skip hidden layers
+        if (hiddenLayers.has(layer)) {
+            if (layer === player.layer) {
+                drawPlayerAndBulletsToCanvas(); // Draw player and bullets on top of the player layer
+            }    
+            continue; // <-- Skip hidden layers
+        }
 
         if (layerCanvases[layer]) {
             ctx.drawImage(layerCanvases[layer], 0, 0);
@@ -183,33 +188,7 @@ function renderLayersToMainCanvas() {
             console.warn(`Layer ${layer} is missing!`); // Debugging
         }
         if (layer === player.layer) {
-            //console.log(player);
-            ctx.save();
-            ctx.shadowColor = "white";
-            ctx.shadowBlur = 10;
-            ctx.drawImage(getSprite(player.sprite, player.color), player.x * tileSizeX, player.y * tileSizeY);
-
-            // Draw red tint if flashing
-            if (player.flashRed) {
-                offscreenCtx.clearRect(0, 0, tileSizeX, tileSizeY);
-                offscreenCtx.drawImage(getSprite(player.sprite, player.color), 0, 0);
-
-                offscreenCtx.globalCompositeOperation = "source-in";
-                // Fade out: alpha is proportional to remaining time
-                let alpha = Math.max(0, player.flashTimer / 200); // 1 at start, 0 at end
-                offscreenCtx.globalAlpha = 0.5 * alpha; // 0.6 is max tint strength
-                offscreenCtx.fillStyle = "red";
-                offscreenCtx.fillRect(0, 0, tileSizeX, tileSizeY);
-                offscreenCtx.globalAlpha = 1.0;
-                offscreenCtx.globalCompositeOperation = "source-over";
-
-                ctx.drawImage(offscreenTile, player.x * tileSizeX, player.y * tileSizeY);
-            }
-
-            bulletArray.forEach(bullet => {
-                bullet.draw();
-            });
-            ctx.restore();
+            drawPlayerAndBulletsToCanvas(); // Draw player and bullets on top of the player layer
         }
     }
     if (nightMode) {
@@ -237,7 +216,35 @@ function renderLayersToMainCanvas() {
         ctx.restore();
 
     }
-    console.timeEnd('renderLayersToMainCanvas'); // End timing
+    //console.timeEnd('renderLayersToMainCanvas'); // End timing
+}
+
+function drawPlayerAndBulletsToCanvas() {
+    ctx.save();
+    ctx.shadowColor = "white";
+    ctx.shadowBlur = 10;
+    ctx.drawImage(getCachedSprite(player.sprite, player.color), player.x * tileSizeX, player.y * tileSizeY);
+
+    // Draw red tint if flashing
+    if (player.flashRed) {
+        offscreenCtx.clearRect(0, 0, tileSizeX, tileSizeY);
+        offscreenCtx.drawImage(getSprite(player.sprite, player.color), 0, 0);
+
+        offscreenCtx.globalCompositeOperation = "source-in";
+        let alpha = Math.max(0, player.flashTimer / 200);
+        offscreenCtx.globalAlpha = 0.5 * alpha;
+        offscreenCtx.fillStyle = "red";
+        offscreenCtx.fillRect(0, 0, tileSizeX, tileSizeY);
+        offscreenCtx.globalAlpha = 1.0;
+        offscreenCtx.globalCompositeOperation = "source-over";
+
+        ctx.drawImage(offscreenTile, player.x * tileSizeX, player.y * tileSizeY);
+    }
+
+    bulletArray.forEach(bullet => {
+        bullet.draw();
+    });
+    ctx.restore();
 }
 
 function drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite, color) {
@@ -251,6 +258,21 @@ function clearTile(x, y) {
 function getSpriteCacheKey(spriteNum, color) {
     // Flatten color array for key (handles both [r,g,b,a],[r,g,b,a])
     return `${spriteNum}_${color.flat().join(',')}`;
+}
+
+function getCachedSprite(spriteNum, color) {
+    const key = getSpriteCacheKey(spriteNum, color);
+    if (spriteCache[key]) {
+        return spriteCache[key];
+    }
+    // Use getSprite from sprite.js to build the sprite
+    const spriteCanvas = getSprite(spriteNum, color);
+    // Clone the canvas to avoid overwriting (if using OffscreenCanvas, you may need to create a new one)
+    const off = new OffscreenCanvas(tileSizeX, tileSizeY);
+    const offCtx = off.getContext('2d');
+    offCtx.drawImage(spriteCanvas, 0, 0, tileSizeX, tileSizeY);
+    spriteCache[key] = off;
+    return off;
 }
 
 function drawDefaultTitleScreen() {
@@ -604,6 +626,8 @@ function executeObjectCommand(obj, action, args) {
             obj.scriptIndex = obj.labels[':loop'] || 0;
             break;
         case '#die':
+            //placedSprites[`${obj.layer},${obj.x},${obj.y}`].pendingRemoval = true; // Mark sprite for removal
+            //obj.pendingRemoval = true; // Mark object for removal
             delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
             delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
             updateTile(obj.layer, obj.x, obj.y);
@@ -786,6 +810,23 @@ function handlePlayerInteraction(tileKey, labelType) {
         } else {
             console.warn(`No active ${labelType} labels found.`);
         }
+    }
+}
+
+function runImmediateLabel(obj, labelType) {
+    let index = resolveLabel(obj, labelType);
+    if (index === null) return;
+    obj.scriptIndex = index;
+    while (obj.scriptIndex < obj.script.length) {
+        let command = obj.script[obj.scriptIndex].split(' ');
+        let action = command[0];
+        let args = command.slice(1);
+
+        // Stop if we hit a wait/sleep/end
+        if (['#wait', '#sleep', '#end'].includes(action)) break;
+
+        executeObjectCommand(obj, action, args);
+        obj.scriptIndex++;
     }
 }
 
@@ -1006,6 +1047,7 @@ function canMoveTo(x, y, object = player) {
             playerLeft, playerTop, playerWidth, playerHeight,
             objLeft, objTop, objWidth, objHeight
         )) {
+
             if (sprite.type === 'object' && object.type === 'bullet') {
                 handlePlayerInteraction(key, ":shot");
                 return false; // Bullet stops here
@@ -1020,12 +1062,25 @@ function canMoveTo(x, y, object = player) {
                 return false; // Bullet stops here
             }
             // --- Handle player touching objects ---
-            if (sprite.type === 'object' && object.type === 'player') {
+            /*if (sprite.type === 'object' && object.type === 'player') {
                 if (!player.justInteracted) {
                     handlePlayerInteraction(key, ":touch");
                 }
-                // Optionally block or allow movement depending on your game logic
                 return false; // Block movement if you want the player to stop
+            }*/
+            if (sprite.type === 'object' && object.type === 'player') {
+                const obj = placedObjects[key];
+                if (obj) {
+                    if (obj.labels && (obj.labels[':step'] || obj.labels[':collect'])) {
+                        if (obj.labels[':step']) runImmediateLabel(obj, ':step');
+                        else runImmediateLabel(obj, ':collect');
+                        continue; // Allow player to step on or collect the object
+                    }
+                    if (!player.justInteracted) {
+                        handlePlayerInteraction(key, ":touch");
+                    }
+                }
+                return false;
             }
             if (sprite.type === 'sign' && object.type === 'player') {
                 gamePaused = true; // Pause the game loop
@@ -1244,6 +1299,14 @@ function tryPushPlayer(startX, startY, direction, layer) {
     player.x = newX;
     player.y = newY;
 
+    for (const key in placedObjects) {
+        if (placedObjects[key].pendingRemoval) {
+            delete placedObjects[key];
+            delete placedSprites[key];
+            updateTile(...key.split(',').map(Number));
+        }
+    }
+
     return true;
 }
 
@@ -1291,6 +1354,7 @@ function updatePlayer(deltaTime) {
         }
         player.transported = false;
         player.justInteracted = false; // Reset the flag after moving
+
         renderLayersToMainCanvas();
     }
 }
@@ -1312,33 +1376,6 @@ function movePlayer(newLayer, newX, newY) {
     const newKey = `${newLayer},${newX},${newY}`;
     placedSprites[newKey] = { ...player, type: 'player' };
 
-    renderLayersToMainCanvas();
-}
-
-function _movePlayer(newLayer, newX, newY) {
-
-    const oldKey = `${player.layer},${player.x},${player.y}`;
-    const newKey = `${newLayer},${newX},${newY}`;
-
-    //console.log('Moving player:', { oldKey, newKey });
-
-    // Update the global player object
-    player.layer = newLayer;
-    player.x = newX;
-    player.y = newY;
-    player.transported = true; // Mark player as moved
-
-    // Update placedSprites
-    if (placedSprites[oldKey]) {
-        placedSprites[newKey] = placedSprites[oldKey]; // Move player sprite to the new key
-        delete placedSprites[oldKey]; // Remove player sprite from the old key
-    } else {
-        console.warn(`Old key ${oldKey} not found in placedSprites.`);
-    }
-
-    //console.log('Player moved to:', { layer: newLayer, x: newX, y: newY });
-
-    // Redraw the board
     renderLayersToMainCanvas();
 }
 
@@ -1418,6 +1455,8 @@ function handleLoadedGame(spriteSheetData, boardList, worldData) {
     placedSprites = world[currentBoard]; // Get the current board from the world object
     placedObjects = worldObjects[currentBoard]; // Get objects for the current board
     placedPassages = worldPassages[currentBoard] || {}; // Load passages for the current board
+    Object.keys(spriteCache).forEach(key => delete spriteCache[key]); // Safe clear sprite cache
+    hiddenLayers.clear(); // Clear hidden layers
 
     loaded = true;
     player = findPlayerSprite();
@@ -1497,54 +1536,6 @@ function switchBoard(board, colorKey) {
     player.locked = false; // Unlock player movement
 
     currentBoard = board;
-    drawBoard();
-    renderLayersToMainCanvas(); // Draw them onto the main canvas
-}
-
-function _switchBoard(board, colorKey) {
-    currentBoard = board;
-
-    placedSprites = world[currentBoard]; // Get the current board from the world object
-    placedObjects = loadObjectsFromGameData(placedSprites);
-    placedPassages = worldPassages[board] || {}; // Load passages for the current board
-
-    //console.log('Switching to board:', board, 'with colorKey:', colorKey);
-    console.log('finding:', findPlayerSprite());
-
-    let foundPassage = false;
-
-    for (const key in placedPassages) {
-        const passage = placedPassages[key];
-        const passageColorKey = passage.color.join(','); // Create a unique key for the passage color
-
-        console.log('Player position before:', player.layer, player.x, player.y); // Debug log
-        console.log('Checking passage:', key, 'with colorKey:', passageColorKey);
-
-        if (passageColorKey === colorKey) { // Compare the color keys
-            const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
-
-            // Update player's position
-            player.layer = layer;
-            player.x = x;
-            player.y = y;
-
-            // Update placedSprites
-            placedSprites[findPlayerSprite()] = placedSprites[`${layer},${x},${y}`]; // Move player to the new key
-
-            foundPassage = true;
-            console.log('Found matching passage at:', { layer, x, y });
-            break; // Exit loop after finding the first match
-        }
-    }
-
-    if (!foundPassage) {
-        console.warn('No matching passage found for colorKey:', colorKey);
-        player = findPlayerSprite(); // Fallback to find player sprite
-    } else {
-        console.log('Rendering player at new position:', { layer: player.layer, x: player.x, y: player.y });
-        //placedSprites[newKey] = placedSprites[oldKey]; // Move player to the new key
-    }
-
     drawBoard();
     renderLayersToMainCanvas(); // Draw them onto the main canvas
 }

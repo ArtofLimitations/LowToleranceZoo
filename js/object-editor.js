@@ -1,4 +1,5 @@
 const container = document.getElementById('editorContainer');
+const title = container.querySelector('strong');
 const text = document.getElementById('textEditor');
 let textOnly = false;
 let tileKey = null;
@@ -72,8 +73,10 @@ function removeObjectEvents() {
 export function editObject (type, script, key, callback) {
     if (type === 'text') {
         textOnly = true;
+        title.innerText = 'Edit Sign Text';
     } else {
         textOnly = false;
+        title.innerText = 'Edit Object Script';
     }
     tileKey = key;
     callbackFunction = callback;

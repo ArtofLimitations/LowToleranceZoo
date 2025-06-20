@@ -38,6 +38,7 @@ export function loadObjectsFromGameData(gameData) {
                 labels: {},  // Will store labels (e.g., `:touch`)
                 zappedLabels: {},
                 resting: false,
+                pendingRemoval: false, // Flag for removal
             };
 
             // Parse labels for quick jumps

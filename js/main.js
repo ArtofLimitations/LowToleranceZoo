@@ -489,6 +489,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('Loaded Board');
         drawBoard();
+
+        updateSpriteData(currentSprite);
     }
 
     function handleLoadedWorld(spriteSheetData, boardListData, worldData) {
@@ -504,6 +506,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('Loaded World');
         drawBoard();
+
+        updateSpriteData(currentSprite);
     }
 
     function handleToolbarClick(layer = currentLayer, hidden = hiddenLayers, spriteType = type) {
@@ -1155,7 +1159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 enterPressed = false; // Unlock when Enter is released
             }
         });
-
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick); // Initialize toolbar with current sprite and colors
         colors = currentColors;
         drawBoard(); // Draw function for entire board
         canvas.focus();
@@ -1176,6 +1180,13 @@ document.addEventListener('DOMContentLoaded', () => {
     editorToolbar.onmouseup = () => {
         canvas.focus();
     }
+
+    overlay.addEventListener('mousedown', function (event) {
+        if (popup.active) {
+            // Optionally check if event.target === overlay to only close when clicking the background
+            closePopup();
+        }
+    });
 
     // Initial board setup
     addMainEvents();
