@@ -65,6 +65,20 @@ let lastTime = 0;                    // Timing variables
 let moveSpeed = 80;                  // Pixels per second
 let accumulatedTime = 0;
 
+// Status messages
+let statusMessage = "";
+let statusMessageTimer = 0;
+let statusMessageStyle = {
+    color: "#fff",
+    bgColor: "rgba(0,0,0,0.7)",
+    x: null, // null means center
+    y: null, // null means bottom
+    font: "bold 16px 'Fira Code', monospace",
+    letterSpacing: 2,
+    shadow: false,
+    duration: 2000
+};
+
 // #################################################
 // ############ Main animation function ############
 // #################################################
@@ -91,6 +105,13 @@ export function animateGame(currentTime) {
             if (player.flashTimer <= 0) {
                 player.flashRed = false;
                 player.flashTimer = 0;
+            }
+        }
+        if (statusMessageTimer > 0) {
+            statusMessageTimer -= deltaTime;
+            if (statusMessageTimer <= 0) {
+                statusMessage = "";
+                statusMessageTimer = 0;
             }
         }
     }
@@ -178,7 +199,7 @@ function renderLayersToMainCanvas() {
         if (hiddenLayers.has(layer)) {
             if (layer === player.layer) {
                 drawPlayerAndBulletsToCanvas(); // Draw player and bullets on top of the player layer
-            }    
+            }
             continue; // <-- Skip hidden layers
         }
 
@@ -215,6 +236,40 @@ function renderLayersToMainCanvas() {
         // You can add more lights for torches, objects, etc. here
         ctx.restore();
 
+    }
+
+    if (statusMessage && statusMessageTimer > 0) {
+        ctx.save();
+        ctx.font = statusMessageStyle.font;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        const padding = 16;
+        const letterSpacing = statusMessageStyle.letterSpacing;
+        let textWidth = 0;
+        for (let i = 0; i < statusMessage.length; i++) {
+            textWidth += ctx.measureText(statusMessage[i]).width;
+        }
+        if (statusMessage.length > 1) {
+            textWidth += letterSpacing * (statusMessage.length - 1);
+        }
+        // Positioning
+        const x = statusMessageStyle.x !== null ? statusMessageStyle.x : canvas.width / 2;
+        const y = statusMessageStyle.y !== null ? statusMessageStyle.y : canvas.height - padding;
+
+        // Draw background
+        ctx.fillStyle = statusMessageStyle.bgColor;
+        ctx.fillRect(x - textWidth / 2 - 12, y - 32, textWidth + 24, 36);
+
+        // Optional shadow
+        if (statusMessageStyle.shadow) {
+            ctx.shadowColor = typeof statusMessageStyle.shadow === "string" ? statusMessageStyle.shadow : "#000";
+            ctx.shadowBlur = 8;
+        }
+
+        // Draw text
+        ctx.fillStyle = statusMessageStyle.color;
+        fillTextWithLetterSpacing(ctx, statusMessage, x - textWidth / 2, y - 14, letterSpacing);
+        ctx.restore();
     }
     //console.timeEnd('renderLayersToMainCanvas'); // End timing
 }
@@ -357,6 +412,11 @@ function executeObjectCommand(obj, action, args) {
         return;
     }
 
+    if (action.startsWith("*")) {
+        showStatusMessage(action.slice(1).trim() + " " + args.join(" ").trim());
+        return;
+    }
+
     switch (action) {
         case '#end':
             obj.resting = true;
@@ -396,17 +456,34 @@ function executeObjectCommand(obj, action, args) {
                 console.error(`Error: Invalid #send command arguments: ${args.join(" ")}`);
             }
             break;
-        case "#change":
+        case "#change": // Sprite and color. example: #change 12 (120,80,40) (255,220,180)
+            if (!args[0] || isNaN(parseInt(args[0], 10))) {
+                console.warn(`#change: Missing or invalid sprite number: ${args[0]}`);
+                break;
+            }
             let spriteNumber = parseInt(args[0], 10);
-            let dark, light;
 
-            // Detect if colors are RGB or named
+            // Check for enough arguments for colors
+            if (!args[1]) {
+                console.warn(`#change: Missing color arguments.`);
+                break;
+            }
+
+            let dark, light;
             if (args[1].startsWith("(")) {
-                // RGB format: Extract two sets of RGB values
+                // RGB format: must have at least 6 color values (3 for dark, 3 for light)
+                if (args.length < 7) {
+                    console.warn(`#change: Not enough RGB values. Expected 6, got ${args.length - 1}.`);
+                    break;
+                }
                 dark = extractRGB(args.slice(1, 4).join(" "));
                 light = extractRGB(args.slice(4, 7).join(" "));
             } else {
-                // Named colors
+                // Named colors: must have at least 2 color names
+                if (!args[2]) {
+                    console.warn(`#change: Missing second color name.`);
+                    break;
+                }
                 dark = namedColors[args[1]] || [0, 0, 0]; // Default to black if not found
                 light = namedColors[args[2]] || [255, 255, 255]; // Default to white if not found
             }
@@ -419,7 +496,6 @@ function executeObjectCommand(obj, action, args) {
             placedSprites[`${obj.layer},${obj.x},${obj.y}`].color = [dark, light];
             updateTile(obj.layer, obj.x, obj.y); // Update tile with new sprite
             renderLayersToMainCanvas(); // Ensure visual update
-
             break;
         case '#color':
         case '#changecolor':
@@ -611,7 +687,7 @@ function executeObjectCommand(obj, action, args) {
             obj.waiting = true;
             obj.waitTime = (parseInt(args[0], 10) || 1) * 1000; // 1 = 1000ms
             break;
-        case "#let":
+        case "#let": {
             // Usage: #let $var = value
             let varName = args[0];
             if (!varName.startsWith('$')) {
@@ -622,6 +698,7 @@ function executeObjectCommand(obj, action, args) {
             let value = args.slice(2).join(" ").replace(/^"|"$/g, '');
             scriptGlobals[varName] = value;
             break;
+        }
         case '#loop':
             obj.scriptIndex = obj.labels[':loop'] || 0;
             break;
@@ -723,6 +800,57 @@ function executeObjectCommand(obj, action, args) {
             hiddenLayers.delete(layerToShow);
             renderLayersToMainCanvas();
             break;
+        case "#message": {
+            if (!args[0]) {
+                console.warn("#message: No property provided.");
+                break;
+            }
+            const prop = args[0].toLowerCase();
+            const value = args.slice(1).join(" ");
+            switch (prop) {
+                case "color":
+                    statusMessageStyle.color = value;
+                    break;
+                case "bgcolor":
+                case "background":
+                    statusMessageStyle.bgColor = value;
+                    break;
+                case "x":
+                    statusMessageStyle.x = isNaN(Number(value)) ? null : Number(value);
+                    break;
+                case "y":
+                    statusMessageStyle.y = isNaN(Number(value)) ? null : Number(value);
+                    break;
+                case "font":
+                    statusMessageStyle.font = value;
+                    break;
+                case "letterspacing":
+                    statusMessageStyle.letterSpacing = Number(value) || 0;
+                    break;
+                case "shadow":
+                    statusMessageStyle.shadow = value === "true" || value === "1" ? true : value; // allow color string
+                    break;
+                case "duration":
+                    statusMessageStyle.duration = Number(value) || 2000;
+                    break;
+                case "reset":
+                    // Reset to defaults
+                    statusMessageStyle = {
+                        color: "#fff",
+                        bgColor: "rgba(0,0,0,0.7)",
+                        x: null,
+                        y: null,
+                        font: "bold 16px 'Fira Code', monospace",
+                        letterSpacing: 2,
+                        shadow: false,
+                        duration: 2000
+                    };
+                    break;
+                default:
+                    console.warn(`#message: Unknown property "${prop}"`);
+            }
+            break;
+        }
         case '#nightmode':
             nightMode = !nightMode;
             break;
@@ -842,6 +970,8 @@ function substituteGlobals(args) {
 // ############ Dialog box functions ############
 // ##############################################
 
+// Paginated text that appears in the dialog box (or bubble)
+
 function paginateText(text, maxLength) { // Split text into pages
     let pages = [];
     let segments = text.split("<page>"); // Split by <page> tag
@@ -914,6 +1044,26 @@ function showDialog(text, object = null) {
         }
     });
 }
+
+// Single status message
+
+function showStatusMessage(text, duration = null) {
+    statusMessage = text.trim();
+    statusMessageTimer = duration !== null ? duration : statusMessageStyle.duration;
+}
+
+function fillTextWithLetterSpacing(ctx, text, x, y, letterSpacing = 0) {
+    // Start at the given x position
+    let currentX = x;
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        ctx.fillText(char, currentX, y);
+        // Advance by the width of the character plus letterSpacing
+        currentX += ctx.measureText(char).width + letterSpacing;
+    }
+}
+
+// Game Over dialog
 
 function showGameOver(text) {
     const dialog = document.getElementById('game-over-box');
