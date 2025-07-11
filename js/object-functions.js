@@ -51,45 +51,62 @@ export function loadObjectsFromGameData(gameData) {
             console.log(placedObjects[key].script);
         }
     }
-    return placedObjects;
-}
-
-export function gridLoadObjectsFromGameData(gameData, grid) {
-    for (let key in gameData) {
-        const tile = gameData[key];
-        const [layer, x, y] = key.split(',').map(Number);
-        let id = 1;
-
-        if (tile.type === 'object' && tile.data.script) {
-            const object = {
-                id: `object-${objectIdCounter++}`, // Unique identifier
-                layer,
-                x,
-                y,
-                width: 32,
-                height: 32,
-                sprite: tile.sprite,
-                color: tile.color,
-                type: 'object',
-                name: tile.data.name || "",
-                direction: 'down',
-                waiting: false,
-                waitTime: 0,
-                speed: tile.data.speed || 1,
-                timer: tile.data.timer || 0,
-                timeSinceLastMove: 0,
-                moveInterval: tile.data.moveInterval || 100,
-                script: parseScript(tile.data.script).script,
-                labels: parseScript(tile.data.script).labels,
-                resting: false
-            };
-
-            addObjectToGrid(grid, object, x, y);
-        }
-    }
+    return placedObjects; 
 }
 
 function parseScript(text) {
+    let lines = text.trim().split("\n").map(line => line.trim());
+    let script = [];
+    let labels = {};
+    let index = 0;
+
+    for (let line of lines) {
+        if (line === "") continue;
+
+        // Labels
+        if (line.startsWith(":")) {
+            labels[line] = index;
+            continue;
+        }
+
+        // Comments
+        if (line.startsWith("--") || line.startsWith("$") || line.startsWith("!")) {
+            continue;
+        }
+
+        // Object name
+        if (line.startsWith("@")) {
+            script.push({ type: "name", value: line.slice(1).trim() });
+            index++;
+            continue;
+        }
+
+        // Status message
+        if (line.startsWith("*")) {
+            script.push({ type: "status", text: line.slice(1).trim() });
+            index++;
+            continue;
+        }
+
+        // Commands
+        if (line.startsWith("#")) {
+            const [cmd, ...args] = line.slice(1).split(" ");
+            // Mark blocking commands
+            const blocking = ["wait", "sleep", "end", "cycle"].includes(cmd.toLowerCase());
+            script.push({ type: "command", name: cmd.toLowerCase(), args, blocking });
+            index++;
+            continue;
+        }
+
+        // Dialog/text
+        script.push({ type: "text", text: line });
+        index++;
+    }
+
+    return { script, labels };
+}
+
+function _parseScript(text) {
     let lines = text.trim().split("\n").map(line => line.trim());
     let script = [];
     let labels = {};
@@ -182,50 +199,6 @@ function parseScript(text) {
 
     // Push any remaining text block at the end
     pushTextBlock();
-
-    return { script, labels };
-}
-
-function _parseScript(text) {
-    let lines = text.trim().split("\n").map(line => line.trim());
-    let script = [];
-    let labels = {}; // Store label positions as arrays
-    let collectingText = false;
-    let textBlock = "";
-    let index = 0;
-
-    for (let line of lines) {
-        if (line === "#text") {
-            collectingText = true;
-            textBlock = "";
-            continue;
-        }
-
-        if (collectingText) {
-            if (line.startsWith("#")) {
-                script.push(`#text ${textBlock.trim()}`);
-                script.push(line); // Next command
-                collectingText = false;
-                index += 2;
-            } else {
-                textBlock += line + "\n";
-            }
-            continue;
-        }
-
-        if (line.startsWith(":")) {
-            if (!labels[line]) {
-                labels[line] = [];
-            }
-            labels[line].push(index); // Push the label position
-            continue; // Labels aren't stored in the script array
-        }
-
-        if (line !== "") {
-            script.push(line);
-            index++;
-        }
-    }
 
     return { script, labels };
 }

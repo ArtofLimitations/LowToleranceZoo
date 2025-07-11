@@ -16,7 +16,7 @@ canvas.style.height = displayHeight + 'px';
 canvas.width = displayWidth * scale;
 canvas.height = displayHeight * scale;
 const ctx = canvas.getContext('2d', { alpha: false });
-ctx.imageSmoothingEnabled = false
+ctx.imageSmoothingEnabled = false;
 
 // Game configurations
 let placedSprites = {};
@@ -369,18 +369,15 @@ function updateObjects(deltaTime) {
         // Process objects that are not waiting
         obj.timeSinceLastMove += deltaTime;
         if (obj.timeSinceLastMove >= obj.moveInterval) {
-            let command = obj.script[obj.scriptIndex].split(' ');
-            let action = command[0];
-            let args = command.slice(1);
-
-            executeObjectCommand(obj, action, args); // Start executing #commands
+            let command = obj.script[obj.scriptIndex];
+            executeObjectCommand(obj, command);
 
             // Move script index only if not waiting
             obj.scriptIndex++;
 
-            if (command[0] === "#loop") {
+            if (command.type === "command" && command.name === "loop") {
                 if (obj.labels[":loop"] !== undefined) {
-                    obj.scriptIndex = obj.labels[":loop"]; // Jump to label position
+                    obj.scriptIndex = obj.labels[":loop"];
                 } else {
                     console.error("Error: Missing ':loop' label in script.");
                 }
@@ -397,7 +394,107 @@ function updateObjects(deltaTime) {
     }
 }
 
-function executeObjectCommand(obj, action, args) {
+function executeObjectCommand(obj, command) {
+    switch (command.type) {
+        case "name":
+            obj.name = command.value;
+            break;
+        case "status":
+            showStatusMessage(command.text);
+            break;
+        case "command":
+            switch (command.name) {
+                case "message":
+                    // e.g. #message color #ff0
+                    if (command.args.length >= 2) {
+                        statusMessageStyle[command.args[0]] = command.args.slice(1).join(" ");
+                    }
+                    break;
+                case "wait":
+                    obj.waitTime = Number(command.args[0]) * 50 || 50;
+                    obj.waiting = true;
+                    break;
+                case "sleep":
+                    obj.waitTime = Number(command.args[0]) * 1000 || 1000;
+                    obj.waiting = true;
+                    break;
+                case "cycle":
+                    obj.moveInterval = (Number(command.args[0]) || 1) * (1000 / fps); // n ticks
+                    break;
+                case "end":
+                    obj.resting = true;
+                    break;
+                case "loop":
+                    if (obj.labels[":loop"] !== undefined) {
+                        obj.scriptIndex = obj.labels[":loop"];
+                    } else {
+                        console.error("Error: Missing ':loop' label in script.");
+                    }
+                    break;
+                case "move": {
+                    let direction = command.args[0];
+                    let opp = false;
+
+                    // Check for 'opp' modifier
+                    if (direction === 'opp') {
+                        opp = true;
+                        direction = command.args[1];
+                    }
+
+                    // Handle random direction
+                    if (direction === 'rndany' || direction === 'random') {
+                        const dirs = ['up', 'down', 'left', 'right'];
+                        direction = dirs[Math.floor(Math.random() * dirs.length)];
+                    } else if (direction === 'seek') {
+                        direction = calculateSeekDirection(obj, player);
+                        if (opp) {
+                            // Reverse direction
+                            switch (direction) {
+                                case 'up': direction = 'down'; break;
+                                case 'down': direction = 'up'; break;
+                                case 'left': direction = 'right'; break;
+                                case 'right': direction = 'left'; break;
+                            }
+                        }
+                    } else {
+                        direction = convertDirections(direction);
+                        if (opp && direction !== -1) {
+                            switch (direction) {
+                                case 'up': direction = 'down'; break;
+                                case 'down': direction = 'up'; break;
+                                case 'left': direction = 'right'; break;
+                                case 'right': direction = 'left'; break;
+                            }
+                        }
+                    }
+
+                    if (direction === -1) {
+                        console.warn(`Invalid direction "${command.args.join(' ')}" provided for #move`);
+                        return;
+                    }
+
+                    // Use full-tile step if #step, otherwise default
+                    let step = obj.fullStep ? 1 : 0.5;
+                    obj.fullStep = false; // Reset flag
+
+                    moveObject(obj, direction, obj.layer, step);
+                    break;
+                }
+                // Add more command handlers here...
+                default:
+                    console.warn(`Unknown command: #${command.name}`);
+            }
+            break;
+        case "text":
+            showDialog(command.text, obj);
+            break;
+        // Add more types as needed
+        default:
+            console.warn(`Unknown script type: ${command.type}`);
+    }
+}
+
+function _executeObjectCommand(obj, action, args) {
 
     args = substituteGlobals(args); // Replace global variables in args
 
@@ -946,9 +1043,9 @@ function runImmediateLabel(obj, labelType) {
     if (index === null) return;
     obj.scriptIndex = index;
     while (obj.scriptIndex < obj.script.length) {
-        let command = obj.script[obj.scriptIndex].split(' ');
-        let action = command[0];
-        let args = command.slice(1);
+        //let command = obj.script[obj.scriptIndex].split(' ');
+        //let action = command[0];
+        //let args = command.slice(1);
 
         // Stop if we hit a wait/sleep/end
         if (['#wait', '#sleep', '#end'].includes(action)) break;
