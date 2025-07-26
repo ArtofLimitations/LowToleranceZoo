@@ -65,9 +65,10 @@ function parseScript(text) {
 
         // Labels
         if (line.startsWith(":")) {
-            labels[line] = index;
-            continue;
-        }
+    if (!labels[line]) labels[line] = [];
+    labels[line].push(index);
+    continue;
+}
 
         // Comments
         if (line.startsWith("--") || line.startsWith("$") || line.startsWith("!")) {
@@ -207,6 +208,7 @@ export function resolveLabel(obj, label) {
     const locations = obj.labels[label];
     const zapped = obj.zappedLabels?.[label] || 0;
 
+    // If locations is undefined or all zapped, return null
     if (!locations || locations.length <= zapped) return null;
     return locations[zapped];
 }

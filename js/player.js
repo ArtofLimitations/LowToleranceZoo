@@ -370,6 +370,7 @@ function updateObjects(deltaTime) {
         obj.timeSinceLastMove += deltaTime;
         if (obj.timeSinceLastMove >= obj.moveInterval) {
             let command = obj.script[obj.scriptIndex];
+            if (obj.scriptIndex == undefined) console.error("Error: scriptIndex is undefined for object", obj.name || 'unknown');
             executeObjectCommand(obj, command);
 
             // Move script index only if not waiting
@@ -478,6 +479,224 @@ function executeObjectCommand(obj, command) {
                     obj.fullStep = false; // Reset flag
 
                     moveObject(obj, direction, obj.layer, step);
+                    break;
+                }
+                case "moveto":
+                case "moveTo": {
+                    // Support "#moveto 5 16", "#moveto 5,16", "#moveto 5, 16", and optional "force"
+                    let targetX, targetY;
+                    let force = false;
+                    let args = command.args.slice();
+
+                    // Check for 'force' as the last argument
+                    if (args[args.length - 1] === 'force') {
+                        force = true;
+                        args = args.slice(0, -1); // Remove 'force' from args
+                    }
+
+                    if (args.length === 1 && args[0].includes(',')) {
+                        [targetX, targetY] = args[0].split(',').map(s => parseInt(s.trim(), 10));
+                    } else if (args.length >= 2) {
+                        targetX = parseInt(args[0].replace(',', ''), 10);
+                        targetY = parseInt(args[1].replace(',', ''), 10);
+                    }
+                    if (
+                        isNaN(targetX) || isNaN(targetY) ||
+                        targetX < 0 || targetY < 0 || targetX >= tilesX || targetY >= tilesY
+                    ) {
+                        console.warn('Invalid arguments for #moveto. Expected two numbers.');
+                        break;
+                    }
+                    let targetKey = `${obj.layer},${targetX},${targetY}`;
+                    if (
+                        (!force && placedObjects[targetKey] && placedObjects[targetKey].id !== obj.id) ||
+                        (!force && placedSprites[targetKey]) ||
+                        (placedSprites[targetKey] && placedSprites[targetKey].type === 'passage') ||
+                        (placedSprites[targetKey] && placedSprites[targetKey].type === 'player')
+                    ) {
+                        console.warn(`Target tile (${targetX}, ${targetY}) is occupied by another object.`);
+                        break; // Prevent moving to an occupied tile
+                    }
+                    // If force, destroy whatever is at the target location
+                    if (force) {
+                        if (placedObjects[targetKey]) delete placedObjects[targetKey];
+                        if (placedSprites[targetKey]) delete placedSprites[targetKey];
+                    }
+                    // Move the object to the specified coordinates
+                    let oldKey = `${obj.layer},${obj.x},${obj.y}`;
+                    placedSprites[targetKey] = placedSprites[oldKey]; // Move sprite
+                    placedObjects[targetKey] = obj;
+                    delete placedObjects[oldKey];
+                    delete placedSprites[oldKey];
+                    updateTile(obj.layer, obj.x, obj.y); // Clear old tile
+                    obj.x = targetX;
+                    obj.y = targetY;
+                    updateTile(obj.layer, obj.x, obj.y); // Update new tile
+                    console.log(`Moved object to (${targetX}, ${targetY})${force ? ' with force' : ''}`);
+                    break;
+                }
+                case "change": {
+                    if (!command.args[0] || isNaN(parseInt(command.args[0], 10))) {
+                        console.warn(`#change: Missing or invalid sprite number: ${command.args[0]}`);
+                        break;
+                    }
+                    let spriteNumber = parseInt(command.args[0], 10);
+
+                    // Check for enough arguments for colors
+                    if (!command.args[1]) {
+                        console.warn(`#change: Missing color arguments.`);
+                        break;
+                    }
+
+                    let dark, light;
+                    if (command.args[1].startsWith("(")) {
+                        // RGB format: must have at least 6 color values (3 for dark, 3 for light)
+                        if (command.args.length < 7) {
+                            console.warn(`#change: Not enough RGB values. Expected 6, got ${command.args.length - 1}.`);
+                            break;
+                        }
+                        dark = extractRGB(command.args.slice(1, 4).join(" "));
+                        light = extractRGB(command.args.slice(4, 7).join(" "));
+                    } else {
+                        // Named colors: must have at least 2 color names
+                        if (!command.args[2]) {
+                            console.warn(`#change: Missing second color name.`);
+                            break;
+                        }
+                        dark = namedColors[command.args[1]] || [0, 0, 0]; // Default to black if not found
+                        light = namedColors[command.args[2]] || [255, 255, 255]; // Default to white if not found
+                    }
+
+                    // Apply sprite change
+                    obj.sprite = spriteNumber;
+                    obj.color = [dark, light];
+
+                    placedSprites[`${obj.layer},${obj.x},${obj.y}`].sprite = spriteNumber;
+                    placedSprites[`${obj.layer},${obj.x},${obj.y}`].color = [dark, light];
+                    updateTile(obj.layer, obj.x, obj.y); // Update tile with new sprite
+                    renderLayersToMainCanvas(); // Ensure visual update
+                    break;
+                }
+                case "changecolor":
+                case "color": {
+                    if (!command.args[0]) {
+                        console.warn("#changecolor: No color provided");
+                        break;
+                    }
+                    let color = extractRGB(command.args[0]);
+                    let spriteKey = `${obj.layer},${obj.x},${obj.y}`;
+                    if (placedSprites[spriteKey]) {
+                        placedSprites[spriteKey].color = color;
+                    }
+                    if (placedObjects[spriteKey]) {
+                        placedObjects[spriteKey].color = color;
+                    }
+                    updateTile(obj.layer, obj.x, obj.y);
+                    renderLayersToMainCanvas();
+                    break;
+                }
+                case "changesprite":
+                case "sprite": {
+                    if (!command.args[0] || isNaN(command.args[0])) {
+                        console.warn("#changesprite: No sprite provided or NaN");
+                        break;
+                    }
+                    let spriteKey = `${obj.layer},${obj.x},${obj.y}`;
+                    let spriteNum = parseInt(command.args[0], 10);
+                    if (placedSprites[spriteKey]) {
+                        placedSprites[spriteKey].sprite = spriteNum;
+                    }
+                    if (placedObjects[spriteKey]) {
+                        placedObjects[spriteKey].sprite = spriteNum;
+                    }
+                    updateTile(obj.layer, obj.x, obj.y);
+                    renderLayersToMainCanvas();
+                    break;
+                }
+                case "give": {
+                    let item = command.args[0];
+                    let amount = parseInt(command.args[1], 10);
+                    if (isNaN(amount)) amount = 1; // Default to 1 if not specified
+                    adjustStat(player, item, amount);
+                    console.log(`Gave ${amount} ${item}(s)`);
+                    break;
+                }
+                case "take": {
+                    let item = command.args[0];
+                    let amount = parseInt(command.args[1], 10);
+                    if (isNaN(amount)) amount = 1; // Default to 1 if not specified
+
+                    // Optional label as last argument
+                    let label = null;
+                    if (command.args.length > 2) {
+                        label = command.args[command.args.length - 1];
+                        if (!isNaN(label)) label = null;
+                    }
+
+                    // Check if player has enough of the stat
+                    if (player.stats[item] === undefined || (player.stats[item] < amount && item !== 'health')) {
+                        if (label && obj.labels && obj.labels[`:${label}`] !== undefined) {
+                            obj.scriptIndex = obj.labels[`:${label}`] - 1;
+                            return;
+                        }
+                        console.warn(`Not enough ${item} to take. No label provided.`);
+                        return;
+                    }
+
+                    adjustStat(player, item, -amount);
+                    if (player.stats.health <= 0) youDied();
+                    console.log(`Took ${amount} ${item}(s)`);
+                    break;
+                }
+                case 'die':
+                    delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
+                    delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
+                    updateTile(obj.layer, obj.x, obj.y);
+                    break;
+                case "zap": {
+                    const zapLabel = command.args[0].startsWith(":") ? command.args[0] : ":" + command.args[0];
+                    if (!obj.zappedLabels[zapLabel]) {
+                        obj.zappedLabels[zapLabel] = 1;
+                    } else {
+                        obj.zappedLabels[zapLabel]++;
+                    }
+                    break;
+                }
+                case "restore": {
+                    const restoreLabel = command.args[0].startsWith(":") ? command.args[0] : ":" + command.args[0];
+                    delete obj.zappedLabels[restoreLabel];
+                    break;
+                }
+                case "send": {
+                    if (command.args.length === 1) {
+                        // Jump to a label within the same object
+                        let label = command.args[0];
+                        if (!label.startsWith(":")) label = ":" + label;
+                        const index = resolveLabel(obj, label);
+                        if (index !== null) {
+                            obj.scriptIndex = index - 1;
+                        } else {
+                            console.error(`Error: Label ${label} not found in script.`);
+                        }
+                    } else if (command.args.length === 2 && command.args[0].startsWith("@")) {
+                        const targetName = command.args[0].slice(1);
+                        let label = command.args[1];
+                        if (!label.startsWith(":")) label = ":" + label;
+                        const targetObject = Object.values(placedObjects).find(o => o.name === targetName);
+                        if (!targetObject) {
+                            console.error(`Error: Object with name "${targetName}" not found.`);
+                            break;
+                        }
+                        const index = resolveLabel(targetObject, label);
+                        if (index !== null) {
+                            targetObject.scriptIndex = index;
+                            targetObject.resting = false;
+                        } else {
+                            console.error(`Error: Label ${label} not found in object "${targetName}".`);
+                        }
+                    } else {
+                        console.error(`Error: Invalid #send command arguments: ${command.args.join(" ")}`);
+                    }
                     break;
                 }
                 // Add more command handlers here...
@@ -1022,7 +1241,8 @@ function handleObjectInteraction(tileKey, labelType) {
 function handlePlayerInteraction(tileKey, labelType) {
     let obj = placedObjects[tileKey];
     if (obj && obj.labels[labelType]) {
-        let index = resolveLabel(obj, labelType);
+        let labelKey = labelType.startsWith(":") ? labelType : ":" + labelType;
+        let index = resolveLabel(obj, labelKey);
         if (index !== null) {
             if (obj.type === 'object') {
                 obj.scriptIndex = index; // For objects, so next tick runs the label's first command
