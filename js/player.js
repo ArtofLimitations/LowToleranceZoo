@@ -432,6 +432,9 @@ function executeObjectCommand(obj, command) {
                         console.error("Error: Missing ':loop' label in script.");
                     }
                     break;
+                case "step":
+                    // Set fullStep to true to use full-tile step
+                    obj.fullStep = true;
                 case "move": {
                     let direction = command.args[0];
                     let opp = false;
@@ -648,6 +651,70 @@ function executeObjectCommand(obj, command) {
                     console.log(`Took ${amount} ${item}(s)`);
                     break;
                 }
+                case "shoot": {
+                    if (!command.args[0]) {
+                        console.warn('#shoot: No direction provided');
+                        break;
+                    }
+
+                    let direction = command.args[0];
+                    let opp = false;
+
+                    // Handle 'opp' modifier
+                    if (direction === 'opp') {
+                        opp = true;
+                        direction = command.args[1];
+                    }
+
+                    // Handle 'flow'
+                    if (direction === 'flow') {
+                        direction = obj.direction || 'right'; // Default to right if undefined
+                        if (opp) {
+                            switch (direction) {
+                                case 'up': direction = 'down'; break;
+                                case 'down': direction = 'up'; break;
+                                case 'left': direction = 'right'; break;
+                                case 'right': direction = 'left'; break;
+                            }
+                        }
+                    } else if (direction === 'seek') {
+                        direction = calculateSeekDirection(obj, player);
+                        if (opp) {
+                            switch (direction) {
+                                case 'up': direction = 'down'; break;
+                                case 'down': direction = 'up'; break;
+                                case 'left': direction = 'right'; break;
+                                case 'right': direction = 'left'; break;
+                            }
+                        }
+                    } else {
+                        direction = convertDirections(direction);
+                        if (opp && direction !== -1) {
+                            switch (direction) {
+                                case 'up': direction = 'down'; break;
+                                case 'down': direction = 'up'; break;
+                                case 'left': direction = 'right'; break;
+                                case 'right': direction = 'left'; break;
+                            }
+                        }
+                    }
+
+                    if (direction === -1) {
+                        console.warn(`#shoot: Invalid direction "${command.args.join(' ')}"`);
+                        break;
+                    }
+
+                    let { x, y } = calculateBulletPosition(obj.x, obj.y, direction);
+                    let bullet = createBullet(canvas, x, y, direction, 16, 'white', obj.name);
+                    bullet.origin = `${obj.layer},${obj.x},${obj.y}`;
+                    bulletArray.push(bullet);
+                    console.log(`Creating bullet at (${x}, ${y}) with direction ${direction}`);
+                    break;
+                }
+                case 'hurt':
+                    player.flashRed = true;
+                    player.flashTimer = 200; // flash for 200ms
+                    break;
                 case 'die':
                     delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
                     delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
@@ -699,9 +766,46 @@ function executeObjectCommand(obj, command) {
                     }
                     break;
                 }
+                case "hidelayer": {
+                    let layerToHide = parseInt(command.args[0], 10);
+                    if (isNaN(layerToHide) || layerToHide < 1 || layerToHide > 3) {
+                        console.warn(`#hidelayer: Invalid layer number: ${command.args[0]}`);
+                        break;
+                    }
+                    if (hiddenLayers.has(layerToHide)) {
+                        console.warn(`#hidelayer: Layer ${layerToHide} is already hidden.`);
+                        break;
+                    }
+                    hiddenLayers.add(layerToHide);
+                    renderLayersToMainCanvas();
+                    break;
+                }
+                case "showlayer": {
+                    let layerToShow = parseInt(command.args[0], 10);
+                    if (isNaN(layerToShow) || layerToShow < 1 || layerToShow > 3) {
+                        console.warn(`#showlayer: Invalid layer number: ${command.args[0]}`);
+                        break;
+                    }
+                    hiddenLayers.delete(layerToShow);
+                    renderLayersToMainCanvas();
+                    break;
+                }
+                case 'nightmode':
+                    nightMode = !nightMode;
+                    break;
                 // Add more command handlers here...
-                default:
-                    console.warn(`Unknown command: #${command.name}`);
+                default: {
+                    // Try to treat unknown command as a label jump
+                    let labelKey = command.name;
+                    if (labelKey.startsWith("#")) labelKey = labelKey.slice(1);
+                    if (!labelKey.startsWith(":")) labelKey = ":" + labelKey;
+                    if (obj.labels && obj.labels[labelKey] !== undefined) {
+                        obj.scriptIndex = obj.labels[labelKey] - 1;
+                        return;
+                    }
+                    console.warn(`Unknown command or label: #${command.name}`);
+                    break;
+                }
             }
             break;
         case "text":
@@ -1090,10 +1194,7 @@ function _executeObjectCommand(obj, action, args) {
                 console.warn("Invalid #cycle value:", args[0]);
             }
             break;
-        case '#hurt':
-            player.flashRed = true;
-            player.flashTimer = 200; // flash for 200ms
-            break;
+
         case '#hidelayer':
             let layerToHide = parseInt(args[0], 10);
             if (isNaN(layerToHide) || layerToHide < 1 || layerToHide > 3) {
