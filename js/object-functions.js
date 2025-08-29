@@ -29,8 +29,8 @@ export function loadObjectsFromGameData(gameData) {
                 direction: 'down', // Default direction
                 waiting: false, // Initialize waiting state
                 waitTime: 0, // Initialize wait time
-                speed: tile.data.speed || 1,  // Default to speed 1
-                timer: tile.data.timer || 0,  // Initialize timer
+                //speed: tile.data.speed || 1,  // Default to speed 1 NOT BEING USED
+                timer: tile.data.timer || 0,  // Initialize timer NOT SURE IT'S USED
                 timeSinceLastMove: 0, // Time since last move
                 moveInterval: tile.data.moveInterval || 100, // Default move interval
                 script: {}, // Parse script
@@ -51,7 +51,7 @@ export function loadObjectsFromGameData(gameData) {
             console.log(placedObjects[key].script);
         }
     }
-    return placedObjects; 
+    return placedObjects;
 }
 
 function parseScript(text) {
@@ -60,18 +60,28 @@ function parseScript(text) {
     let labels = {};
     let index = 0;
 
-    for (let line of lines) {
-        if (line === "") continue;
+    while (index < lines.length) {
+        let line = lines[index];
+        if (line === "") { index++; continue; }
 
         // Labels
         if (line.startsWith(":")) {
-    if (!labels[line]) labels[line] = [];
-    labels[line].push(index);
-    continue;
-}
+            // Prevent forbidden label names
+            const forbiddenLabels = [":any"];
+            if (forbiddenLabels.includes(line.toLowerCase())) {
+                console.warn(`Label name "${line}" is reserved and cannot be used.`);
+                index++;
+                continue;
+            }
+            if (!labels[line]) labels[line] = [];
+            labels[line].push(script.length);
+            index++;
+            continue;
+        }
 
         // Comments
         if (line.startsWith("--") || line.startsWith("$") || line.startsWith("!")) {
+            index++;
             continue;
         }
 
@@ -92,114 +102,61 @@ function parseScript(text) {
         // Commands
         if (line.startsWith("#")) {
             const [cmd, ...args] = line.slice(1).split(" ");
-            // Mark blocking commands
-            const blocking = ["wait", "sleep", "end", "cycle"].includes(cmd.toLowerCase());
+            const blocking = ["wait", "sleep", "end", "cycle", "move", "moveto", "moveTo", "change", "changeSprite", "changesprite", "changeColor", "changecolor", "color", "text", "die", "shoot"].includes(cmd.toLowerCase());
             script.push({ type: "command", name: cmd.toLowerCase(), args, blocking });
             index++;
             continue;
         }
 
-        // Dialog/text
-        script.push({ type: "text", text: line });
-        index++;
-    }
-
-    return { script, labels };
-}
-
-function _parseScript(text) {
-    let lines = text.trim().split("\n").map(line => line.trim());
-    let script = [];
-    let labels = {};
-    let collectingText = false;
-    let textBlock = "";
-    let index = 0;
-
-    function pushTextBlock() {
-        if (textBlock.trim() !== "") {
-            script.push(`#text ${textBlock.trim()}`);
-            index++;
-            textBlock = "";
-        }
-    }
-
-    for (let line of lines) {
-        if (line === "#text") {
-            pushTextBlock();
-            collectingText = true;
-            continue;
-        }
-
-        // If collecting #text block, stop at next command/label
-        if (collectingText) {
-            if (
-                line.startsWith("#") ||
-                line.startsWith(":") ||
-                line.startsWith("$") ||
-                line.startsWith("!") ||
-                line.startsWith("--") ||
-                //line.startsWith("@") ||
-                line.startsWith("*")
-            ) {
-                pushTextBlock();
-                collectingText = false;
-                // Now process this line as normal below
-            } else {
-                textBlock += line + "\n";
-                continue;
+        // Slash commands (e.g. /e/e/n/i)
+        if (line.startsWith("/")) {
+            // Remove leading slash, split by '/', filter out empty
+            let moves = line.split('/').filter(Boolean);
+            for (let move of moves) {
+                // Lowercase is normal move, uppercase is step
+                if (move.length === 1) {
+                    if (move === 'i') {
+                        script.push({ type: "command", name: "sleep", args: ["1"], blocking: true });
+                    } else if (move === 'I') {
+                        script.push({ type: "command", name: "sleep", args: ["1"], blocking: true });
+                    } else if (move === move.toUpperCase()) {
+                        // Capital letter: step + move
+                        script.push({ type: "command", name: "step", args: [] });
+                        script.push({ type: "command", name: "move", args: [move.toLowerCase()], blocking: true });
+                    } else {
+                        // Lowercase: normal move
+                        script.push({ type: "command", name: "move", args: [move], blocking: true });
+                    }
+                }
+                // You can expand this for multi-char commands if needed
             }
-        }
-
-        // Handle object name lines
-        if (line.startsWith("@")) {
-            pushTextBlock();
-            script.push(line); // Add @name line to script
             index++;
             continue;
         }
 
-        // Handle labels
-        if (line.startsWith(":")) {
-            pushTextBlock();
-            if (!labels[line]) labels[line] = [];
-            labels[line].push(index);
-            continue;
-        }
-
-        // Handle comments
-        if (
-            line.startsWith("--") ||
-            line.startsWith("$") ||
-            line.startsWith("!")
-        ) {
-            pushTextBlock();
-            continue; // Ignore comments
-        }
-
-        // Handle status message
-        if (line.startsWith("*")) {
-            pushTextBlock();
-            script.push(line); // Store as-is, let executor handle it
-            index++;
-            continue;
-        }
-
-        // Handle commands
-        if (line.startsWith("#")) {
-            pushTextBlock();
-            script.push(line);
-            index++;
-            continue;
-        }
-
-        // Handle dialog lines (not starting with any symbol)
+        // Group consecutive text lines into one block
         if (line !== "") {
-            textBlock += line + "\n";
+            let textBlock = line;
+            while (
+                index + 1 < lines.length &&
+                lines[index + 1] !== "" &&
+                !lines[index + 1].startsWith("#") &&
+                !lines[index + 1].startsWith(":") &&
+                !lines[index + 1].startsWith("@") &&
+                !lines[index + 1].startsWith("*") &&
+                !lines[index + 1].startsWith("--") &&
+                !lines[index + 1].startsWith("$") &&
+                !lines[index + 1].startsWith("!")
+            ) {
+                textBlock += "\n" + lines[index + 1];
+                index++;
+            }
+            //script.push({ type: "text", text: textBlock });
+            script.push({ type: "text", text: textBlock, blocking: true }); // Mark as blocking
+            index++;
+            continue;
         }
     }
-
-    // Push any remaining text block at the end
-    pushTextBlock();
 
     return { script, labels };
 }

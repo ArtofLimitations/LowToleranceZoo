@@ -32,7 +32,8 @@ const layerCanvases = {};            // Stores canvases for layers
 const layerContexts = {};            // Stores 2D contexts for layers
 let placedObjects = {};              // Stores objects on the board
 let placedPassages = {};             // Stores passages on the board
-let gamePaused = false;
+let gamePaused = false;              // Game pause state
+let playerPaused = false;            // Player pause state
 let bulletArray = [];
 const scriptGlobals = {};            // Global variables for scripts
 const spriteCache = {};              // Cache for sprites to avoid redundant redrawing
@@ -84,7 +85,7 @@ let statusMessageStyle = {
 // #################################################
 
 export function animateGame(currentTime) {
-    if (gamePaused) return; // Stop the loop when the game is paused
+    if (gamePaused || playerPaused) return; // Stop the loop when the game is paused
 
     const deltaTime = currentTime - lastTime;
 
@@ -369,21 +370,33 @@ function updateObjects(deltaTime) {
         // Process objects that are not waiting
         obj.timeSinceLastMove += deltaTime;
         if (obj.timeSinceLastMove >= obj.moveInterval) {
-            let command = obj.script[obj.scriptIndex];
-            if (obj.scriptIndex == undefined) console.error("Error: scriptIndex is undefined for object", obj.name || 'unknown');
-            executeObjectCommand(obj, command);
-
-            // Move script index only if not waiting
-            obj.scriptIndex++;
-
-            if (command.type === "command" && command.name === "loop") {
-                if (obj.labels[":loop"] !== undefined) {
-                    obj.scriptIndex = obj.labels[":loop"];
-                } else {
-                    console.error("Error: Missing ':loop' label in script.");
+            while (obj.scriptIndex < obj.script.length) {
+                let command = obj.script[obj.scriptIndex];
+                if (obj.scriptIndex == undefined) {
+                    console.error("Error: scriptIndex is undefined for object", obj.name || 'unknown');
+                    break;
                 }
-                continue;
+                executeObjectCommand(obj, command);
+
+                // Handle #loop command immediately
+                if (command.type === "command" && command.name === "loop") {
+                    if (obj.labels[":loop"] !== undefined) {
+                        obj.scriptIndex = obj.labels[":loop"];
+                    } else {
+                        console.error("Error: Missing ':loop' label in script.");
+                    }
+                    break; // Stop further execution this tick
+                }
+
+                // If the command is blocking or the object is now waiting, stop here
+                if (command.blocking || obj.waiting) {
+                    obj.scriptIndex++;
+                    break;
+                }
+                obj.scriptIndex++;
             }
+
+
 
             // Auto-stop if script ends without `#end`
             if (obj.scriptIndex >= obj.script.length) {
@@ -415,6 +428,7 @@ function executeObjectCommand(obj, command) {
                     obj.waitTime = Number(command.args[0]) * 50 || 50;
                     obj.waiting = true;
                     break;
+                case 'idle':
                 case "sleep":
                     obj.waitTime = Number(command.args[0]) * 1000 || 1000;
                     obj.waiting = true;
@@ -581,6 +595,7 @@ function executeObjectCommand(obj, command) {
                     break;
                 }
                 case "changecolor":
+                case "changeColor":
                 case "color": {
                     if (!command.args[0]) {
                         console.warn("#changecolor: No color provided");
@@ -599,6 +614,7 @@ function executeObjectCommand(obj, command) {
                     break;
                 }
                 case "changesprite":
+                case "changeSprite":
                 case "sprite": {
                     if (!command.args[0] || isNaN(command.args[0])) {
                         console.warn("#changesprite: No sprite provided or NaN");
@@ -649,6 +665,21 @@ function executeObjectCommand(obj, command) {
                     adjustStat(player, item, -amount);
                     if (player.stats.health <= 0) youDied();
                     console.log(`Took ${amount} ${item}(s)`);
+                    break;
+                }
+                case "let": {
+                    // Usage: #let $var = value
+                    let varName = command.args[0];
+                    if (!varName || !varName.startsWith('$')) {
+                        console.warn("#let: Global variable names must start with $");
+                        break;
+                    }
+                    // Find '=' and join everything after as the value
+                    let eqIndex = command.args.indexOf('=');
+                    let value = eqIndex !== -1
+                        ? command.args.slice(eqIndex + 1).join(" ").replace(/^"|"$/g, '')
+                        : command.args.slice(1).join(" ").replace(/^"|"$/g, '');
+                    scriptGlobals[varName] = value;
                     break;
                 }
                 case "shoot": {
@@ -720,6 +751,28 @@ function executeObjectCommand(obj, command) {
                     delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
                     updateTile(obj.layer, obj.x, obj.y);
                     break;
+                case "dieitem":
+                    delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
+                    delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
+                    updateTile(obj.layer, obj.x, obj.y);
+                    // Mark the object and sprite for removal
+                    //obj.pendingRemoval = true;
+                    //placedSprites[`${obj.layer},${obj.x},${obj.y}`].pendingRemoval = true;
+                    // Remove the object and its sprite from the board
+                    //delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
+                    //delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
+                    //updateTile(obj.layer, obj.x, obj.y);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+                    // Optionally: allow player to move here immediately (no extra flag needed if removal is instant)
+                    break;
+                case "zapall":
+                    // Zap all labels in the object
+                    for (let label in obj.labels) {
+                        if (label.startsWith(":")) {
+                            obj.zappedLabels[label] = (obj.zappedLabels[label] || 0) + 1;
+                        }
+                    }
+                    obj.labels = {}; // Clear all labels
+                    break;
                 case "zap": {
                     const zapLabel = command.args[0].startsWith(":") ? command.args[0] : ":" + command.args[0];
                     if (!obj.zappedLabels[zapLabel]) {
@@ -766,6 +819,7 @@ function executeObjectCommand(obj, command) {
                     }
                     break;
                 }
+                case "hideLayer":
                 case "hidelayer": {
                     let layerToHide = parseInt(command.args[0], 10);
                     if (isNaN(layerToHide) || layerToHide < 1 || layerToHide > 3) {
@@ -780,6 +834,7 @@ function executeObjectCommand(obj, command) {
                     renderLayersToMainCanvas();
                     break;
                 }
+                case "showLayer":
                 case "showlayer": {
                     let layerToShow = parseInt(command.args[0], 10);
                     if (isNaN(layerToShow) || layerToShow < 1 || layerToShow > 3) {
@@ -809,6 +864,7 @@ function executeObjectCommand(obj, command) {
             }
             break;
         case "text":
+            gamePaused = true; // Pause the game loop
             showDialog(command.text, obj);
             break;
         // Add more types as needed
@@ -1119,6 +1175,10 @@ function _executeObjectCommand(obj, action, args) {
             scriptGlobals[varName] = value;
             break;
         }
+        case '#endscript':
+            obj.resting = true; // Mark the object as resting
+            obj.scriptIndex = -1; // Stop executing the script
+            break;
         case '#loop':
             obj.scriptIndex = obj.labels[':loop'] || 0;
             break;
@@ -1129,6 +1189,7 @@ function _executeObjectCommand(obj, action, args) {
             delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
             updateTile(obj.layer, obj.x, obj.y);
             break;
+
         case '#zap':
             const zapLabel = `:${args[0]}`;
             if (!obj.zappedLabels[zapLabel]) {
@@ -1364,14 +1425,16 @@ function runImmediateLabel(obj, labelType) {
     if (index === null) return;
     obj.scriptIndex = index;
     while (obj.scriptIndex < obj.script.length) {
-        //let command = obj.script[obj.scriptIndex].split(' ');
-        //let action = command[0];
-        //let args = command.slice(1);
+        let command = obj.script[obj.scriptIndex];
 
-        // Stop if we hit a wait/sleep/end
-        if (['#wait', '#sleep', '#end'].includes(action)) break;
+        // Stop if we hit a blocking command or end
+        if (
+            (command.type === "command" && command.blocking) ||
+            command.type === "text" ||
+            command.type === "status"
+        ) break;
 
-        executeObjectCommand(obj, action, args);
+        executeObjectCommand(obj, command);
         obj.scriptIndex++;
     }
 }
@@ -1639,12 +1702,11 @@ function canMoveTo(x, y, object = player) {
             if (sprite.type === 'object' && object.type === 'player') {
                 const obj = placedObjects[key];
                 if (obj) {
+                    // Run :step or :collect immediately if present
                     if (obj.labels && (obj.labels[':step'] || obj.labels[':collect'])) {
                         if (obj.labels[':step']) runImmediateLabel(obj, ':step');
                         else runImmediateLabel(obj, ':collect');
-                        continue; // Allow player to step on or collect the object
-                    }
-                    if (!player.justInteracted) {
+                    } else if (!player.justInteracted) {
                         handlePlayerInteraction(key, ":touch");
                     }
                 }
@@ -2146,8 +2208,15 @@ document.addEventListener("keydown", (event) => {
         }
 
         if (event.key === 'p') {
-            gamePaused = !gamePaused;
-            if (!gamePaused) requestAnimationFrame(animateGame);
+            if (!gamePaused) {
+                playerPaused = !playerPaused;
+                if (!playerPaused) {
+                    requestAnimationFrame(animateGame);
+                }
+                // Optionally show/hide your pause UI here
+            }
+            //gamePaused = !gamePaused;
+            //if (!gamePaused) requestAnimationFrame(animateGame);
         }
 
         if (event.key === ' ' && !gamePaused) { // Space bar to shoot
