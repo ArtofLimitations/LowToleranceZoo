@@ -748,6 +748,7 @@ function executeObjectCommand(obj, command) {
                     player.flashTimer = 200; // flash for 200ms
                     break;
                 case 'die':
+                    console.log("object died via #die command");
                     delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
                     delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
                     updateTile(obj.layer, obj.x, obj.y);
@@ -835,6 +836,10 @@ function executeObjectCommand(obj, command) {
                 }
                 case 'nightmode':
                     nightMode = !nightMode;
+                    break;
+                case "debug":
+                    console.log("DEBUG: Object script:", obj.script);
+                    console.log("DEBUG: Object labels:", obj.labels);
                     break;
                 // Add more command handlers here...
                 default: {
@@ -1409,23 +1414,58 @@ function handlePlayerInteraction(tileKey, labelType) {
 }
 
 function runImmediateLabel(obj, labelType) {
+    let labelKey = labelType.startsWith(":") ? labelType : ":" + labelType;
+    let index = resolveLabel(obj, labelKey);
+    if (index === null) return;
+
+    obj.scriptIndex = index;
+    obj.waitTime = 0;
+    obj.waiting = false;
+    obj.resting = false;
+    obj.moveInterval = 0; // Fastest possible speed (process immediately)
+
+
+    // Option 1: Only execute the first command (like handlePlayerInteraction)
+    let command = obj.script[obj.scriptIndex];
+    if (command) {
+        executeObjectCommand(obj, command);
+        obj.scriptIndex++;
+    }
+
+    // Option 2: If you want to execute all non-blocking commands instantly, use this loop:
+    /*
+    while (obj.scriptIndex < obj.script.length) {
+        let command = obj.script[obj.scriptIndex];
+        if ((command.type === "command" && command.blocking) || command.type === "text") break;
+        executeObjectCommand(obj, command);
+        obj.scriptIndex++;
+    }
+    */
+}
+
+/*function runImmediateLabel(obj, labelType) {
     let index = resolveLabel(obj, labelType);
     if (index === null) return;
     obj.scriptIndex = index;
     while (obj.scriptIndex < obj.script.length) {
         let command = obj.script[obj.scriptIndex];
+        console.log("Object", obj);
+        console.log("runImmediateLabel executing:", command, "at", obj.scriptIndex);
 
-        // Stop if we hit a blocking command or end
-        if (
-            (command.type === "command" && command.blocking) ||
-            command.type === "text" //||
-            //command.type === "status"
-        ) break;
+        // Stop if we hit a blocking command or a dialog/text
+        if (command.type === "text" || (command.type === "command" && command.blocking)) break;
+
+        // Execute status messages immediately (do not break)
+        if (command.type === "status") {
+            executeObjectCommand(obj, command);
+            obj.scriptIndex++;
+            continue;
+        }
 
         executeObjectCommand(obj, command);
         obj.scriptIndex++;
     }
-}
+}*/
 
 function substituteGlobals(args) {
     return args.map(arg =>
@@ -1711,6 +1751,7 @@ function canMoveTo(x, y, object = player) {
                 if (player.stats.health <= 0) youDied(); // Check if player died
                 return false; // Bullet stops here
             }
+
             // --- Handle player touching objects ---
             /*if (sprite.type === 'object' && object.type === 'player') {
                 if (!player.justInteracted) {
@@ -1718,7 +1759,25 @@ function canMoveTo(x, y, object = player) {
                 }
                 return false; // Block movement if you want the player to stop
             }*/
-            if (sprite.type === 'object' && object.type === 'player') {
+
+                if (sprite.type === 'object' && object.type === 'player') {
+    const obj = placedObjects[key];
+    if (obj) {
+        // Run :step or :collect immediately if present
+        if (obj.labels && (obj.labels[':step'] || obj.labels[':collect'])) {
+            if (obj.labels[':step']) runImmediateLabel(obj, ':step');
+            else runImmediateLabel(obj, ':collect');
+            // After running the label, if the object is gone, allow movement
+            if (!placedObjects[key]) return true;
+        } else if (!player.justInteracted) {
+            handlePlayerInteraction(key, ":touch");
+            if (!placedObjects[key]) return true;
+        }
+    }
+    return false;
+}
+
+            /*if (sprite.type === 'object' && object.type === 'player') {
                 const obj = placedObjects[key];
                 if (obj) {
                     // Run :step or :collect immediately if present
@@ -1730,7 +1789,7 @@ function canMoveTo(x, y, object = player) {
                     }
                 }
                 return false;
-            }
+            }*/
             if (sprite.type === 'sign' && object.type === 'player') {
                 gamePaused = true; // Pause the game loop
                 showDialog(placedSprites[key].data.script
