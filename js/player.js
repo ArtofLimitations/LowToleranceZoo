@@ -414,7 +414,8 @@ function executeObjectCommand(obj, command) {
             obj.name = command.value;
             break;
         case "status":
-            showStatusMessage(command.text);
+            //showStatusMessage(command.text);
+            showStatusMessageHTML(command.text);
             break;
         case "command":
             switch (command.name) {
@@ -750,19 +751,6 @@ function executeObjectCommand(obj, command) {
                     delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
                     delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
                     updateTile(obj.layer, obj.x, obj.y);
-                    break;
-                case "dieitem":
-                    delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
-                    delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
-                    updateTile(obj.layer, obj.x, obj.y);
-                    // Mark the object and sprite for removal
-                    //obj.pendingRemoval = true;
-                    //placedSprites[`${obj.layer},${obj.x},${obj.y}`].pendingRemoval = true;
-                    // Remove the object and its sprite from the board
-                    //delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
-                    //delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
-                    //updateTile(obj.layer, obj.x, obj.y);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
-                    // Optionally: allow player to move here immediately (no extra flag needed if removal is instant)
                     break;
                 case "zapall":
                     // Zap all labels in the object
@@ -1430,8 +1418,8 @@ function runImmediateLabel(obj, labelType) {
         // Stop if we hit a blocking command or end
         if (
             (command.type === "command" && command.blocking) ||
-            command.type === "text" ||
-            command.type === "status"
+            command.type === "text" //||
+            //command.type === "status"
         ) break;
 
         executeObjectCommand(obj, command);
@@ -1542,6 +1530,37 @@ function fillTextWithLetterSpacing(ctx, text, x, y, letterSpacing = 0) {
         // Advance by the width of the character plus letterSpacing
         currentX += ctx.measureText(char).width + letterSpacing;
     }
+}
+
+function showStatusMessageHTML(message, duration = 2000) {
+    // Check if the status element already exists
+    let statusEl = document.getElementById('status-message');
+    if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.id = 'status-message';
+        // Style the element
+        statusEl.style.position = 'absolute';
+        statusEl.style.left = '50%';
+        statusEl.style.bottom = '20px';
+        statusEl.style.transform = 'translateX(-50%)';
+        statusEl.style.background = 'rgba(0,0,0,0.85)';
+        statusEl.style.color = '#fff';
+        statusEl.style.padding = '8px 24px';
+        statusEl.style.borderRadius = '6px';
+        statusEl.style.fontSize = '18px';
+        statusEl.style.fontFamily = 'monospace, sans-serif';
+        statusEl.style.pointerEvents = 'none'; // Don't block input
+        statusEl.style.zIndex = 1000;
+        document.body.appendChild(statusEl);
+    }
+    statusEl.textContent = message;
+    statusEl.style.display = 'block';
+
+    // Hide after duration
+    clearTimeout(statusEl._timeout);
+    statusEl._timeout = setTimeout(() => {
+        statusEl.style.display = 'none';
+    }, duration);
 }
 
 // Game Over dialog
