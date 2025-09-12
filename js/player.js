@@ -50,6 +50,7 @@ let nightMode = true;
 let world = {};                      // World object
 let worldObjects = {};               // Stores objects for all boards
 let worldPassages = {};              // Stores passages for all boards
+const scriptFlags = {};              // Stores all set flags as { flagName: true }
 
 // Player variables
 let player = structuredClone(defaultPlayerStats); // Player object
@@ -69,16 +70,17 @@ let accumulatedTime = 0;
 // Status messages
 let statusMessage = "";
 let statusMessageTimer = 0;
-let statusMessageStyle = {
+const defaultStatusMessageStyle = {
     color: "#fff",
     bgColor: "rgba(0,0,0,0.7)",
-    x: null, // null means center
-    y: null, // null means bottom
+    x: null,
+    y: null,
     font: "bold 16px 'Fira Code', monospace",
     letterSpacing: 2,
     shadow: false,
     duration: 2000
 };
+let statusMessageStyle = { ...defaultStatusMessageStyle };
 
 // #################################################
 // ############ Main animation function ############
@@ -419,12 +421,42 @@ function executeObjectCommand(obj, command) {
             break;
         case "command":
             switch (command.name) {
-                case "message":
-                    // e.g. #message color #ff0
-                    if (command.args.length >= 2) {
-                        statusMessageStyle[command.args[0]] = command.args.slice(1).join(" ");
+                case "message": {
+                    if (!command.args[0]) {
+                        console.warn("#message: No property provided.");
+                        break;
+                    }
+                    const prop = command.args[0].toLowerCase();
+                    const value = command.args.slice(1).join(" ");
+                    if (prop === "reset") {
+                        statusMessageStyle = { ...defaultStatusMessageStyle };
+                        break;
+                    }
+                    if (!(prop in defaultStatusMessageStyle)) {
+                        console.warn(`#message: Unknown property "${prop}"`);
+                        break;
+                    }
+                    // Type conversion for known properties
+                    switch (prop) {
+                        case "color":
+                        case "bgcolor":
+                        case "font":
+                            statusMessageStyle[prop] = value;
+                            break;
+                        case "x":
+                        case "y":
+                        case "duration":
+                        case "letterspacing":
+                            statusMessageStyle[prop] = isNaN(Number(value)) ? null : Number(value);
+                            break;
+                        case "shadow":
+                            statusMessageStyle[prop] = value === "true" || value === "1" ? true : value; // allow color string
+                            break;
+                        default:
+                            statusMessageStyle[prop] = value;
                     }
                     break;
+                }
                 case "wait":
                     obj.waitTime = Number(command.args[0]) * 50 || 50;
                     obj.waiting = true;
@@ -643,8 +675,21 @@ function executeObjectCommand(obj, command) {
                 }
                 case "take": {
                     let item = command.args[0];
-                    let amount = parseInt(command.args[1], 10);
-                    if (isNaN(amount)) amount = 1; // Default to 1 if not specified
+                    let amountArg = command.args[1];
+                    let amount;
+
+                    // Support "all" and "half"
+                    if (typeof amountArg === "string" && amountArg.toLowerCase() === "all") {
+                        amount = player.stats[item] || 0;
+                        console.log(`Taking all of ${item}, which is ${amount}, player ${player.stats[item]}`); // Debugging
+                    } else if (typeof amountArg === "string" && amountArg.toLowerCase() === "half") {
+                        amount = Math.floor((player.stats[item] || 0) / 2);
+                    } else {
+                        amount = parseInt(amountArg, 10);
+                        if (isNaN(amount)) amount = 1; // Default to 1 if not specified
+                    }
+
+                    if (amount <= 0) amount = 1; // Ensure at least 1 is taken
 
                     // Optional label as last argument
                     let label = null;
@@ -681,6 +726,24 @@ function executeObjectCommand(obj, command) {
                         ? command.args.slice(eqIndex + 1).join(" ").replace(/^"|"$/g, '')
                         : command.args.slice(1).join(" ").replace(/^"|"$/g, '');
                     scriptGlobals[varName] = value;
+                    break;
+                }
+                case "set": {
+                    if (!command.args[0]) {
+                        console.warn("#set: No flag provided.");
+                        break;
+                    }
+                    const flag = command.args[0].toLowerCase();
+                    scriptFlags[flag] = true;
+                    break;
+                }
+                case "clear": {
+                    if (!command.args[0]) {
+                        console.warn("#clear: No flag provided.");
+                        break;
+                    }
+                    const flag = command.args[0].toLowerCase();
+                    delete scriptFlags[flag];
                     break;
                 }
                 case "shoot": {
@@ -748,7 +811,7 @@ function executeObjectCommand(obj, command) {
                     player.flashTimer = 200; // flash for 200ms
                     break;
                 case 'die':
-                    console.log("object died via #die command");
+                    //console.log("object died via #die command");
                     delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
                     delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
                     updateTile(obj.layer, obj.x, obj.y);
@@ -1574,25 +1637,34 @@ function fillTextWithLetterSpacing(ctx, text, x, y, letterSpacing = 0) {
 
 function showStatusMessageHTML(message, duration = 2000) {
     // Check if the status element already exists
+    let container = document.getElementById('block');
     let statusEl = document.getElementById('status-message');
     if (!statusEl) {
         statusEl = document.createElement('div');
         statusEl.id = 'status-message';
-        // Style the element
-        statusEl.style.position = 'absolute';
-        statusEl.style.left = '50%';
-        statusEl.style.bottom = '20px';
-        statusEl.style.transform = 'translateX(-50%)';
-        statusEl.style.background = 'rgba(0,0,0,0.85)';
-        statusEl.style.color = '#fff';
-        statusEl.style.padding = '8px 24px';
-        statusEl.style.borderRadius = '6px';
-        statusEl.style.fontSize = '18px';
-        statusEl.style.fontFamily = 'monospace, sans-serif';
-        statusEl.style.pointerEvents = 'none'; // Don't block input
-        statusEl.style.zIndex = 1000;
-        document.body.appendChild(statusEl);
+        container.appendChild(statusEl); // append to container, not body
     }
+
+    // Apply styles from statusMessageStyle
+    statusEl.style.position = 'absolute';
+    statusEl.style.left = statusMessageStyle.x !== null ? `${statusMessageStyle.x}px` : '50%';
+    statusEl.style.bottom = statusMessageStyle.y !== null ? `${statusMessageStyle.y}px` : '20px';
+    statusEl.style.transform = statusMessageStyle.x !== null ? 'none' : 'translateX(-50%)';
+    statusEl.style.background = statusMessageStyle.bgColor;
+    statusEl.style.color = statusMessageStyle.color;
+    statusEl.style.padding = '8px 24px';
+    statusEl.style.borderRadius = '6px';
+    statusEl.style.fontSize = statusMessageStyle.font.match(/\d+px/) ? statusMessageStyle.font.match(/\d+px/)[0] : '18px';
+    statusEl.style.fontFamily = statusMessageStyle.font.split(' ').slice(1).join(' ') || 'monospace, sans-serif';
+    statusEl.style.fontWeight = statusMessageStyle.font.includes('bold') ? 'bold' : 'normal';
+    statusEl.style.pointerEvents = 'none'; // Don't block input
+    statusEl.style.zIndex = 1000;
+    statusEl.style.textShadow = statusMessageStyle.shadow
+        ? (typeof statusMessageStyle.shadow === "string"
+            ? `0 0 8px ${statusMessageStyle.shadow}`
+            : "0 0 8px #000")
+        : "none";
+
     statusEl.textContent = message;
     statusEl.style.display = 'block';
 
@@ -1600,7 +1672,7 @@ function showStatusMessageHTML(message, duration = 2000) {
     clearTimeout(statusEl._timeout);
     statusEl._timeout = setTimeout(() => {
         statusEl.style.display = 'none';
-    }, duration);
+    }, duration !== undefined && duration !== null ? duration : statusMessageStyle.duration);
 }
 
 // Game Over dialog
@@ -1760,22 +1832,22 @@ function canMoveTo(x, y, object = player) {
                 return false; // Block movement if you want the player to stop
             }*/
 
-                if (sprite.type === 'object' && object.type === 'player') {
-    const obj = placedObjects[key];
-    if (obj) {
-        // Run :step or :collect immediately if present
-        if (obj.labels && (obj.labels[':step'] || obj.labels[':collect'])) {
-            if (obj.labels[':step']) runImmediateLabel(obj, ':step');
-            else runImmediateLabel(obj, ':collect');
-            // After running the label, if the object is gone, allow movement
-            if (!placedObjects[key]) return true;
-        } else if (!player.justInteracted) {
-            handlePlayerInteraction(key, ":touch");
-            if (!placedObjects[key]) return true;
-        }
-    }
-    return false;
-}
+            if (sprite.type === 'object' && object.type === 'player') {
+                const obj = placedObjects[key];
+                if (obj) {
+                    // Run :step or :collect immediately if present
+                    if (obj.labels && (obj.labels[':step'] || obj.labels[':collect'])) {
+                        if (obj.labels[':step']) runImmediateLabel(obj, ':step');
+                        else runImmediateLabel(obj, ':collect');
+                        // After running the label, if the object is gone, allow movement
+                        if (!placedObjects[key]) return true;
+                    } else if (!player.justInteracted) {
+                        handlePlayerInteraction(key, ":touch");
+                        if (!placedObjects[key]) return true;
+                    }
+                }
+                return false;
+            }
 
             /*if (sprite.type === 'object' && object.type === 'player') {
                 const obj = placedObjects[key];
