@@ -421,6 +421,36 @@ function executeObjectCommand(obj, command) {
             break;
         case "command":
             switch (command.name) {
+                case "text": {
+                    // Legacy #text command: display dialog and pause game
+                    if (!command.args.length) {
+                        console.warn("#text: No text provided.");
+                        break;
+                    }
+                    const dialogText = command.args.join(" ");
+                    gamePaused = true;
+                    showDialog(dialogText, obj);
+                    break;
+                }
+                case "bind": {
+                    if (!command.args[0] || !command.args[0].startsWith("@")) {
+                        console.warn("#bind: No valid source object name provided.");
+                        break;
+                    }
+                    const sourceName = command.args[0].slice(1);
+                    const sourceObj = Object.values(placedObjects).find(o => o.name === sourceName);
+                    if (!sourceObj) {
+                        console.warn(`#bind: Source object "${sourceName}" not found.`);
+                        break;
+                    }
+                    // Deep copy script and labels
+                    obj.script = JSON.parse(JSON.stringify(sourceObj.script));
+                    obj.labels = JSON.parse(JSON.stringify(sourceObj.labels));
+                    obj.scriptIndex = 0;
+                    obj.zappedLabels = {}; // Reset zapped labels
+                    console.log(`#bind: Bound script from "${sourceName}" to "${obj.name || obj.id}"`);
+                    break;
+                }
                 case "message": {
                     if (!command.args[0]) {
                         console.warn("#message: No property provided.");
@@ -929,478 +959,6 @@ function executeObjectCommand(obj, command) {
     }
 }
 
-function _executeObjectCommand(obj, action, args) {
-
-    args = substituteGlobals(args); // Replace global variables in args
-
-    // Skip comments: lines starting with '--' or '#rem'
-    if (action.startsWith('--') || action === '#rem') {
-        return;
-    }
-
-    if (action.startsWith("@")) {
-        // Set the object's name to everything after @
-        obj.name = action.slice(1) + (args.length > 0 ? " " + args.join(" ") : "");
-        return;
-    }
-
-    if (action.startsWith("*")) {
-        showStatusMessage(action.slice(1).trim() + " " + args.join(" ").trim());
-        return;
-    }
-
-    switch (action) {
-        case '#end':
-            obj.resting = true;
-            break;
-        case "#text":
-            gamePaused = true; // Pause the game loop
-            showDialog(args.join(" "), obj);
-            break;
-        case "#send":
-            if (args.length === 1) {
-                // Jump to a label within the same object
-                let label = args[0];
-                if (!label.startsWith(":")) label = ":" + label;
-                const index = resolveLabel(obj, label); // resolveLabel expects label without colon
-                if (index !== null) {
-                    obj.scriptIndex = index - 1;
-                } else {
-                    console.error(`Error: Label ${label} not found in script.`);
-                }
-            } else if (args.length === 2 && args[0].startsWith("@")) {
-                const targetName = args[0].slice(1);
-                let label = args[1];
-                if (!label.startsWith(":")) label = ":" + label;
-                const targetObject = Object.values(placedObjects).find(o => o.name === targetName);
-                if (!targetObject) {
-                    console.error(`Error: Object with name "${targetName}" not found.`);
-                    break;
-                }
-                const index = resolveLabel(targetObject, label);
-                if (index !== null) {
-                    targetObject.scriptIndex = index;
-                    targetObject.resting = false;
-                } else {
-                    console.error(`Error: Label ${label} not found in object "${targetName}".`);
-                }
-            } else {
-                console.error(`Error: Invalid #send command arguments: ${args.join(" ")}`);
-            }
-            break;
-        case "#change": // Sprite and color. example: #change 12 (120,80,40) (255,220,180)
-            if (!args[0] || isNaN(parseInt(args[0], 10))) {
-                console.warn(`#change: Missing or invalid sprite number: ${args[0]}`);
-                break;
-            }
-            let spriteNumber = parseInt(args[0], 10);
-
-            // Check for enough arguments for colors
-            if (!args[1]) {
-                console.warn(`#change: Missing color arguments.`);
-                break;
-            }
-
-            let dark, light;
-            if (args[1].startsWith("(")) {
-                // RGB format: must have at least 6 color values (3 for dark, 3 for light)
-                if (args.length < 7) {
-                    console.warn(`#change: Not enough RGB values. Expected 6, got ${args.length - 1}.`);
-                    break;
-                }
-                dark = extractRGB(args.slice(1, 4).join(" "));
-                light = extractRGB(args.slice(4, 7).join(" "));
-            } else {
-                // Named colors: must have at least 2 color names
-                if (!args[2]) {
-                    console.warn(`#change: Missing second color name.`);
-                    break;
-                }
-                dark = namedColors[args[1]] || [0, 0, 0]; // Default to black if not found
-                light = namedColors[args[2]] || [255, 255, 255]; // Default to white if not found
-            }
-
-            // Apply sprite change
-            obj.sprite = spriteNumber;
-            obj.color = [dark, light];
-
-            placedSprites[`${obj.layer},${obj.x},${obj.y}`].sprite = spriteNumber;
-            placedSprites[`${obj.layer},${obj.x},${obj.y}`].color = [dark, light];
-            updateTile(obj.layer, obj.x, obj.y); // Update tile with new sprite
-            renderLayersToMainCanvas(); // Ensure visual update
-            break;
-        case '#color':
-        case '#changecolor':
-            if (args[0] === "undefined") { console.warn("No color provided"); return; }
-            let color = extractRGB(args[0]); // Extract RGB values
-            let spriteKey = `${obj.layer},${obj.x},${obj.y}`;
-            placedSprites[spriteKey].color = color; // Update color
-            placedObjects[spriteKey].color = color; // Update object color
-            updateTile(obj.layer, obj.x, obj.y); // Update tile with new color
-            renderLayersToMainCanvas(); // Ensure visual update
-            break;
-        case '#sprite':
-        case '#changesprite':
-            if (args[0] === "undefined" || isNaN(args[0])) { console.warn("No sprite provided or NaN"); return; }
-            let spriteKeyChange = `${obj.layer},${obj.x},${obj.y}`;
-            placedSprites[spriteKeyChange].sprite = parseInt(args[0], 10); // Update sprite
-            placedObjects[spriteKeyChange].sprite = parseInt(args[0], 10); // Update object sprite
-            updateTile(obj.layer, obj.x, obj.y); // Update tile with new sprite
-            renderLayersToMainCanvas(); // Ensure visual update
-            break;
-        case "#timer":
-            obj.timer = parseInt(args[0], 10); // Set timer
-            break;
-        case '#step':
-            // Set a flag or override step size for full-tile movement
-            obj.fullStep = true;
-        case '#move': {
-            let direction = args[0];
-            let opp = false;
-
-            // Check for 'opp' modifier
-            if (direction === 'opp') {
-                opp = true;
-                direction = args[1];
-            }
-
-            // Handle random direction
-            if (direction === 'rndany' || direction === 'random') {
-                const dirs = ['up', 'down', 'left', 'right'];
-                direction = dirs[Math.floor(Math.random() * dirs.length)];
-            } else if (direction === 'seek') {
-                direction = calculateSeekDirection(obj, player);
-                if (opp) {
-                    // Reverse direction
-                    switch (direction) {
-                        case 'up': direction = 'down'; break;
-                        case 'down': direction = 'up'; break;
-                        case 'left': direction = 'right'; break;
-                        case 'right': direction = 'left'; break;
-                    }
-                }
-            } else {
-                direction = convertDirections(direction);
-                if (opp && direction !== -1) {
-                    // Reverse direction
-                    switch (direction) {
-                        case 'up': direction = 'down'; break;
-                        case 'down': direction = 'up'; break;
-                        case 'left': direction = 'right'; break;
-                        case 'right': direction = 'left'; break;
-                    }
-                }
-            }
-
-            if (direction === -1) {
-                console.warn(`Invalid direction "${args.join(' ')}" provided for #move`);
-                return;
-            }
-
-            // Use full-tile step if #step, otherwise default
-            let step = obj.fullStep ? 1 : 0.5;
-            obj.fullStep = false; // Reset flag
-
-            moveObject(obj, direction, obj.layer, step);
-            break;
-        }
-        case '#moveto':
-        case '#moveTo': {
-            // Support both "#moveto 5 16", "#moveto 5,16", "#moveto 5, 16", and optional "force"
-            let targetX, targetY;
-            let force = false;
-
-            // Check for 'force' as the last argument
-            if (args[args.length - 1] === 'force') {
-                force = true;
-                args = args.slice(0, -1); // Remove 'force' from args
-            }
-
-            if (args.length === 1 && args[0].includes(',')) {
-                [targetX, targetY] = args[0].split(',').map(s => parseInt(s.trim(), 10));
-            } else if (args.length >= 2) {
-                targetX = parseInt(args[0].replace(',', ''), 10);
-                targetY = parseInt(args[1].replace(',', ''), 10);
-            }
-            if (
-                isNaN(targetX) || isNaN(targetY) ||
-                targetX < 0 || targetY < 0 || targetX >= tilesX || targetY >= tilesY
-            ) {
-                console.warn('Invalid arguments for #moveTo. Expected two numbers.');
-                return;
-            }
-            let targetKey = `${obj.layer},${targetX},${targetY}`;
-            if (!force && placedObjects[targetKey] && placedObjects[targetKey].id !== obj.id || !force && placedSprites[targetKey] || placedSprites[targetKey] && placedSprites[targetKey].type === 'passage' || placedSprites[targetKey] && placedSprites[targetKey].type === 'player') {
-                console.warn(`Target tile (${targetX}, ${targetY}) is occupied by another object.`);
-                return; // Prevent moving to an occupied tile
-            }
-            // If force, destroy whatever is at the target location
-            if (force) {
-                if (placedObjects[targetKey]) delete placedObjects[targetKey];
-                if (placedSprites[targetKey]) delete placedSprites[targetKey];
-            }
-            // Move the object to the specified coordinates
-            let oldKey = `${obj.layer},${obj.x},${obj.y}`;
-            placedSprites[targetKey] = placedSprites[oldKey]; // Move sprite
-            placedObjects[targetKey] = obj;
-            delete placedObjects[oldKey];
-            delete placedSprites[oldKey];
-            updateTile(obj.layer, obj.x, obj.y); // Clear old tile
-            obj.x = targetX;
-            obj.y = targetY;
-            updateTile(obj.layer, obj.x, obj.y); // Update new tile
-            console.log(`Moved object to (${targetX}, ${targetY})${force ? ' with force' : ''}`);
-            break;
-        }
-        case '#shoot': {
-            if (!args[0]) { console.warn('No direction provided'); return; }
-
-            let direction = args[0];
-            let opp = false;
-
-            // Handle 'opp' modifier
-            if (direction === 'opp') {
-                opp = true;
-                direction = args[1];
-            }
-
-            // Handle 'flow'
-            if (direction === 'flow') {
-                direction = obj.direction || 'right'; // Default to right if undefined
-                if (opp) {
-                    // Reverse direction
-                    switch (direction) {
-                        case 'up': direction = 'down'; break;
-                        case 'down': direction = 'up'; break;
-                        case 'left': direction = 'right'; break;
-                        case 'right': direction = 'left'; break;
-                    }
-                }
-            } else if (direction === 'seek') {
-                direction = calculateSeekDirection(obj, player);
-                if (opp) {
-                    switch (direction) {
-                        case 'up': direction = 'down'; break;
-                        case 'down': direction = 'up'; break;
-                        case 'left': direction = 'right'; break;
-                        case 'right': direction = 'left'; break;
-                    }
-                }
-            } else {
-                direction = convertDirections(direction);
-                if (opp && direction !== -1) {
-                    switch (direction) {
-                        case 'up': direction = 'down'; break;
-                        case 'down': direction = 'up'; break;
-                        case 'left': direction = 'right'; break;
-                        case 'right': direction = 'left'; break;
-                    }
-                }
-            }
-
-            if (direction === -1) {
-                console.warn(`Invalid direction "${args.join(' ')}" provided for #shoot`);
-                return;
-            }
-
-            let { x, y } = calculateBulletPosition(obj.x, obj.y, direction);
-            let bullet = createBullet(canvas, x, y, direction, 16, 'white', obj.name);
-            bullet.origin = `${obj.layer},${obj.x},${obj.y}`;
-            bulletArray.push(bullet);
-            console.log(`Creating bullet at (${x}, ${y}) with direction ${direction}`);
-            break;
-        }
-        case '#wait':
-            obj.waiting = true; // Set waiting state
-            //obj.waitTime = parseInt(args[0], 10) * 10; // Store remaining time in milliseconds
-            obj.waitTime = (parseInt(args[0], 10) || 1) * 50; // Default to 50ms if no valid argument is provided
-            break;
-        case '#sleep':
-            obj.waiting = true;
-            obj.waitTime = (parseInt(args[0], 10) || 1) * 1000; // 1 = 1000ms
-            break;
-        case "#let": {
-            // Usage: #let $var = value
-            let varName = args[0];
-            if (!varName.startsWith('$')) {
-                console.warn("Global variable names must start with $");
-                return;
-            }
-            // Join the rest as the value, remove quotes if present
-            let value = args.slice(2).join(" ").replace(/^"|"$/g, '');
-            scriptGlobals[varName] = value;
-            break;
-        }
-        case '#endscript':
-            obj.resting = true; // Mark the object as resting
-            obj.scriptIndex = -1; // Stop executing the script
-            break;
-        case '#loop':
-            obj.scriptIndex = obj.labels[':loop'] || 0;
-            break;
-        case '#die':
-            //placedSprites[`${obj.layer},${obj.x},${obj.y}`].pendingRemoval = true; // Mark sprite for removal
-            //obj.pendingRemoval = true; // Mark object for removal
-            delete placedObjects[`${obj.layer},${obj.x},${obj.y}`];
-            delete placedSprites[`${obj.layer},${obj.x},${obj.y}`];
-            updateTile(obj.layer, obj.x, obj.y);
-            break;
-
-        case '#zap':
-            const zapLabel = `:${args[0]}`;
-            if (!obj.zappedLabels[zapLabel]) {
-                obj.zappedLabels[zapLabel] = 1;
-            } else {
-                obj.zappedLabels[zapLabel]++;
-            }
-            break;
-        case '#restore':
-            const restoreLabel = `:${args[0]}`;
-            delete obj.zappedLabels[restoreLabel];
-            break;
-        case "#trigger":
-            let triggerLabel = args[0];
-            let index = resolveLabel(obj, triggerLabel);
-            if (index !== null) {
-                obj.scriptIndex = index;
-            } else {
-                console.warn(`No active labels found for :${triggerLabel}`);
-            }
-            break;
-        case '#take': {
-            let item = args[0];
-            let amount = parseInt(args[1], 10);
-            if (isNaN(amount)) amount = 1; // Default to 1 if not specified
-
-            // Check for optional label as last argument
-            let label = null;
-            if (args.length > 2) {
-                label = args[args.length - 1];
-                // Only treat as label if it's not a number (to avoid confusion with multi-digit amounts)
-                if (!isNaN(label)) label = null;
-            }
-
-            // Check if player has enough of the stat
-            if (player.stats[item] === undefined || player.stats[item] < amount && item !== 'health') {
-                if (label && obj.labels && obj.labels[`:${label}`] !== undefined) {
-                    obj.scriptIndex = obj.labels[`:${label}`] - 1;
-                    return;
-                }
-                // If no label, warn and return
-                console.warn(`Not enough ${item} to take. No label provided.`);
-                return;
-            }
-
-            adjustStat(player, item, -amount);
-            if (player.stats.health <= 0) youDied(); // Check if player died after taking an item
-            console.log(`Took ${amount} ${item}(s)`);
-            break;
-        }
-        case '#give':
-            let itemGive = args[0];
-            let amountGive = parseInt(args[1], 10);
-            if (isNaN(amountGive)) amountGive = 1; // Default to 1 if not specified
-            adjustStat(player, itemGive, amountGive);
-            console.log(`Gave ${amountGive} ${itemGive}(s)`);
-            break;
-        case "#cycle":
-            let cycleNum = parseInt(args[0], 10);
-            if (!isNaN(cycleNum) && cycleNum > 0) {
-                obj.moveInterval = cycleNum * 10;
-            } else {
-                console.warn("Invalid #cycle value:", args[0]);
-            }
-            break;
-
-        case '#hidelayer':
-            let layerToHide = parseInt(args[0], 10);
-            if (isNaN(layerToHide) || layerToHide < 1 || layerToHide > 3) {
-                console.warn(`Invalid layer number: ${args[0]}`);
-                return;
-            }
-            if (hiddenLayers.has(layerToHide)) {
-                console.warn(`Layer ${layerToHide} is already hidden.`);
-                return;
-            }
-            hiddenLayers.add(layerToHide);
-            renderLayersToMainCanvas(); // <-- Add this
-            break;
-        case '#showlayer':
-            let layerToShow = parseInt(args[0], 10);
-            if (isNaN(layerToShow) || layerToShow < 1 || layerToShow > 3) {
-                console.warn(`Invalid layer number: ${args[0]}`);
-                return;
-            }
-            hiddenLayers.delete(layerToShow);
-            renderLayersToMainCanvas();
-            break;
-        case "#message": {
-            if (!args[0]) {
-                console.warn("#message: No property provided.");
-                break;
-            }
-            const prop = args[0].toLowerCase();
-            const value = args.slice(1).join(" ");
-            switch (prop) {
-                case "color":
-                    statusMessageStyle.color = value;
-                    break;
-                case "bgcolor":
-                case "background":
-                    statusMessageStyle.bgColor = value;
-                    break;
-                case "x":
-                    statusMessageStyle.x = isNaN(Number(value)) ? null : Number(value);
-                    break;
-                case "y":
-                    statusMessageStyle.y = isNaN(Number(value)) ? null : Number(value);
-                    break;
-                case "font":
-                    statusMessageStyle.font = value;
-                    break;
-                case "letterspacing":
-                    statusMessageStyle.letterSpacing = Number(value) || 0;
-                    break;
-                case "shadow":
-                    statusMessageStyle.shadow = value === "true" || value === "1" ? true : value; // allow color string
-                    break;
-                case "duration":
-                    statusMessageStyle.duration = Number(value) || 2000;
-                    break;
-                case "reset":
-                    // Reset to defaults
-                    statusMessageStyle = {
-                        color: "#fff",
-                        bgColor: "rgba(0,0,0,0.7)",
-                        x: null,
-                        y: null,
-                        font: "bold 16px 'Fira Code', monospace",
-                        letterSpacing: 2,
-                        shadow: false,
-                        duration: 2000
-                    };
-                    break;
-                default:
-                    console.warn(`#message: Unknown property "${prop}"`);
-            }
-            break;
-        }
-        case '#nightmode':
-            nightMode = !nightMode;
-            break;
-        default:
-            // If not a command, check if it's a label in the script (with or without # or :)
-            let labelKey = action;
-            if (labelKey.startsWith("#")) labelKey = labelKey.slice(1);
-            if (!labelKey.startsWith(":")) labelKey = ":" + labelKey;
-            if (obj.labels && obj.labels[labelKey]) {
-                obj.scriptIndex = obj.labels[labelKey] - 1;
-                return;
-            }
-            console.warn(`Unknown command or label: ${action}`);
-    }
-}
-
 function moveObject(obj, direction, layer, step = 0.5) {
     const offsets = { up: [0, -step], down: [0, step], left: [-step, 0], right: [step, 0] };
     const dir = convertDirections(direction);
@@ -1505,6 +1063,58 @@ function runImmediateLabel(obj, labelType) {
     }
     */
 }
+
+// Attach this to your canvas or board element
+//const canvas = document.getElementById('game-canvas'); // Use your actual canvas ID
+
+/*canvas.addEventListener('click', function(event) {
+    // Get mouse position relative to canvas
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Convert to tile coordinates (replace with your helper)
+    const { tileX, tileY } = getTileAt(mouseX, mouseY);
+
+    // Get the object at this tile (replace with your helper)
+    const obj = getObjectAtTile(tileX, tileY);
+
+    if (obj && obj.labels && obj.labels[':click']) {
+        // Jump to the :click label in the object's script
+        jumpToLabel(obj, ':click');
+        // Optionally, start executing the script from here
+    }
+});*/
+
+/*canvas.addEventListener('click', function(event) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    const { tileX, tileY } = getTileAtCanvasPosition(mouseX, mouseY);
+    const obj = getObjectAtTile(tileX, tileY);
+
+    if (obj && obj.labels && obj.labels[':click']) {
+        runImmediateLabel(obj, ':click');
+    }
+});*/
+
+canvas.addEventListener('click', function (event) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const { tileX, tileY } = getTileAtCanvasPosition(mouseX, mouseY);
+
+    // Try all layers, top to bottom
+    let obj = null;
+    for (let layer = 3; layer >= 1; layer--) {
+        obj = getObjectAtTile(tileX, tileY, layer);
+        if (obj && obj.labels && obj.labels[':click']) {
+            runImmediateLabel(obj, ':click');
+            break;
+        }
+    }
+});
 
 /*function runImmediateLabel(obj, labelType) {
     let index = resolveLabel(obj, labelType);
@@ -1693,6 +1303,34 @@ function youDied() {
 // #############################################
 // ############ Collision detection ############
 // #############################################
+
+function getTileAtCanvasPosition(mouseX, mouseY) {
+    // Assumes tileSizeX and tileSizeY are defined globally
+    const tileX = Math.floor(mouseX / tileSizeX);
+    const tileY = Math.floor(mouseY / tileSizeY);
+    return { tileX, tileY };
+}
+
+function getObjectAtTile(tileX, tileY, layer = 1) {
+    // Default to layer 1 if not specified
+    const key = `${layer},${tileX},${tileY}`;
+    return placedObjects[key] || null;
+}
+
+function jumpToLabel(obj, label) {
+    // label should include the colon, e.g., ':click'
+    if (!obj.labels || !obj.labels[label]) {
+        console.warn(`Label ${label} not found in object script.`);
+        return;
+    }
+    const index = resolveLabel(obj, label);
+    if (index !== null) {
+        obj.scriptIndex = index;
+        obj.waitTime = 0;
+        obj.waiting = false;
+        obj.resting = false;
+    }
+}
 
 function checkTiles(x, y, direction = 'down') {
     let leftTile = Math.floor(x / tileSizeX);

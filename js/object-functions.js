@@ -46,6 +46,16 @@ export function loadObjectsFromGameData(gameData) {
             placedObjects[key].script = parsedScript.script;  // Store only the script array
             placedObjects[key].labels = parsedScript.labels;  // Store the labels separately
 
+            // Pre-pass: set name from first @ (type: 'name') command in script, if present
+            let foundName = "";
+            for (let cmd of parsedScript.script) {
+                if (cmd.type === "name" && typeof cmd.value === "string" && cmd.value.length > 0) {
+                    foundName = cmd.value;
+                    break;
+                }
+            }
+            placedObjects[key].name = foundName;
+
             placedSprites[key].id = placedObjects[key].id; // Add ID to the sprite data too
 
             console.log(placedObjects[key].script);
