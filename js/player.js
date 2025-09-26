@@ -448,6 +448,7 @@ function executeObjectCommand(obj, command) {
                     obj.labels = JSON.parse(JSON.stringify(sourceObj.labels));
                     obj.scriptIndex = 0;
                     obj.zappedLabels = {}; // Reset zapped labels
+                    obj.name = sourceObj.name;
                     console.log(`#bind: Bound script from "${sourceName}" to "${obj.name || obj.id}"`);
                     break;
                 }
@@ -509,7 +510,7 @@ function executeObjectCommand(obj, command) {
                         console.error("Error: Missing ':loop' label in script.");
                     }
                     break;
-                case "step":
+                case "step": // STEP NEEDS TO COME BEFORE MOVE
                     // Set fullStep to true to use full-tile step
                     obj.fullStep = true;
                 case "move": {
@@ -743,6 +744,12 @@ function executeObjectCommand(obj, command) {
                     console.log(`Took ${amount} ${item}(s)`);
                     break;
                 }
+                case "lock":
+                    obj.locked = true;
+                    break;
+                case "unlock":
+                    obj.locked = false;
+                    break;
                 case "let": {
                     // Usage: #let $var = value
                     let varName = command.args[0];
@@ -881,22 +888,28 @@ function executeObjectCommand(obj, command) {
                             console.error(`Error: Label ${label} not found in script.`);
                         }
                     } else if (command.args.length === 2 && command.args[0].startsWith("@")) {
-                        const targetName = command.args[0].slice(1);
-                        let label = command.args[1];
-                        if (!label.startsWith(":")) label = ":" + label;
-                        const targetObject = Object.values(placedObjects).find(o => o.name === targetName);
-                        if (!targetObject) {
-                            console.error(`Error: Object with name "${targetName}" not found.`);
-                            break;
-                        }
-                        const index = resolveLabel(targetObject, label);
-                        if (index !== null) {
-                            targetObject.scriptIndex = index;
-                            targetObject.resting = false;
-                        } else {
-                            console.error(`Error: Label ${label} not found in object "${targetName}".`);
-                        }
-                    } else {
+    const targetName = command.args[0].slice(1);
+    let label = command.args[1];
+    if (!label.startsWith(":")) label = ":" + label;
+    const targetObjects = Object.values(placedObjects).filter(o => o.name === targetName);
+    if (targetObjects.length === 0) {
+        console.error(`Error: Object with name "${targetName}" not found.`);
+        break;
+    }
+    for (const targetObject of targetObjects) {
+        if (targetObject.locked) {
+            console.warn(`Object "${targetName}" is locked and cannot receive #send.`);
+            continue;
+        }
+        const index = resolveLabel(targetObject, label);
+        if (index !== null) {
+            targetObject.scriptIndex = index;
+            targetObject.resting = false;
+        } else {
+            console.error(`Error: Label ${label} not found in object "${targetName}".`);
+        }
+    }
+} else {
                         console.error(`Error: Invalid #send command arguments: ${command.args.join(" ")}`);
                     }
                     break;
@@ -1001,6 +1014,7 @@ function moveObject(obj, direction, layer, step = 0.5) {
 
 function handleObjectInteraction(tileKey, labelType) {
     let obj = placedObjects[tileKey];
+    if (obj && obj.locked) return; // Prevent interaction if locked
     if (obj && obj.labels[labelType]) {
         let index = resolveLabel(obj, labelType);
         if (index !== null) {
@@ -1016,6 +1030,7 @@ function handleObjectInteraction(tileKey, labelType) {
 
 function handlePlayerInteraction(tileKey, labelType) {
     let obj = placedObjects[tileKey];
+    if (obj && obj.locked) return; // Prevent interaction if locked
     if (obj && obj.labels[labelType]) {
         let labelKey = labelType.startsWith(":") ? labelType : ":" + labelType;
         let index = resolveLabel(obj, labelKey);
