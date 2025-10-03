@@ -48,7 +48,7 @@ spriteButton.onclick = () => {
   editSprite(newCurrent);
 }
 
-boardLayers.forEach((element, index) => {
+/*boardLayers.forEach((element, index) => {
   if (index > 0) {
     element.onclick = () => {
       callbackFunction(index, hidden);
@@ -74,6 +74,35 @@ spriteTypes.forEach((element) => {
     const type = element.id;
     if (type === 'other') return;
     callbackFunction( undefined, undefined, type);
+  }
+});*/
+
+boardLayers.forEach((element, index) => {
+  if (index > 0) {
+    element.onclick = () => {
+      callbackFunction({ layer: index, hidden });
+    }
+  }
+});
+
+layerButtons.forEach((element, index) => {
+  if (index > 0) {
+    element.onclick = () => {
+      if (hidden.has(index)) {
+        hidden.delete(index);
+      } else {
+        hidden.add(index);
+      }
+      callbackFunction({ hidden });
+    }
+  }
+});
+
+spriteTypes.forEach((element) => { 
+  element.onclick = () => {
+    const type = element.id;
+    if (type === 'other') return;
+    callbackFunction({ type });
   }
 });
 
