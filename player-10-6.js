@@ -62,52 +62,7 @@ const messageStylePresets = {        // Preset styles for status messages
     subtle: { color: "#888", bgColor: "#222", duration: 1800, font: "16px monospace" },
     big: { color: "#fff", bgColor: "#000", duration: 4000, font: "bold 32px monospace" }
 };
-let worldSaveData = {                // All the data needed to save the world
-    spritesheet: [],                 // Will be filled when saving
-    boards: [],                      // Board list
-    world: {},                       // Board data
-
-    // World-level settings and scripts
-    worldSettings: {
-        startingStats: {
-            health: 100,
-            ammo: 10,
-            coins: 0,
-            // ...add more as needed
-        },
-        deathBoard: 2,          // Board ID to go to on death
-        globalScripts: "",      // Any global script text
-        // ...future global settings
-    },
-
-    // Per-board settings and scripts
-    boardSettings: {
-        // Example for board 1
-        1: {
-            playerStart: { x: 10, y: 5, layer: 2 },
-            reenterAtStart: true,
-            linkedBoards: { east: 2, west: null, north: null, south: null },
-            dark: false,
-            nightmode: false,
-            playerLocked: false,
-            playerCanAttack: true,
-            boardScript: "", // Board-specific script
-            // ...future board settings
-        },
-        // Example for board 2
-        2: {
-            playerStart: { x: 20, y: 10, layer: 2 },
-            reenterAtStart: false,
-            linkedBoards: { east: null, west: 1, north: null, south: null },
-            dark: true,
-            nightmode: false,
-            playerLocked: false,
-            playerCanAttack: true,
-            boardScript: "",
-        }
-        // ...add more boards as needed
-    }
-};
+//const scriptMixins = {};             // Reusable script snippets
 
 // Player variables
 let player = structuredClone(defaultPlayerStats); // Player object
@@ -157,9 +112,8 @@ export function animateGame(currentTime) {
         updateObjects(deltaTime);
         updatePlayer(deltaTime);
 
-        //if (loaded) renderLayersToMainCanvas();
-        //else drawDefaultTitleScreen();
-        renderLayersToMainCanvas();
+        if (loaded) renderLayersToMainCanvas();
+        else drawDefaultTitleScreen();
 
         if (player.flashRed) {
             player.flashTimer -= deltaTime;
@@ -296,6 +250,7 @@ function renderLayersToMainCanvas() {
 
         // You can add more lights for torches, objects, etc. here
         ctx.restore();
+
     }
 
     if (statusMessage && statusMessageTimer > 0) {
@@ -455,6 +410,8 @@ function updateObjects(deltaTime) {
                 obj.scriptIndex++;
             }
 
+
+
             // Auto-stop if script ends without `#end`
             if (obj.scriptIndex >= obj.script.length) {
                 obj.resting = true;
@@ -507,29 +464,6 @@ function executeObjectCommand(obj, command) {
                     console.log(`#bind: Bound script from "${sourceName}" to "${obj.name || obj.id}"`);
                     break;
                 }
-                case "if": {
-                    // Basic: #if <flag> then <:label>
-                    const flag = command.args[0]?.toLowerCase();
-                    const thenIndex = command.args.indexOf("then");
-                    const label = thenIndex !== -1 ? command.args[thenIndex + 1] : null;
-
-                    if (!flag || !label) {
-                        console.warn("#if: Invalid syntax. Usage: #if <flag> then <:label>");
-                        break;
-                    }
-
-                    if (scriptFlags[flag]) {
-                        // Jump to the label if the flag is set
-                        let labelKey = label.startsWith(":") ? label : ":" + label;
-                        const index = resolveLabel(obj, labelKey);
-                        if (index !== null) {
-                            obj.scriptIndex = index - 1; // -1 so next tick runs the label's first command
-                        } else {
-                            console.warn(`#if: Label ${labelKey} not found.`);
-                        }
-                    }
-                    break;
-                }
                 case "message": {
                     // Reset to default before applying new styles
                     Object.assign(statusMessageStyle, defaultStatusMessageStyle);
@@ -564,41 +498,42 @@ function executeObjectCommand(obj, command) {
                     }
                     break;
                 }
-                /*if (!command.args[0]) {
-                    console.warn("#message: No property provided.");
-                    break;
-                }
-                const prop = command.args[0].toLowerCase();
-                const value = command.args.slice(1).join(" ");
-                if (prop === "reset") {
-                    statusMessageStyle = { ...defaultStatusMessageStyle };
-                    break;
-                }
-                if (!(prop in defaultStatusMessageStyle)) {
-                    console.warn(`#message: Unknown property "${prop}"`);
-                    break;
-                }
-                // Type conversion for known properties
-                switch (prop) {
-                    case "color":
-                    case "bgcolor":
-                    case "font":
-                        statusMessageStyle[prop] = value;
+                /*case "message": {
+                    if (!command.args[0]) {
+                        console.warn("#message: No property provided.");
                         break;
-                    case "x":
-                    case "y":
-                    case "duration":
-                    case "letterspacing":
-                        statusMessageStyle[prop] = isNaN(Number(value)) ? null : Number(value);
+                    }
+                    const prop = command.args[0].toLowerCase();
+                    const value = command.args.slice(1).join(" ");
+                    if (prop === "reset") {
+                        statusMessageStyle = { ...defaultStatusMessageStyle };
                         break;
-                    case "shadow":
-                        statusMessageStyle[prop] = value === "true" || value === "1" ? true : value; // allow color string
+                    }
+                    if (!(prop in defaultStatusMessageStyle)) {
+                        console.warn(`#message: Unknown property "${prop}"`);
                         break;
-                    default:
-                        statusMessageStyle[prop] = value;
-                }
-                break;
-            }*/
+                    }
+                    // Type conversion for known properties
+                    switch (prop) {
+                        case "color":
+                        case "bgcolor":
+                        case "font":
+                            statusMessageStyle[prop] = value;
+                            break;
+                        case "x":
+                        case "y":
+                        case "duration":
+                        case "letterspacing":
+                            statusMessageStyle[prop] = isNaN(Number(value)) ? null : Number(value);
+                            break;
+                        case "shadow":
+                            statusMessageStyle[prop] = value === "true" || value === "1" ? true : value; // allow color string
+                            break;
+                        default:
+                            statusMessageStyle[prop] = value;
+                    }
+                    break;
+                }*/
                 case "wait":
                     obj.waitTime = Number(command.args[0]) * 50 || 50;
                     obj.waiting = true;
@@ -982,6 +917,11 @@ function executeObjectCommand(obj, command) {
                     }
                     break;
                 }
+                case "restore": {
+                    const restoreLabel = command.args[0].startsWith(":") ? command.args[0] : ":" + command.args[0];
+                    delete obj.zappedLabels[restoreLabel];
+                    break;
+                }
                 case "use": {
                     const mixinName = command.args[0];
                     if (scriptMixins[mixinName]) {
@@ -990,11 +930,6 @@ function executeObjectCommand(obj, command) {
                     } else {
                         console.warn(`#use: Mixin "${mixinName}" not found.`);
                     }
-                    break;
-                }
-                case "restore": {
-                    const restoreLabel = command.args[0].startsWith(":") ? command.args[0] : ":" + command.args[0];
-                    delete obj.zappedLabels[restoreLabel];
                     break;
                 }
                 case "send": {
@@ -2120,9 +2055,6 @@ document.addEventListener("keydown", (event) => {
         loadWorld(handleLoadedGame);
     }
 
-    // Block all other keys if not loaded
-    if (!loaded) return;
-
     if (!player.locked) { // Prevent input if player is locked
 
         if (event.key === 'l' && !gamePaused) { // load game
@@ -2167,7 +2099,6 @@ document.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener('keyup', (event) => {
-    if (!loaded) return; // Ignore input if game not loaded
     keys[event.key] = false;
     updateDirection(); // Update direction when key is released
     if (
@@ -2194,5 +2125,4 @@ function updateDirection() {
 }
 
 // Start the animation
-//requestAnimationFrame(animateGame);
-drawDefaultTitleScreen()
+requestAnimationFrame(animateGame);

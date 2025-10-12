@@ -50,12 +50,14 @@ export function saveCombinedData(spritesheet, board, fileName = 'gameData') { //
     document.body.removeChild(link);
 }
 
-export function saveWorld(spritesheet, boardList, world, filename = 'world') { // Save World (Board, SpriteSheet)
+export function saveWorld(spritesheet, boardList, world, worldSettings = {}, boardSettings = {}, filename = 'world') {
     const fileExtension = 'json';
     let worldData = {
         spritesheet: spritesheet.map(element => element[0]),
         boards: boardList,
         world: world,
+        worldSettings: worldSettings,
+        boardSettings: boardSettings
     };
 
     // Convert the data to JSON
@@ -67,7 +69,6 @@ export function saveWorld(spritesheet, boardList, world, filename = 'world') { /
     link.href = URL.createObjectURL(blob);
     link.download = `${filename}.${fileExtension}`;
 
-    // Append the link to the DOM, click it to start download, and remove it afterward
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
