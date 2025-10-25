@@ -1,5 +1,52 @@
 //if (object === 'bullet' && tileType === 'object' && object.origin === 'object') return true; 
 
+export let worldSaveData = { // Global game data
+    spritesheet: [],
+    boards: [],
+    world: {},
+    worldSettings: {
+        startingStats: {
+            health: 100,
+            ammo: 10,
+            coins: 0,
+        },
+        deathBoard: 2,
+        globalScripts: "",
+    },
+    boardSettings: {
+        1: {
+            playerStart: { x: 10, y: 5, layer: 2 },
+            reenterAtStart: true,
+            linkedBoards: { east: 2, west: null, north: null, south: null },
+            dark: false,
+            nightmode: false,
+            playerLocked: false,
+            playerCanAttack: true,
+            boardScript: "",
+        },
+        2: {
+            playerStart: { x: 20, y: 10, layer: 2 },
+            reenterAtStart: false,
+            linkedBoards: { east: null, west: 1, north: null, south: null },
+            dark: true,
+            nightmode: false,
+            playerLocked: false,
+            playerCanAttack: true,
+            boardScript: "",
+        }
+    }
+};
+
+export const defaultStatusMessageStyle = {
+    color: "#fff",
+    bgColor: "rgba(0,0,0,0.7)",
+    x: null,
+    y: null,
+    font: "bold 16px 'Fira Code', monospace",
+    letterSpacing: 2,
+    shadow: false,
+    duration: 2000
+};
 
 // Global mixin storage
 export const scriptMixins = {}; // <-- Added for mixin support
@@ -29,6 +76,7 @@ export function loadObjectsFromGameData(gameData) {
                 type: 'object',
                 name: tile.data.name || "",
                 direction: 'down', // Default direction
+                statusMessageStyle: { ...defaultStatusMessageStyle }, // Default status message style
                 waiting: false, // Initialize waiting state
                 waitTime: 0, // Initialize wait time
                 //speed: tile.data.speed || 1,  // Default to speed 1 NOT BEING USED

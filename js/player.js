@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, scriptMixins } from './object-functions.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -62,52 +62,6 @@ const messageStylePresets = {        // Preset styles for status messages
     subtle: { color: "#888", bgColor: "#222", duration: 1800, font: "16px monospace" },
     big: { color: "#fff", bgColor: "#000", duration: 4000, font: "bold 32px monospace" }
 };
-let worldSaveData = {                // All the data needed to save the world
-    spritesheet: [],                 // Will be filled when saving
-    boards: [],                      // Board list
-    world: {},                       // Board data
-
-    // World-level settings and scripts
-    worldSettings: {
-        startingStats: {
-            health: 100,
-            ammo: 10,
-            coins: 0,
-            // ...add more as needed
-        },
-        deathBoard: 2,          // Board ID to go to on death
-        globalScripts: "",      // Any global script text
-        // ...future global settings
-    },
-
-    // Per-board settings and scripts
-    boardSettings: {
-        // Example for board 1
-        1: {
-            playerStart: { x: 10, y: 5, layer: 2 },
-            reenterAtStart: true,
-            linkedBoards: { east: 2, west: null, north: null, south: null },
-            dark: false,
-            nightmode: false,
-            playerLocked: false,
-            playerCanAttack: true,
-            boardScript: "", // Board-specific script
-            // ...future board settings
-        },
-        // Example for board 2
-        2: {
-            playerStart: { x: 20, y: 10, layer: 2 },
-            reenterAtStart: false,
-            linkedBoards: { east: null, west: 1, north: null, south: null },
-            dark: true,
-            nightmode: false,
-            playerLocked: false,
-            playerCanAttack: true,
-            boardScript: "",
-        }
-        // ...add more boards as needed
-    }
-};
 
 // Player variables
 let player = structuredClone(defaultPlayerStats); // Player object
@@ -127,16 +81,6 @@ let accumulatedTime = 0;
 // Status messages
 let statusMessage = "";
 let statusMessageTimer = 0;
-const defaultStatusMessageStyle = {
-    color: "#fff",
-    bgColor: "rgba(0,0,0,0.7)",
-    x: null,
-    y: null,
-    font: "bold 16px 'Fira Code', monospace",
-    letterSpacing: 2,
-    shadow: false,
-    duration: 2000
-};
 let statusMessageStyle = { ...defaultStatusMessageStyle };
 
 // #################################################
@@ -531,39 +475,44 @@ function executeObjectCommand(obj, command) {
                     break;
                 }
                 case "message": {
-                    // Reset to default before applying new styles
-                    Object.assign(statusMessageStyle, defaultStatusMessageStyle);
-
-                    // Check for preset usage
+                    console.log('message command args:', command.args);
+                    if (!command.args.length) {
+                        console.warn("#message: No arguments provided.");
+                        break;
+                    }
+                    if (!obj.statusMessageStyle) obj.statusMessageStyle = { ...defaultStatusMessageStyle };
+                    if (command.args[0] === "reset") {
+                        Object.assign(obj.statusMessageStyle, defaultStatusMessageStyle);
+                        break;
+                    }
                     if (command.args[0] === "preset" && messageStylePresets[command.args[1]]) {
-                        Object.assign(statusMessageStyle, messageStylePresets[command.args[1]]);
-                        // Remove 'preset' and preset name from args
+                        //Object.assign(obj.statusMessageStyle, defaultStatusMessageStyle);
+                        Object.assign(obj.statusMessageStyle, messageStylePresets[command.args[1]]);
                         command.args.splice(0, 2);
                     }
-
-                    // Parse remaining args as key-value pairs (e.g., color #0f0)
                     for (let i = 0; i < command.args.length; i += 2) {
                         const key = command.args[i];
                         const value = command.args[i + 1];
                         if (!key || value === undefined) continue;
-
-                        // Type conversion for known properties
                         switch (key.toLowerCase()) {
                             case "x":
                             case "y":
                             case "duration":
                             case "letterspacing":
-                                statusMessageStyle[key] = isNaN(Number(value)) ? null : Number(value);
+                                obj.statusMessageStyle[key] = isNaN(Number(value)) ? null : Number(value);
                                 break;
                             case "shadow":
-                                statusMessageStyle[key] = value === "true" || value === "1" ? true : value; // allow color string
+                                obj.statusMessageStyle[key] = value === "true" || value === "1" ? true : value;
                                 break;
                             default:
-                                statusMessageStyle[key] = value;
+                                obj.statusMessageStyle[key] = value;
                         }
                     }
                     break;
                 }
+                case "status":
+                    showStatusMessageHTML(command.text, obj.statusMessageStyle.duration, obj.statusMessageStyle);
+                    break;
                 /*if (!command.args[0]) {
                     console.warn("#message: No property provided.");
                     break;
@@ -1381,44 +1330,42 @@ function fillTextWithLetterSpacing(ctx, text, x, y, letterSpacing = 0) {
     }
 }
 
-function showStatusMessageHTML(message, duration = 2000) {
-    // Check if the status element already exists
+function showStatusMessageHTML(message, duration = 2000, style = defaultStatusMessageStyle) {
     let container = document.getElementById('block');
     let statusEl = document.getElementById('status-message');
     if (!statusEl) {
         statusEl = document.createElement('div');
         statusEl.id = 'status-message';
-        container.appendChild(statusEl); // append to container, not body
+        container.appendChild(statusEl);
     }
 
-    // Apply styles from statusMessageStyle
+    // Use the passed-in style object!
     statusEl.style.position = 'absolute';
-    statusEl.style.left = statusMessageStyle.x !== null ? `${statusMessageStyle.x}px` : '50%';
-    statusEl.style.bottom = statusMessageStyle.y !== null ? `${statusMessageStyle.y}px` : '20px';
-    statusEl.style.transform = statusMessageStyle.x !== null ? 'none' : 'translateX(-50%)';
-    statusEl.style.background = statusMessageStyle.bgColor;
-    statusEl.style.color = statusMessageStyle.color;
+    statusEl.style.left = style.x !== null ? `${style.x}px` : '50%';
+    statusEl.style.bottom = style.y !== null ? `${style.y}px` : '20px';
+    statusEl.style.transform = style.x !== null ? 'none' : 'translateX(-50%)';
+    statusEl.style.background = style.bgColor;
+    statusEl.style.color = style.color;
     statusEl.style.padding = '8px 24px';
     statusEl.style.borderRadius = '6px';
-    statusEl.style.fontSize = statusMessageStyle.font.match(/\d+px/) ? statusMessageStyle.font.match(/\d+px/)[0] : '18px';
-    statusEl.style.fontFamily = statusMessageStyle.font.split(' ').slice(1).join(' ') || 'monospace, sans-serif';
-    statusEl.style.fontWeight = statusMessageStyle.font.includes('bold') ? 'bold' : 'normal';
-    statusEl.style.pointerEvents = 'none'; // Don't block input
+    statusEl.style.fontSize = style.font.match(/\d+px/) ? style.font.match(/\d+px/)[0] : '18px';
+    statusEl.style.fontFamily = style.font.split(' ').slice(1).join(' ') || 'monospace, sans-serif';
+    statusEl.style.fontWeight = style.font.includes('bold') ? 'bold' : 'normal';
+    statusEl.style.pointerEvents = 'none';
     statusEl.style.zIndex = 1000;
-    statusEl.style.textShadow = statusMessageStyle.shadow
-        ? (typeof statusMessageStyle.shadow === "string"
-            ? `0 0 8px ${statusMessageStyle.shadow}`
+    statusEl.style.textShadow = style.shadow
+        ? (typeof style.shadow === "string"
+            ? `0 0 8px ${style.shadow}`
             : "0 0 8px #000")
         : "none";
 
     statusEl.textContent = message;
     statusEl.style.display = 'block';
 
-    // Hide after duration
     clearTimeout(statusEl._timeout);
     statusEl._timeout = setTimeout(() => {
         statusEl.style.display = 'none';
-    }, duration !== undefined && duration !== null ? duration : statusMessageStyle.duration);
+    }, duration !== undefined && duration !== null ? duration : style.duration);
 }
 
 // Game Over dialog
