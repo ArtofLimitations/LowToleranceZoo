@@ -51,7 +51,8 @@ let world = {};                      // World object
 let worldObjects = {};               // Stores objects for all boards
 let worldPassages = {};              // Stores passages for all boards
 const scriptFlags = {};              // Stores all set flags as { flagName: true }
-const messageStylePresets = {        // Preset styles for status messages
+
+const messageStylePresets = {
     alert: { color: "#fff", bgColor: "#c00", duration: 3000, font: "bold 18px monospace" },
     info: { color: "#222", bgColor: "#eee", duration: 2000, font: "16px monospace" },
     centered: { x: null, y: null, font: "bold 20px monospace" },
@@ -77,11 +78,6 @@ let fps = 60;
 let lastTime = 0;                    // Timing variables
 let moveSpeed = 80;                  // Pixels per second
 let accumulatedTime = 0;
-
-// Status messages
-let statusMessage = "";
-let statusMessageTimer = 0;
-let statusMessageStyle = { ...defaultStatusMessageStyle };
 
 // #################################################
 // ############ Main animation function ############
@@ -112,13 +108,7 @@ export function animateGame(currentTime) {
                 player.flashTimer = 0;
             }
         }
-        if (statusMessageTimer > 0) {
-            statusMessageTimer -= deltaTime;
-            if (statusMessageTimer <= 0) {
-                statusMessage = "";
-                statusMessageTimer = 0;
-            }
-        }
+
     }
 
     // Loop the animation
@@ -242,39 +232,6 @@ function renderLayersToMainCanvas() {
         ctx.restore();
     }
 
-    if (statusMessage && statusMessageTimer > 0) {
-        ctx.save();
-        ctx.font = statusMessageStyle.font;
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        const padding = 16;
-        const letterSpacing = statusMessageStyle.letterSpacing;
-        let textWidth = 0;
-        for (let i = 0; i < statusMessage.length; i++) {
-            textWidth += ctx.measureText(statusMessage[i]).width;
-        }
-        if (statusMessage.length > 1) {
-            textWidth += letterSpacing * (statusMessage.length - 1);
-        }
-        // Positioning
-        const x = statusMessageStyle.x !== null ? statusMessageStyle.x : canvas.width / 2;
-        const y = statusMessageStyle.y !== null ? statusMessageStyle.y : canvas.height - padding;
-
-        // Draw background
-        ctx.fillStyle = statusMessageStyle.bgColor;
-        ctx.fillRect(x - textWidth / 2 - 12, y - 32, textWidth + 24, 36);
-
-        // Optional shadow
-        if (statusMessageStyle.shadow) {
-            ctx.shadowColor = typeof statusMessageStyle.shadow === "string" ? statusMessageStyle.shadow : "#000";
-            ctx.shadowBlur = 8;
-        }
-
-        // Draw text
-        ctx.fillStyle = statusMessageStyle.color;
-        fillTextWithLetterSpacing(ctx, statusMessage, x - textWidth / 2, y - 14, letterSpacing);
-        ctx.restore();
-    }
     //console.timeEnd('renderLayersToMainCanvas'); // End timing
 }
 
@@ -415,8 +372,9 @@ function executeObjectCommand(obj, command) {
             obj.name = command.value;
             break;
         case "status":
-            //showStatusMessage(command.text);
-            showStatusMessageHTML(command.text);
+            // Use the object's style (set via #message on that object)
+            if (!obj.statusMessageStyle) obj.statusMessageStyle = { ...defaultStatusMessageStyle };
+            showStatusMessage(command.text, obj.statusMessageStyle.duration, obj.statusMessageStyle);
             break;
         case "command":
             switch (command.name) {
@@ -474,80 +432,9 @@ function executeObjectCommand(obj, command) {
                     }
                     break;
                 }
-                case "message": {
-                    console.log('message command args:', command.args);
-                    if (!command.args.length) {
-                        console.warn("#message: No arguments provided.");
-                        break;
-                    }
-                    if (!obj.statusMessageStyle) obj.statusMessageStyle = { ...defaultStatusMessageStyle };
-                    if (command.args[0] === "reset") {
-                        Object.assign(obj.statusMessageStyle, defaultStatusMessageStyle);
-                        break;
-                    }
-                    if (command.args[0] === "preset" && messageStylePresets[command.args[1]]) {
-                        //Object.assign(obj.statusMessageStyle, defaultStatusMessageStyle);
-                        Object.assign(obj.statusMessageStyle, messageStylePresets[command.args[1]]);
-                        command.args.splice(0, 2);
-                    }
-                    for (let i = 0; i < command.args.length; i += 2) {
-                        const key = command.args[i];
-                        const value = command.args[i + 1];
-                        if (!key || value === undefined) continue;
-                        switch (key.toLowerCase()) {
-                            case "x":
-                            case "y":
-                            case "duration":
-                            case "letterspacing":
-                                obj.statusMessageStyle[key] = isNaN(Number(value)) ? null : Number(value);
-                                break;
-                            case "shadow":
-                                obj.statusMessageStyle[key] = value === "true" || value === "1" ? true : value;
-                                break;
-                            default:
-                                obj.statusMessageStyle[key] = value;
-                        }
-                    }
-                    break;
-                }
-                case "status":
-                    showStatusMessageHTML(command.text, obj.statusMessageStyle.duration, obj.statusMessageStyle);
-                    break;
-                /*if (!command.args[0]) {
-                    console.warn("#message: No property provided.");
-                    break;
-                }
-                const prop = command.args[0].toLowerCase();
-                const value = command.args.slice(1).join(" ");
-                if (prop === "reset") {
-                    statusMessageStyle = { ...defaultStatusMessageStyle };
-                    break;
-                }
-                if (!(prop in defaultStatusMessageStyle)) {
-                    console.warn(`#message: Unknown property "${prop}"`);
-                    break;
-                }
-                // Type conversion for known properties
-                switch (prop) {
-                    case "color":
-                    case "bgcolor":
-                    case "font":
-                        statusMessageStyle[prop] = value;
-                        break;
-                    case "x":
-                    case "y":
-                    case "duration":
-                    case "letterspacing":
-                        statusMessageStyle[prop] = isNaN(Number(value)) ? null : Number(value);
-                        break;
-                    case "shadow":
-                        statusMessageStyle[prop] = value === "true" || value === "1" ? true : value; // allow color string
-                        break;
-                    default:
-                        statusMessageStyle[prop] = value;
-                }
-                break;
-            }*/
+
+                // Status Messages go here
+
                 case "wait":
                     obj.waitTime = Number(command.args[0]) * 50 || 50;
                     obj.waiting = true;
@@ -843,6 +730,108 @@ function executeObjectCommand(obj, command) {
                     delete scriptFlags[flag];
                     break;
                 }
+                // -------------------------
+                // Per-object #message / #msg
+                // Usage examples:
+                //   #message x 20
+                //   #msg duration 3000
+                //   #message color #fff bgcolor #000
+                //   #message style "width:80%;background:#222;color:#fff;"
+                //   #message preset alert
+                // -------------------------
+                case "message":
+                case "msg": {
+                    // ensure object style exists
+                    if (!obj.statusMessageStyle) obj.statusMessageStyle = { ...defaultStatusMessageStyle };
+
+                    if (!command.args || command.args.length === 0) {
+                        console.warn("#message: expected arguments (preset, x, y, duration, color, bgColor, font, style).");
+                        break;
+                    }
+
+                    const first = String(command.args[0]).toLowerCase();
+
+                    // RESET handling: #message reset
+                    if (first === "reset") {
+                        obj.statusMessageStyle = { ...defaultStatusMessageStyle };
+                        break;
+                    }
+
+                    // preset handling: #message preset <name>
+                    if (first === "preset") {
+                        const presetName = command.args[1];
+                        if (!presetName) {
+                            console.warn("#message preset: missing preset name.");
+                            break;
+                        }
+                        const preset = messageStylePresets[presetName];
+                        if (!preset) {
+                            console.warn(`#message preset: unknown preset "${presetName}".`);
+                            break;
+                        }
+                        // apply preset onto a fresh style object
+                        obj.statusMessageStyle = { ...defaultStatusMessageStyle, ...preset };
+                        // keep any cssString already present on the preset (if created elsewhere)
+                        if (preset.cssString) obj.statusMessageStyle.cssString = preset.cssString;
+                        break;
+                    }
+
+                    // Generic key/value parsing. 'style' consumes the rest of the args as a CSS string.
+                    for (let i = 0; i < command.args.length; i++) {
+                        const key = String(command.args[i]).toLowerCase();
+
+                        if (key === "style") {
+                            // join remaining args as a single CSS string, strip surrounding quotes
+                            const css = command.args.slice(i + 1).join(" ").replace(/^"|"$/g, "").trim();
+                            obj.statusMessageStyle.cssString = css;
+                            break; // style is last / consumes rest
+                        }
+
+                        const value = command.args[i + 1];
+                        if (value === undefined) break;
+
+                        if (key === "x") {
+                            const n = Number(value);
+                            obj.statusMessageStyle.x = isNaN(n) ? null : n;
+                            i++;
+                            continue;
+                        }
+                        if (key === "y") {
+                            const n = Number(value);
+                            obj.statusMessageStyle.y = isNaN(n) ? null : n;
+                            i++;
+                            continue;
+                        }
+                        if (key === "duration") {
+                            const n = Number(value);
+                            if (!isNaN(n)) obj.statusMessageStyle.duration = n;
+                            i++;
+                            continue;
+                        }
+                        if (key === "color") {
+                            obj.statusMessageStyle.color = String(value).replace(/^"|"$/g, "");
+                            i++;
+                            continue;
+                        }
+                        if (key === "bgcolor" || key === "bgColor" || key === "background") {
+                            obj.statusMessageStyle.bgColor = String(value).replace(/^"|"$/g, "");
+                            i++;
+                            continue;
+                        }
+                        if (key === "font") {
+                            obj.statusMessageStyle.font = String(value).replace(/^"|"$/g, "");
+                            i++;
+                            continue;
+                        }
+
+                        // Unknown key — skip one to avoid infinite loop
+                        console.warn(`#message: unknown key "${key}"`);
+                        i++;
+                    }
+
+                    break;
+                }
+                // End status message handling
                 case "shoot": {
                     if (!command.args[0]) {
                         console.warn('#shoot: No direction provided');
@@ -1145,53 +1134,18 @@ function runImmediateLabel(obj, labelType) {
         if ((command.type === "command" && command.blocking) || command.type === "text") break;
         executeObjectCommand(obj, command);
         obj.scriptIndex++;
-    }
+    }  wwwwwwwww
     */
 }
 
-// Attach this to your canvas or board element
-//const canvas = document.getElementById('game-canvas'); // Use your actual canvas ID
-
-/*canvas.addEventListener('click', function(event) {
-    // Get mouse position relative to canvas
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-
-    // Convert to tile coordinates (replace with your helper)
-    const { tileX, tileY } = getTileAt(mouseX, mouseY);
-
-    // Get the object at this tile (replace with your helper)
-    const obj = getObjectAtTile(tileX, tileY);
-
-    if (obj && obj.labels && obj.labels[':click']) {
-        // Jump to the :click label in the object's script
-        jumpToLabel(obj, ':click');
-        // Optionally, start executing the script from here
-    }
-});*/
-
-/*canvas.addEventListener('click', function(event) {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-
-    const { tileX, tileY } = getTileAtCanvasPosition(mouseX, mouseY);
-    const obj = getObjectAtTile(tileX, tileY);
-
-    if (obj && obj.labels && obj.labels[':click']) {
-        runImmediateLabel(obj, ':click');
-    }
-});*/
-
 canvas.addEventListener('click', function (event) {
     const rect = canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
+    const mouseX = event.clientX - rect.left; 
     const mouseY = event.clientY - rect.top;
     const { tileX, tileY } = getTileAtCanvasPosition(mouseX, mouseY);
 
     // Try all layers, top to bottom
-    let obj = null;
+    let obj = null; 
     for (let layer = 3; layer >= 1; layer--) {
         obj = getObjectAtTile(tileX, tileY, layer);
         if (obj && obj.labels && obj.labels[':click']) {
@@ -1200,30 +1154,6 @@ canvas.addEventListener('click', function (event) {
         }
     }
 });
-
-/*function runImmediateLabel(obj, labelType) {
-    let index = resolveLabel(obj, labelType);
-    if (index === null) return;
-    obj.scriptIndex = index;
-    while (obj.scriptIndex < obj.script.length) {
-        let command = obj.script[obj.scriptIndex];
-        console.log("Object", obj);
-        console.log("runImmediateLabel executing:", command, "at", obj.scriptIndex);
-
-        // Stop if we hit a blocking command or a dialog/text
-        if (command.type === "text" || (command.type === "command" && command.blocking)) break;
-
-        // Execute status messages immediately (do not break)
-        if (command.type === "status") {
-            executeObjectCommand(obj, command);
-            obj.scriptIndex++;
-            continue;
-        }
-
-        executeObjectCommand(obj, command);
-        obj.scriptIndex++;
-    }
-}*/
 
 function substituteGlobals(args) {
     return args.map(arg =>
@@ -1312,60 +1242,70 @@ function showDialog(text, object = null) {
     });
 }
 
-// Single status message
+// Single status message 
+function showStatusMessage(message, duration = defaultStatusMessageStyle.duration, style = {}) {
+    // container: prefer element with id 'block' if present (editor/game layout), fall back to body
+    const container = document.getElementById('block') || document.body;
 
-function showStatusMessage(text, duration = null) {
-    statusMessage = text.trim();
-    statusMessageTimer = duration !== null ? duration : statusMessageStyle.duration;
-}
-
-function fillTextWithLetterSpacing(ctx, text, x, y, letterSpacing = 0) {
-    // Start at the given x position
-    let currentX = x;
-    for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        ctx.fillText(char, currentX, y);
-        // Advance by the width of the character plus letterSpacing
-        currentX += ctx.measureText(char).width + letterSpacing;
-    }
-}
-
-function showStatusMessageHTML(message, duration = 2000, style = defaultStatusMessageStyle) {
-    let container = document.getElementById('block');
-    let statusEl = document.getElementById('status-message');
-    if (!statusEl) {
-        statusEl = document.createElement('div');
-        statusEl.id = 'status-message';
-        container.appendChild(statusEl);
+    let el = document.getElementById('status-message');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'status-message';
+        container.appendChild(el);
     }
 
-    // Use the passed-in style object!
-    statusEl.style.position = 'absolute';
-    statusEl.style.left = style.x !== null ? `${style.x}px` : '50%';
-    statusEl.style.bottom = style.y !== null ? `${style.y}px` : '20px';
-    statusEl.style.transform = style.x !== null ? 'none' : 'translateX(-50%)';
-    statusEl.style.background = style.bgColor;
-    statusEl.style.color = style.color;
-    statusEl.style.padding = '8px 24px';
-    statusEl.style.borderRadius = '6px';
-    statusEl.style.fontSize = style.font.match(/\d+px/) ? style.font.match(/\d+px/)[0] : '18px';
-    statusEl.style.fontFamily = style.font.split(' ').slice(1).join(' ') || 'monospace, sans-serif';
-    statusEl.style.fontWeight = style.font.includes('bold') ? 'bold' : 'normal';
-    statusEl.style.pointerEvents = 'none';
-    statusEl.style.zIndex = 1000;
-    statusEl.style.textShadow = style.shadow
-        ? (typeof style.shadow === "string"
-            ? `0 0 8px ${style.shadow}`
-            : "0 0 8px #000")
-        : "none";
+    // Merge provided style with defaults
+    const s = { ...defaultStatusMessageStyle, ...(style || {}) };
 
-    statusEl.textContent = message;
-    statusEl.style.display = 'block';
+    // Build an inline css string (explicit and deterministic)
+    const parts = [];
 
-    clearTimeout(statusEl._timeout);
-    statusEl._timeout = setTimeout(() => {
-        statusEl.style.display = 'none';
-    }, duration !== undefined && duration !== null ? duration : style.duration);
+    // Positioning (centered horizontally by default)
+    parts.push('position:absolute');
+    parts.push('left:50%');
+    parts.push('transform:translateX(-50%)');
+    parts.push(`bottom:${(s.y !== null && s.y !== undefined) ? s.y + 'px' : '20px'}`);
+
+    // Visual defaults
+    parts.push('padding:8px 24px');
+    parts.push('border-radius:6px');
+    parts.push('pointer-events:none');
+    parts.push('z-index:10000');
+    parts.push('display:block');
+    parts.push('text-align:center');
+    parts.push('max-width:80%');
+    parts.push('box-sizing:border-box');
+
+    // Colors / font if provided
+    if (s.bgColor) parts.push(`background:${s.bgColor}`);
+    if (s.color) parts.push(`color:${s.color}`);
+    if (s.font) parts.push(`font:${s.font}`);
+
+    // Append any raw cssString last so it can override defaults
+    if (s.cssString) {
+        const css = String(s.cssString).replace(/^"|"$/g, '').trim();
+        if (css) parts.push(css.replace(/;$/,''));
+    }
+
+    // Apply all styles at once
+    el.style.cssText = parts.join(';') + ';';
+
+    // Set message text (use textContent to avoid HTML injection)
+    el.textContent = message;
+
+    // Clear previous timeout and set hide timer
+    clearTimeout(el._timeout);
+    const hideAfter = (duration !== undefined && duration !== null) ? Number(duration) : s.duration;
+    el._timeout = setTimeout(() => {
+        el.style.display = 'none';
+    }, isNaN(hideAfter) ? defaultStatusMessageStyle.duration : hideAfter);
+}
+
+// Reset all objects' message styles to default
+function resetAllMessageStyles() {
+    for (const k in placedObjects) {
+        if (placedObjects[k]) placedObjects[k].statusMessageStyle = { ...defaultStatusMessageStyle };
+    }
 }
 
 // Game Over dialog

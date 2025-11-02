@@ -560,6 +560,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (options.layer !== undefined) currentLayer = options.layer;
         if (options.hidden !== undefined) hiddenLayers = options.hidden;
         if (options.type !== undefined) currentType = options.type;
+        if (options.current !== undefined) {
+            currentSprite = options.current;
+            updateSpriteData(currentSprite);
+        }
 
         console.log('current layer: ', currentLayer);
         console.log('hidden layers: ', hiddenLayers);
@@ -1011,7 +1015,14 @@ document.addEventListener('DOMContentLoaded', () => {
             switch (event.key.toLowerCase()) {
                 case 'e':
                     removeMainEvents();
-                    editSprite(currentSprite); // Open the sprite editor from sprite-editor.js
+                    editSprite(currentSprite, (newIndex) => {
+                        // callback from sprite editor when it changes or closes
+                        currentSprite = newIndex;
+                        updateSpriteData(currentSprite);
+                        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick);
+                        drawBoard();
+                        canvas.focus();
+                    });
                     if (event.repeat) { return }
                     break;
                 case 'c':

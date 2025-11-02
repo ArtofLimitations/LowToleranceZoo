@@ -45,37 +45,12 @@ paletteButton.onclick = () => {
 spriteButton.onclick = () => {
   removeMainEvents(); // remove main.js canvas events
   overlay.style.display = 'block';
-  editSprite(newCurrent);
+  editSprite(newCurrent, (newIndex) => {
+    // Notify main via toolbar callback
+    callbackFunction({ current: newIndex });
+    overlay.style.display = 'none';
+  });
 }
-
-/*boardLayers.forEach((element, index) => {
-  if (index > 0) {
-    element.onclick = () => {
-      callbackFunction(index, hidden);
-    }
-  }
-});
-
-layerButtons.forEach((element, index) => {
-  if (index > 0) {
-    element.onclick = () => {
-      if (hidden.has(index)) {
-        hidden.delete(index);
-      } else {
-        hidden.add(index);
-      }
-      callbackFunction( undefined, hidden);
-    }
-  }
-});
-
-spriteTypes.forEach((element) => { 
-  element.onclick = () => {
-    const type = element.id;
-    if (type === 'other') return;
-    callbackFunction( undefined, undefined, type);
-  }
-});*/
 
 boardLayers.forEach((element, index) => {
   if (index > 0) {

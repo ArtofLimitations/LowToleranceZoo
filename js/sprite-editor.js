@@ -29,6 +29,8 @@ let mouse = {
 };
 
 let spriteSheet = {};
+// Optional callback to notify caller (main.js) when editor closes or changes current sprite
+let onCloseCallback = null;
 
 const buttons = [
     { x: 8, y: 100, width: 48, height: 40, label: 'Dark' },
@@ -308,17 +310,31 @@ function handleKeyboard(event) {
         case '=':
         case 'NumpadAdd':
             if (currentSprite < maxSprites) {
+                // Save current edits before switching
+                try {
+                    const imageData = updateSpriteImage(spriteData);
+                    addToSpriteSheet(currentSprite, spriteData, imageData);
+                } catch (e) { console.warn('Failed to save sprite before switching', e); }
                 currentSprite++;
                 updateSpriteData(currentSprite);
                 drawGrid();
+                // notify caller of change
+                if (onCloseCallback) onCloseCallback(currentSprite);
             }
             break;
         case '-':
         case '_':
         case 'NumpadSubtract':
-            if (currentSprite > 1) currentSprite--;
-            updateSpriteData(currentSprite);
-            drawGrid();
+            if (currentSprite > 1) {
+                try {
+                    const imageData = updateSpriteImage(spriteData);
+                    addToSpriteSheet(currentSprite, spriteData, imageData);
+                } catch (e) { console.warn('Failed to save sprite before switching', e); }
+                currentSprite--;
+                updateSpriteData(currentSprite);
+                drawGrid();
+                if (onCloseCallback) onCloseCallback(currentSprite);
+            }
             break;
         case 'Escape':
             removeSpriteEvents()
@@ -327,6 +343,10 @@ function handleKeyboard(event) {
             addToSpriteSheet(currentSprite, spriteData, imageData);  // in sprite-sheet.js
             overlay.style.display = 'none';
             addMainEvents();
+            if (onCloseCallback) {
+                try { onCloseCallback(currentSprite); } catch (e) { console.warn('onCloseCallback failed', e); }
+                onCloseCallback = null;
+            }
     }
 
     switch (event.code) { // Handles numpad keys
@@ -383,11 +403,12 @@ export function updateSpriteData(current) {
     }
 }
 
-export function editSprite(current) {
+export function editSprite(current, onClose = null) {
     //container.hidden = container.hidden === false ? true : false;
     //container.style.display = container.style.display === 'block' ? 'none' : 'block';
     container.style.display = 'block';
     currentSprite = current;
+    onCloseCallback = onClose;
 
     // add event listeners
     addSpriteEvents();
