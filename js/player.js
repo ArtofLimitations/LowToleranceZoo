@@ -460,53 +460,44 @@ function executeObjectCommand(obj, command) {
                 case "step": // STEP NEEDS TO COME BEFORE MOVE
                     // Set fullStep to true to use full-tile step
                     obj.fullStep = true;
+                case "step": // STEP NEEDS TO COME BEFORE MOVE
+                    obj.fullStep = true;
                 case "move": {
-                    let direction = command.args[0];
-                    let opp = false;
-
-                    // Check for 'opp' modifier
-                    if (direction === 'opp') {
-                        opp = true;
-                        direction = command.args[1];
+                    const moveParams = resolveMoveParams(obj, command.args);
+                    if (!moveParams) {
+                        console.warn(`Invalid direction "${command.args.join(' ')}" provided for #${command.name}`);
+                        break;
                     }
+                    moveObject(obj, moveParams.direction, obj.layer, moveParams.step);
+                    break;
+                }
+                case "try": {
+                    const moveParams = resolveMoveParams(obj, command.args);
+                    if (!moveParams) {
+                        console.warn(`Invalid direction "${command.args.join(' ')}" provided for #try`);
+                        break;
+                    }
+                    const moved = moveObject(obj, moveParams.direction, obj.layer, moveParams.step);
+                    if (moved) break;
 
-                    // Handle random direction
-                    if (direction === 'rndany' || direction === 'random') {
-                        const dirs = ['up', 'down', 'left', 'right'];
-                        direction = dirs[Math.floor(Math.random() * dirs.length)];
-                    } else if (direction === 'seek') {
-                        direction = calculateSeekDirection(obj, player);
-                        if (opp) {
-                            // Reverse direction
-                            switch (direction) {
-                                case 'up': direction = 'down'; break;
-                                case 'down': direction = 'up'; break;
-                                case 'left': direction = 'right'; break;
-                                case 'right': direction = 'left'; break;
-                            }
-                        }
+                    const fallbackArgs = command.args.slice(moveParams.argsUsed);
+                    if (!fallbackArgs.length) break;
+
+                    const first = fallbackArgs[0];
+                    if (first.startsWith(":")) {
+                        const label = first;
+                        const index = resolveLabel(obj, label);
+                        if (index !== null) obj.scriptIndex = index - 1;
+                        else console.warn(`#try: Label ${label} not found.`);
                     } else {
-                        direction = convertDirections(direction);
-                        if (opp && direction !== -1) {
-                            switch (direction) {
-                                case 'up': direction = 'down'; break;
-                                case 'down': direction = 'up'; break;
-                                case 'left': direction = 'right'; break;
-                                case 'right': direction = 'left'; break;
-                            }
-                        }
+                        const fallbackCommand = {
+                            type: "command",
+                            name: first.toLowerCase(),
+                            args: fallbackArgs.slice(1),
+                            blocking: false
+                        };
+                        executeObjectCommand(obj, fallbackCommand);
                     }
-
-                    if (direction === -1) {
-                        console.warn(`Invalid direction "${command.args.join(' ')}" provided for #move`);
-                        return;
-                    }
-
-                    // Use full-tile step if #step, otherwise default
-                    let step = obj.fullStep ? 1 : 0.5;
-                    obj.fullStep = false; // Reset flag
-
-                    moveObject(obj, direction, obj.layer, step);
                     break;
                 }
                 case "moveto":
@@ -999,6 +990,37 @@ function executeObjectCommand(obj, command) {
                     renderLayersToMainCanvas();
                     break;
                 }
+                case "maybe": {
+                    if (Math.random() >= 0.5) break; // 50% chance to skip
+
+                    if (!command.args.length) {
+                        console.warn("#maybe: expected a command or label to execute.");
+                        break;
+                    }
+
+                    const first = command.args[0];
+
+                    // Label target (e.g., #maybe :attack)
+                    if (first.startsWith(":")) {
+                        const index = resolveLabel(obj, first);
+                        if (index !== null) {
+                            obj.scriptIndex = index - 1;
+                        } else {
+                            console.warn(`#maybe: Label ${first} not found.`);
+                        }
+                        break;
+                    }
+
+                    // Command target (e.g., #maybe hidelayer 3)
+                    const maybeCommand = {
+                        type: "command",
+                        name: first.toLowerCase(),
+                        args: command.args.slice(1),
+                        blocking: false
+                    };
+                    executeObjectCommand(obj, maybeCommand);
+                    break;
+                }
                 case 'nightmode':
                     nightMode = !nightMode;
                     break;
@@ -1031,13 +1053,56 @@ function executeObjectCommand(obj, command) {
     }
 }
 
+function getOppositeDirection(dir) {
+    switch (dir) {
+        case 'up': return 'down';
+        case 'down': return 'up';
+        case 'left': return 'right';
+        case 'right': return 'left';
+        default: return dir;
+    }
+}
+
+function resolveMoveParams(obj, args = []) {
+    if (!args.length) return null;
+
+    let index = 0;
+    let token = args[index];
+    let opp = false;
+
+    if (token === 'opp') {
+        opp = true;
+        index++;
+        token = args[index];
+        if (!token) return null;
+    }
+
+    let direction;
+    if (token === 'rndany' || token === 'random') {
+        const dirs = ['up', 'down', 'left', 'right'];
+        direction = dirs[Math.floor(Math.random() * dirs.length)];
+    } else if (token === 'seek') {
+        direction = calculateSeekDirection(obj, player);
+        if (!direction) return null;
+    } else {
+        direction = convertDirections(token);
+        if (direction === -1) return null;
+    }
+    if (opp) direction = getOppositeDirection(direction);
+
+    const step = obj.fullStep ? 1 : 0.5;
+    obj.fullStep = false;
+
+    return { direction, step, argsUsed: index + 1 };
+}
+
 function moveObject(obj, direction, layer, step = 0.5) {
     const offsets = { up: [0, -step], down: [0, step], left: [-step, 0], right: [step, 0] };
     const dir = convertDirections(direction);
 
     if (!offsets[dir]) {
-        console.warn(`Invalid direction: ${direction} for #move`);
-        return; // Invalid direction guard
+        console.warn(`Invalid direction: ${direction} for move`);
+        return false;
     }
 
     const [dx, dy] = offsets[dir];
@@ -1045,29 +1110,25 @@ function moveObject(obj, direction, layer, step = 0.5) {
 
     const oldKey = `${layer},${obj.x},${obj.y}`;
     const newKey = `${layer},${newX},${newY}`;
-    obj.direction = dir; // change the object's direction
+    obj.direction = dir;
 
-    //if (placedObjects[newKey] && placedObjects[newKey].id !== obj.id) return; // Prevent movement if occupied by another object
-    if (canMoveTo(newX, newY, obj)) { // can the object move?
-
-        placedSprites[newKey] = placedSprites[oldKey]; // Move sprite
+    if (canMoveTo(newX, newY, obj)) {
+        placedSprites[newKey] = placedSprites[oldKey];
         placedObjects[newKey] = obj;
 
         delete placedObjects[oldKey];
         delete placedSprites[oldKey];
 
-        updateTile(layer, obj.x, obj.y); // Clear old tile
+        updateTile(layer, obj.x, obj.y);
 
         obj.x = newX;
         obj.y = newY;
 
-        updateTile(layer, obj.x, obj.y); // Update new tile
-    }
-    else {
-        // Trigger :thud label if present
-        //console.log('Trying :thud for', oldKey, placedObjects[oldKey]);
+        updateTile(layer, obj.x, obj.y);
+        return true;
+    } else {
         handleObjectInteraction(oldKey, ":thud");
-        return; // no
+        return false;
     }
 }
 
