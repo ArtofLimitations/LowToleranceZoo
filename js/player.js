@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle } from './object-functions.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -50,19 +50,7 @@ let nightMode = true;
 let world = {};                      // World object
 let worldObjects = {};               // Stores objects for all boards
 let worldPassages = {};              // Stores passages for all boards
-const scriptFlags = {};              // Stores all set flags as { flagName: true }
-
-const messageStylePresets = {
-    alert: { color: "#fff", bgColor: "#c00", duration: 3000, font: "bold 18px monospace" },
-    info: { color: "#222", bgColor: "#eee", duration: 2000, font: "16px monospace" },
-    centered: { x: null, y: null, font: "bold 20px monospace" },
-    warning: { color: "#ff0", bgColor: "#333", duration: 4000, font: "bold 18px monospace" },
-    success: { color: "#fff", bgColor: "#080", duration: 2500, font: "bold 18px monospace" },
-    error: { color: "#fff", bgColor: "#900", duration: 3500, font: "bold 18px monospace" },
-    tip: { color: "#333", bgColor: "#ff9", duration: 2200, font: "italic 16px monospace" },
-    subtle: { color: "#888", bgColor: "#222", duration: 1800, font: "16px monospace" },
-    big: { color: "#fff", bgColor: "#000", duration: 4000, font: "bold 32px monospace" }
-};
+const scriptFlags = {};              // Stores all set flags as { flagName: true } 77777777777777
 
 // Player variables
 let player = structuredClone(defaultPlayerStats); // Player object
@@ -78,6 +66,25 @@ let fps = 60;
 let lastTime = 0;                    // Timing variables
 let moveSpeed = 80;                  // Pixels per second
 let accumulatedTime = 0;
+
+const defaultDialogStyle = [
+    'position:fixed',
+    'bottom:60px',
+    'left:50%',
+    'transform:translateX(-50%)',
+    'max-width:70%',
+    'padding:18px 28px',
+    'border-radius:16px',
+    'background:rgba(18,18,28,0.92)',
+    'color:#f8f8ff',
+    'font:18px "IBM Plex Mono", monospace',
+    'box-shadow:0 18px 40px rgba(0,0,0,0.35)',
+    'border:1px solid rgba(255,255,255,0.08)',
+    'display:none',
+    'flex-direction:column',
+    'gap:8px'
+].join(';');
+let currentDialogStyle = defaultDialogStyle;
 
 // #################################################
 // ############ Main animation function ############
@@ -1195,7 +1202,7 @@ function runImmediateLabel(obj, labelType) {
         if ((command.type === "command" && command.blocking) || command.type === "text") break;
         executeObjectCommand(obj, command);
         obj.scriptIndex++;
-    }  wwwwwwwww
+    }  
     */
 }
 
@@ -1258,6 +1265,8 @@ function showDialog(text, object = null) {
     let pages = paginateText(text, 200); // Adjust maxLength as needed
     let pageIndex = 0;
     const dialog = document.getElementById('dialog-box');
+
+    dialog.style.cssText = currentDialogStyle; // apply global style
 
     // Set object name if available
     if (object && object.name) {

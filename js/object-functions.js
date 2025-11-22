@@ -378,3 +378,15 @@ export function calculateBulletPosition(x, y, direction) {
             return { x, y }; // Return the original position if the direction is invalid
     }
 }
+
+export const messageStylePresets = {
+    alert: { color: "#fff", bgColor: "#c00", duration: 3000, font: "bold 18px monospace" },
+    info: { color: "#222", bgColor: "#eee", duration: 2000, font: "16px monospace" },
+    centered: { x: null, y: null, font: "bold 20px monospace" },
+    warning: { color: "#ff0", bgColor: "#333", duration: 4000, font: "bold 18px monospace" },
+    success: { color: "#fff", bgColor: "#080", duration: 2500, font: "bold 18px monospace" },
+    error: { color: "#fff", bgColor: "#900", duration: 3500, font: "bold 18px monospace" },
+    tip: { color: "#333", bgColor: "#ff9", duration: 2200, font: "italic 16px monospace" },
+    subtle: { color: "#888", bgColor: "#222", duration: 1800, font: "16px monospace" },
+    big: { color: "#fff", bgColor: "#000", duration: 4000, font: "bold 32px monospace" }
+};
