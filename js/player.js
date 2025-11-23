@@ -68,23 +68,51 @@ let moveSpeed = 80;                  // Pixels per second
 let accumulatedTime = 0;
 
 const defaultDialogStyle = [
-    'position:fixed',
-    'bottom:60px',
-    'left:50%',
-    'transform:translateX(-50%)',
-    'max-width:70%',
-    'padding:18px 28px',
-    'border-radius:16px',
-    'background:rgba(18,18,28,0.92)',
-    'color:#f8f8ff',
-    'font:18px "IBM Plex Mono", monospace',
-    'box-shadow:0 18px 40px rgba(0,0,0,0.35)',
-    'border:1px solid rgba(255,255,255,0.08)',
     'display:none',
     'flex-direction:column',
-    'gap:8px'
+    'justify-content:center',
+    'align-items:center',
+    'position:relative',
+    'overflow:hidden',
+    'top:500px',
+    'margin:0 auto',
+    'width:60%',
+    'max-height:30%',
+    'min-height:10%',
+    'background-color:rgba(0,0,0,0.8)',
+    'border-radius:32px',
+    'color:#fff',
+    "font-family:'Fira Code', monospace",
+    'font-size:24px',
+    'text-shadow:0px 1px 20px #444, 0px 1px 10px rgba(255,255,255,0.8)',
+    'padding:20px 60px',
+    'animation:fade_in_show 0.5s',
+    'z-index:99'
 ].join(';');
 let currentDialogStyle = defaultDialogStyle;
+
+function mergeCssStrings(baseCss, extraCss) {
+    const toMap = (css) =>
+        css.split(';')
+            .map(part => part.trim())
+            .filter(Boolean)
+            .reduce((acc, decl) => {
+                const [prop, ...valueParts] = decl.split(':');
+                if (!prop || !valueParts.length) return acc;
+                acc[prop.trim().toLowerCase()] = valueParts.join(':').trim();
+                return acc;
+            }, {});
+    const baseMap = toMap(baseCss);
+    const extraMap = toMap(extraCss);
+    return Object.entries({ ...baseMap, ...extraMap })
+        .map(([prop, value]) => `${prop}:${value}`)
+        .join(';');
+}
+
+function applyDialogStyle() {
+    const dialogEl = document.getElementById('dialog-box');
+    if (dialogEl) dialogEl.style.cssText = currentDialogStyle;
+}
 
 // #################################################
 // ############ Main animation function ############
@@ -830,6 +858,41 @@ function executeObjectCommand(obj, command) {
                     break;
                 }
                 // End status message handling
+                // Dialog style handling
+                case "dialog": {
+                    if (!command.args.length) {
+                        console.warn("#dialog: expected 'style \"...\"', 'mergestyle \"...\"', or 'default'.");
+                        break;
+                    }
+                    const keyword = command.args[0].toLowerCase();
+                    if (keyword === "style") {
+                        const css = command.args.slice(1).join(" ").replace(/^"|"$/g, "").trim();
+                        if (!css) {
+                            console.warn("#dialog style: empty CSS string.");
+                            break;
+                        }
+                        currentDialogStyle = css;
+                        applyDialogStyle();
+                        break;
+                    }
+                    if (keyword === "mergestyle") {
+                        const css = command.args.slice(1).join(" ").replace(/^"|"$/g, "").trim();
+                        if (!css) {
+                            console.warn("#dialog mergestyle: empty CSS string.");
+                            break;
+                        }
+                        currentDialogStyle = mergeCssStrings(defaultDialogStyle, css);
+                        applyDialogStyle();
+                        break;
+                    }
+                    if (keyword === "default") {
+                        currentDialogStyle = defaultDialogStyle;
+                        applyDialogStyle();
+                        break;
+                    }
+                    console.warn(`#dialog: unknown argument "${keyword}".`);
+                    break;
+                }
                 case "shoot": {
                     if (!command.args[0]) {
                         console.warn('#shoot: No direction provided');
@@ -1208,12 +1271,12 @@ function runImmediateLabel(obj, labelType) {
 
 canvas.addEventListener('click', function (event) {
     const rect = canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left; 
+    const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     const { tileX, tileY } = getTileAtCanvasPosition(mouseX, mouseY);
 
     // Try all layers, top to bottom
-    let obj = null; 
+    let obj = null;
     for (let layer = 3; layer >= 1; layer--) {
         obj = getObjectAtTile(tileX, tileY, layer);
         if (obj && obj.labels && obj.labels[':click']) {
@@ -1354,7 +1417,7 @@ function showStatusMessage(message, duration = defaultStatusMessageStyle.duratio
     // Append any raw cssString last so it can override defaults
     if (s.cssString) {
         const css = String(s.cssString).replace(/^"|"$/g, '').trim();
-        if (css) parts.push(css.replace(/;$/,''));
+        if (css) parts.push(css.replace(/;$/, ''));
     }
 
     // Apply all styles at once
