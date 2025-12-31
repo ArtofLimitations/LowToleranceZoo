@@ -10,6 +10,7 @@ const spriteValue = document.getElementById('currentSprite');
 const spriteImage = document.getElementById('currentSpriteImage');
 const darkColor = document.getElementById('colorBoxDark');
 const lightColor = document.getElementById('colorBoxLight');
+const spriteType = document.getElementById('spriteType');
 const swapColor = document.getElementById('swapButton');
 const paletteButton = document.getElementById('paletteButton');
 const spriteButton = document.getElementById('spriteButton');
@@ -85,7 +86,7 @@ terrainButton.onclick = () => {
   
 }
 
-export function toolbar(current, currentColors, layer, mouse, hiddenLayers, callback) { // Main toolbar function
+export function toolbar(current, currentColors, layer, mouse, hiddenLayers, callback, currentType) { // Main toolbar function
   //console.log('Function called from toolbar.js');
   //const leftSide = canvas.width - toolBarSize;
   colors = currentColors || [[0, 0, 0, 1], [255, 255, 255, 1]];
@@ -138,6 +139,8 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
   layerOpacity.onchange = () => {
     console.log('opacity:', layerOpacity.value * 5);
   }
+
+  spriteType.innerText = currentType || 'wall';
 
   editMode.innerText = mouseStatus.mode;
 }

@@ -1990,8 +1990,7 @@ function handleLoadedBoard(spriteSheetData, boardData) {
     document.getElementById('game-over-box').style.display = 'none';
     gamePaused = false;
     player.locked = false;
-    // ...existing code...
-
+ 
     //stats = player.stats;
     console.log('Loaded Stats', playerStats);
     console.log(player);
