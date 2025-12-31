@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentLayer = 2;                // Layer to draw sprite on. 1 = floor 2 = default 3 = ceiling
     let tileSetLength = 300;             // Size of tileset
     let colors = currentColors;          // colors selected from palette
-    let type = 'wall';
+    let type = 'wall';                   // type of sprite to place. wall, object, sign, passage, item, coin, ammo, invisible
     let currentAmount = 1;               // current value for item amount (ammo, coins, health, etc)
     let tileData = { script: '' };       // extra data for tile (script, amount, etc)
     let popup = { active: false, type: null };
