@@ -450,12 +450,21 @@ function executeObjectCommand(obj, command) {
                     const thenIndex = command.args.indexOf("then");
                     const label = thenIndex !== -1 ? command.args[thenIndex + 1] : null;
 
+                    // Debugging help: log the flag and current value for inspection when unexpected behavior occurs
+                    // (This will help diagnose why #if appears to always be true)
+                    try {
+                        console.debug(`#if check -> flag: '${flag}', value:`, scriptFlags[flag], 'allFlags:', scriptFlags);
+                    } catch (e) {
+                        console.debug('#if check -> unable to dump scriptFlags', e);
+                    }
+
                     if (!flag || !label) {
                         console.warn("#if: Invalid syntax. Usage: #if <flag> then <:label>");
                         break;
                     }
 
-                    if (scriptFlags[flag]) {
+                    // Use hasOwnProperty to avoid truthy prototype properties (e.g., "toString")
+                    if (Object.prototype.hasOwnProperty.call(scriptFlags, flag) && scriptFlags[flag]) {
                         // Jump to the label if the flag is set
                         let labelKey = label.startsWith(":") ? label : ":" + label;
                         const index = resolveLabel(obj, labelKey);
@@ -1097,6 +1106,9 @@ function executeObjectCommand(obj, command) {
                 case "debug":
                     console.log("DEBUG: Object script:", obj.script);
                     console.log("DEBUG: Object labels:", obj.labels);
+                    // Also print global script flags and globals for easier debugging
+                    console.log("DEBUG: scriptFlags:", scriptFlags);
+                    console.log("DEBUG: scriptGlobals:", scriptGlobals);
                     break;
                 // Add more command handlers here...
                 default: {
@@ -1978,8 +1990,7 @@ function handleLoadedBoard(spriteSheetData, boardData) {
     document.getElementById('game-over-box').style.display = 'none';
     gamePaused = false;
     player.locked = false;
-    // ...existing code...
-
+ 
     //stats = player.stats;
     console.log('Loaded Stats', playerStats);
     console.log(player);
