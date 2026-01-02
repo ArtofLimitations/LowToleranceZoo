@@ -57,13 +57,32 @@
                             <label class="tab other" for="other">Other</label>
                             <span class="glider"></span>
                         </div>
-                    </div><span class="fieldText">Tile<br>Type</span>
+                    </div><span class="fieldText">Quick<br>Types</span>
                 </div>
-                <div class="fieldRow"><span class="valueBox valueText" id="spriteType"></span></div>
+                <!--  Currently selected tile type -->
+                <div class="fieldRow"><span class="valueBox valueText" id="spriteType"></span><span class="fieldText">Current <br>Type </span></div>
+                <!-- Other types (menu) -->
                 <div class="fieldRow"><span class="fieldCategory" id="terrainButton">Terrain</span></div>
                 <div class="fieldRow"><span class="fieldCategory" id="itemButton">Item</span></div>
-                <div class="fieldRow"><span class="fieldCategory">Creatures</span></div>
-                <div class="fieldRow"><span class="valueBox valueText" id="editMode"> Draw </span><span class="fieldText">Edit<br> Mode</span></div>
+                <div class="fieldRow"><span class="fieldCategory" id="creatureButton">Creatures</span></div>
+                <div class="fieldRow">
+                    <span class="valueBox valueText" id="editMode">Draw</span>
+                    <span class="fieldText">Edit<br> Mode</span>
+                    
+                </div>
+                <div class="fieldRow">
+                    <div class="modeButtonGroup">
+                        <button class="modeButton" id="modeButtonDraw">Draw</button>
+                        <button class="modeButton" id="modeButtonFill">Fill</button>
+                        <button class="modeButton" id="modeButtonPaint">Paint</button>
+                        <button class="modeButton" id="modeButtonLighten">Lighten</button>
+                        <button class="modeButton" id="modeButtonDarken">Darken</button>
+                    </div>
+                </div>
+                <div class="fieldRow undoRedoRow">
+                    <button class="toolbarActionButton" id="undoButton">Undo</button>
+                    <button class="toolbarActionButton" id="redoButton">Redo</button>
+                </div>
             </div>
         </div>
         <!----------------->
@@ -135,6 +154,11 @@
                 <li><span>P</span>Passage</li><span class="fieldText">Move to another board. Use same color to dictate where player appears.</span>
                 <li><span>I</span>Sign</li><span class="fieldText">Enter text to display when touched. Use &lt;page&gt; to force pagination. Accepts some html (br, em, strong, b, i, center)</span>
             </ul>
+        </div>
+        <div class="extraTiles" id="extraCreatures">
+            <p><span class="char">☺</span><strong>Creatures</strong></p>
+            <br>
+            <p class="fieldText">Creature presets are coming soon. Use scripted objects for interactive actors.</p>
         </div>
     </div>
     <canvas id="exportedSpriteCanvas" width="32" height="32" style="margin-top: 20px;"></canvas>

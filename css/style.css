@@ -241,6 +241,55 @@ h3 {
   width: auto;
 }
 
+.lowToleranceToolbar .modeButtonGroup {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 6px;
+  margin-right: 8px;
+  width: 100%;
+}
+
+.lowToleranceToolbar .undoRedoRow {
+  gap: 8px;
+}
+
+.lowToleranceToolbar .toolbarActionButton {
+  flex: 1;
+  height: 32px;
+  background-color: #5f76aa;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 12px;
+  margin-right: 0;
+}
+
+.lowToleranceToolbar .toolbarActionButton:hover {
+  background-color: #7d93c4;
+}
+
+.lowToleranceToolbar .modeButton {
+  background-color: #2e4675;
+  color: #fff;
+  border: none;
+  height: 32px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-right: 0;
+  width: 100%;
+  padding: 0 12px;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.lowToleranceToolbar .modeButton.modeButton-active {
+  background-color: #f0f0f0;
+  color: #131313;
+}
+
 .lowToleranceToolbar .imageBox {
   background-color: #131313;
   width: 32px;
@@ -738,6 +787,14 @@ h3 {
   list-style-type: none;
   padding: 0;
   margin: 0;
+}
+
+.extraTiles .popupOption {
+  cursor: pointer;
+}
+
+.extraTiles .popupOption:hover {
+  color: #ffc800;
 }
 
 .extraTiles ul li {

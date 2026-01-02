@@ -1,4 +1,4 @@
-import { toolbar, updateType } from './toolbar.js';
+import { toolbar, updateType, updateLayers } from './toolbar.js';
 import { drawSprite, createDataURL, adjustColor } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.width = displayWidth * scale;
     canvas.height = displayHeight * scale;
     const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = false
+    ctx.imageSmoothingEnabled = false;
 
     const editorToolbar = document.getElementById('lowToleranceToolbar');
     const overlay = document.getElementById('overlay');
@@ -29,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const tileSizeY = 32;
     let hiddenLayers = new Set();        // Set to hold hidden layers
     let placedSprites = {};              // Store the positions of placed sprites (as key-value pairs)
+    const boardHistories = {};
+    const historyLimit = 200;
+    let suppressHistory = false;
     let tilesX = 36;                     // Board width and height
     let tilesY = 25;
     let [cursorX, cursorY] = [9, 4];     // Keyboard cursor
@@ -147,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         world = {}; // Initialize the world object
         for (const [boardId, boardName] of boardList) {
             world[boardId] = {}; // Create an empty object for each board
+            resetBoardHistory(boardId);
         }
         console.log('World:', world);
     }
@@ -214,7 +218,11 @@ document.addEventListener('DOMContentLoaded', () => {
             .map(key => key.split(',').map(Number)) // Convert "l,x,y" to [l, x, y]
             .sort(([l1], [l2]) => l1 - l2); // Sort by layer (ascending)
 
-        for (const [l, sx, sy] of sortedKeys) {
+
+
+
+
+       for (const [l, sx, sy] of sortedKeys) {
             // Skip hidden layers
             if (hiddenLayers.has(l)) continue;
 
@@ -338,10 +346,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!shouldFill) continue; // Skip if the tile doesn't match the criteria
 
             // Fill the tile with the new sprite and color
-            placedSprites[key] = {
+            const tilePayload = {
                 ...newSpriteData,
-                type: newSpriteData.type || (currentTile ? currentTile.type : "wall") // Default to "wall" if empty
+                layer: currentLayer,
+                oldKey: key,
+                type: newSpriteData.type || (currentTile ? currentTile.type : "wall"),
             };
+            setTile(key, tilePayload);
 
             // Add neighboring tiles to the stack
             const neighbors = [
@@ -380,39 +391,203 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function placeSprite(key, sprite, type) {
+    function deepCopyTile(tile) {
+        if (tile === null || tile === undefined) return tile;
+        if (typeof structuredClone === 'function') {
+            try {
+                return structuredClone(tile);
+            } catch (err) {
+                // Fallback
+            }
+        }
+        return JSON.parse(JSON.stringify(tile));
+    }
+
+    function createEmptyHistory() {
+        return {
+            undoStack: [],
+            redoStack: [],
+            activeTransaction: null,
+        };
+    }
+
+    function resetBoardHistory(boardId) {
+        boardHistories[boardId] = createEmptyHistory();
+        return boardHistories[boardId];
+    }
+
+    function getBoardHistory(boardId = currentBoard) {
+        if (!boardHistories[boardId]) {
+            return resetBoardHistory(boardId);
+        }
+        return boardHistories[boardId];
+    }
+
+    function recordHistoryEntry(entry) {
+        if (suppressHistory) return;
+        const history = getBoardHistory();
+        if (history.activeTransaction) {
+            history.activeTransaction.push(entry);
+            return;
+        }
+        history.undoStack.push(entry);
+        if (history.undoStack.length > historyLimit) {
+            history.undoStack.shift();
+        }
+        history.redoStack.length = 0;
+    }
+
+    function beginHistoryTransaction() {
+        const history = getBoardHistory();
+        if (!history.activeTransaction) {
+            history.activeTransaction = [];
+        }
+    }
+
+    function commitHistoryTransaction() {
+        const history = getBoardHistory();
+        if (!history.activeTransaction || !history.activeTransaction.length) {
+            history.activeTransaction = null;
+            return;
+        }
+        const groupedEntry = {
+            batch: history.activeTransaction.map((entry) => ({ ...entry }))
+        };
+        history.undoStack.push(groupedEntry);
+        if (history.undoStack.length > historyLimit) {
+            history.undoStack.shift();
+        }
+        history.redoStack.length = 0;
+        history.activeTransaction = null;
+    }
+
+    function cancelHistoryTransaction() {
+        const history = getBoardHistory();
+        history.activeTransaction = null;
+    }
+
+    function setTile(tileKey, tileData, logHistory = true) {
+        const previous = deepCopyTile(placedSprites[tileKey]);
+        const next = tileData ? deepCopyTile(tileData) : null;
+
+        if (next) {
+            placedSprites[tileKey] = next;
+        } else {
+            delete placedSprites[tileKey];
+        }
+
+        if (logHistory) {
+            recordHistoryEntry({
+                key: tileKey,
+                previous,
+                next: next ? deepCopyTile(next) : null
+            });
+        }
+    }
+
+    function removeSprite(tileKey, logHistory = true) {
+        if (!placedSprites[tileKey]) return;
+        if (placedSprites[tileKey].type === 'player') return;
+        setTile(tileKey, null, logHistory);
+    }
+
+    function clearHistory(targetBoardId = null) {
+        if (targetBoardId !== null) {
+            resetBoardHistory(targetBoardId);
+            return;
+        }
+        if (boardList && boardList.length) {
+            boardList.forEach(([boardId]) => {
+                resetBoardHistory(boardId);
+            });
+        } else {
+            Object.keys(boardHistories).forEach((boardId) => {
+                resetBoardHistory(boardId);
+            });
+        }
+        getBoardHistory(currentBoard);
+    }
+
+    function applyHistoryTile(tileKey, tileData) {
+        if (tileData) {
+            placedSprites[tileKey] = deepCopyTile(tileData);
+        } else {
+            delete placedSprites[tileKey];
+        }
+    }
+
+    function refreshEditorAfterHistory() {
+        drawBoard();
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+    }
+
+    function undoAction() {
+        const history = getBoardHistory();
+        const entry = history.undoStack.pop();
+        if (!entry) return;
+        suppressHistory = true;
+        if (entry.batch) {
+            const reversed = [...entry.batch].reverse();
+            reversed.forEach((item) => applyHistoryTile(item.key, item.previous));
+        } else {
+            applyHistoryTile(entry.key, entry.previous);
+        }
+        suppressHistory = false;
+        history.redoStack.push(entry);
+        refreshEditorAfterHistory();
+    }
+
+    function redoAction() {
+        const history = getBoardHistory();
+        const entry = history.redoStack.pop();
+        if (!entry) return;
+        suppressHistory = true;
+        if (entry.batch) {
+            entry.batch.forEach((item) => applyHistoryTile(item.key, item.next));
+        } else {
+            applyHistoryTile(entry.key, entry.next);
+        }
+        suppressHistory = false;
+        history.undoStack.push(entry);
+        refreshEditorAfterHistory();
+    }
+
+    function placeSprite(key, sprite, type, logHistory = true) {
         const tileKey = key;
-        placedSprites[tileKey] = {
+        const tilePayload = {
             sprite: sprite,
-            //image: getSpriteImage(),
             color: colors,
             type: type,
             layer: currentLayer,
             oldKey: tileKey,
             data: {},
-        }
+        };
+
         if (type === 'object' || type === 'sign') {
-            placedSprites[tileKey].data = {
+            tilePayload.data = {
                 name: '',
                 speed: 2,
                 timer: 0,
-                script: '',
+                script: tileData.script || '',
                 scriptIndex: 0,
                 text: '',
-            }; // default data for placed sprites
+            };
         }
+
         if (type === 'passage') {
-            placedSprites[tileKey].data = {
+            tilePayload.data = {
                 speed: 1,
                 board: currentBoard,
             };
         }
+
         if (type === 'item' || type === 'coin' || type === 'ammo') {
-            placedSprites[tileKey].data = {
+            tilePayload.data = {
                 value: currentAmount,
             };
         }
-        if (type === 'object' || type === 'sign') placedSprites[tileKey].data.script = tileData.script; // update object.data.script if type = sign or object
+
+        setTile(tileKey, tilePayload, logHistory);
     }
 
     // ######################################
@@ -435,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (mouse.mode === 'draw') {
                     if (placedSprites[tileKey]) {
                         // Remove sprite if it exists (except player)
-                        if (placedSprites[tileKey].type !== 'player') delete placedSprites[tileKey];
+                        removeSprite(tileKey);
                     } else {
                         // Place sprite
                         placeSprite(tileKey, currentSprite, type); // Place sprite
@@ -445,24 +620,53 @@ document.addEventListener('DOMContentLoaded', () => {
                     const useColorComparison = key.shift;
 
                     // Perform Flood Fill
-                    floodFill(cursorX, cursorY, {
-                        sprite: currentSprite,
-                        //image: getSpriteImage(),
-                        color: colors,
-                        type: type,
-                        data: getObjectData()
-                    }, useColorComparison);
+                    beginHistoryTransaction();
+                    try {
+                        floodFill(cursorX, cursorY, {
+                            sprite: currentSprite,
+                            //image: getSpriteImage(),
+                            color: colors,
+                            type: type,
+                            data: getObjectData()
+                        }, useColorComparison);
+                        commitHistoryTransaction();
+                    } catch (err) {
+                        console.error('Flood fill failed:', err);
+                        cancelHistoryTransaction();
+                    }
 
                     mouse.mode = 'draw'; // Reset mode after filling
+                }
+
+                else if (mouse.mode === 'darken') {
+                    if (placedSprites[tileKey]) {
+                        const updatedTile = deepCopyTile(placedSprites[tileKey]);
+                        updatedTile.color = [
+                            adjustColor(updatedTile.color[0], -0.1),
+                            adjustColor(updatedTile.color[1], -0.1)
+                        ];
+                        setTile(tileKey, updatedTile);
+                    }
+
+                } else if (mouse.mode === 'lighten') {
+                    if (placedSprites[tileKey]) {
+                        const updatedTile = deepCopyTile(placedSprites[tileKey]);
+                        updatedTile.color = [
+                            adjustColor(updatedTile.color[0], 0.1),
+                            adjustColor(updatedTile.color[1], 0.1)
+                        ];
+                        setTile(tileKey, updatedTile);
+                    }
                 }
                 break;
             case 1: // Middle mouse button (Adjust color)
                 if (placedSprites[tileKey]) {
-                    const color = [
-                        adjustColor(placedSprites[tileKey].color[0], 0.1),
-                        adjustColor(placedSprites[tileKey].color[1], 0.1)
+                    const updatedTile = deepCopyTile(placedSprites[tileKey]);
+                    updatedTile.color = [
+                        adjustColor(updatedTile.color[0], 0.1),
+                        adjustColor(updatedTile.color[1], 0.1)
                     ];
-                    placedSprites[tileKey].color = color;
+                    setTile(tileKey, updatedTile);
                 }
         }
 
@@ -484,6 +688,11 @@ document.addEventListener('DOMContentLoaded', () => {
             handleTileClick(event);
             mouse.oldX = mouse.x;
             mouse.oldY = mouse.y;
+        }
+        else if (quickMenuPopups.has(popup.type)) {
+            closePopup();
+            mouse.down = false;
+            return;
         }
         else {
             // handle toolbar clicks from toolbar.js
@@ -537,6 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
         drawBoard();
 
         updateSpriteData(currentSprite);
+        clearHistory();
     }
 
     function handleLoadedWorld(spriteSheetData, boardListData, worldData) {
@@ -554,12 +764,26 @@ document.addEventListener('DOMContentLoaded', () => {
         drawBoard();
 
         updateSpriteData(currentSprite);
+        clearHistory();
     }
 
     function handleToolbarClick(options = {}) {
+        if (options.popup) {
+            togglePopup(options.popup);
+            return;
+        }
+        if (options.history === 'undo') {
+            undoAction();
+            return;
+        }
+        if (options.history === 'redo') {
+            redoAction();
+            return;
+        }
         if (options.layer !== undefined) currentLayer = options.layer;
         if (options.hidden !== undefined) hiddenLayers = options.hidden;
         if (options.type !== undefined) type = options.type;
+        if (options.mode !== undefined) mouse.mode = options.mode;
         if (options.current !== undefined) {
             currentSprite = options.current;
             updateSpriteData(currentSprite);
@@ -715,6 +939,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newBoardId = boardList.length + 1; // Simple ID generation
                 boardList.push([newBoardId, newBoardName]);
                 world[newBoardId] = {}; // Initialize the new board in the world object
+                clearHistory(newBoardId);
                 createPlayerInBoard(newBoardId); // Create player in the new board
                 console.log('New Board Added: ', newBoardId, newBoardName);
 
@@ -814,6 +1039,8 @@ document.addEventListener('DOMContentLoaded', () => {
         selectContainer.focus();
     }
 
+    const quickMenuPopups = new Set(['extraTerrain', 'extraItems', 'extraCreatures']);
+
     const popupHandlers = {
         extraItems: {
             p: (tileKey) => {
@@ -829,6 +1056,16 @@ document.addEventListener('DOMContentLoaded', () => {
             a: (tileKey) => {
                 type = 'ammo'; // Set type to ammo
                 placeSprite(tileKey, currentSprite, 'ammo'); // Place sprite
+                closePopup();
+            },
+            k: (tileKey) => {
+                type = 'key'; // Set type to key item
+                placeSprite(tileKey, currentSprite, 'key');
+                closePopup();
+            },
+            d: (tileKey) => {
+                type = 'door'; // Set type to door
+                placeSprite(tileKey, currentSprite, 'door');
                 closePopup();
             },
             i: (tileKey) => {
@@ -858,6 +1095,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 placeSprite(tileKey, currentSprite, 'push'); // Place sprite    
                 closePopup();
             },
+            a: (tileKey) => {
+                type = 'animation'; // Set type to animation tile
+                placeSprite(tileKey, currentSprite, 'animation');
+                closePopup();
+            },
             i: (tileKey) => {
                 type = 'invisible'; // Set type to invisible tile
                 placeSprite(tileKey, currentSprite, 'invisible'); // Place sprite
@@ -868,6 +1110,54 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add key handlers for extraCreatures here
         },
     };
+
+    function triggerPopupSelection(popupId, key) {
+        if (!popupId || !key) return;
+        const handlers = popupHandlers[popupId];
+        if (!handlers) return;
+        const handler = handlers[key];
+        if (!handler) return;
+        const tileKey = `${currentLayer},${cursorX},${cursorY}`;
+        handler(tileKey);
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+    }
+
+    function attachPopupClickHandlers(popupId) {
+        const container = document.getElementById(popupId);
+        if (!container) return;
+        const handlers = popupHandlers[popupId];
+        if (!handlers) return;
+
+        const interactiveElements = [];
+        container.querySelectorAll('li').forEach((item) => {
+            const keySpan = item.querySelector('span');
+            const derivedKey = (item.dataset.popupKey || (keySpan ? keySpan.textContent : '')).trim().toLowerCase();
+            if (!derivedKey || !handlers[derivedKey]) return;
+            item.dataset.popupKey = derivedKey;
+            interactiveElements.push(item);
+
+            const description = item.nextElementSibling;
+            if (description && description.classList.contains('fieldText')) {
+                description.dataset.popupKey = derivedKey;
+                interactiveElements.push(description);
+            }
+        });
+
+        interactiveElements.forEach((element) => {
+            element.classList.add('popupOption');
+            element.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                triggerPopupSelection(popupId, element.dataset.popupKey);
+            });
+        });
+    }
+
+    function initializeQuickMenuInteractions() {
+        quickMenuPopups.forEach((popupId) => attachPopupClickHandlers(popupId));
+    }
+
+    initializeQuickMenuInteractions();
 
     function closePopup() {
         if (!popup.type) return; // If no popup type is active, do nothing
@@ -888,6 +1178,39 @@ document.addEventListener('DOMContentLoaded', () => {
         // Refocus the canvas
         canvas.focus();
     }
+
+    function openPopup(popupId) {
+        if (!popupId) return;
+        if (popup.active) {
+            closePopup();
+        }
+
+        const popupElement = document.getElementById(popupId);
+        if (!popupElement) return;
+
+        popup.active = true;
+        popup.type = popupId;
+        overlay.style.display = 'block';
+        popupElement.style.display = 'flex';
+    }
+
+    function togglePopup(popupId) {
+        if (!popupId) return;
+        if (popup.active && popup.type === popupId) {
+            closePopup();
+            return;
+        }
+        openPopup(popupId);
+    }
+
+    document.addEventListener('keydown', (event) => {
+        if (!popup.active) return;
+        if (!quickMenuPopups.has(popup.type)) return;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closePopup();
+        }
+    });
 
     // ######################################
     // KEYBOARD HANDLING FUNCTIONS
@@ -923,10 +1246,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (cursorX < tilesX - 1) cursorX += 1; // Move right
                     break;
                 case ' ':
-                    if (placedSprites[tileKey]) {
-                        if (placedSprites[tileKey].type != 'player') delete placedSprites[tileKey]; // Remove sprite if it exists
-                    } else {
-                        placeSprite(tileKey, currentSprite, type); // Place sprite
+                    if (mouse.mode === 'draw') {
+                        if (placedSprites[tileKey]) {
+                            removeSprite(tileKey);
+                        } else {
+                            placeSprite(tileKey, currentSprite, type); // Place sprite
+                        }
+                    }
+                    else if (mouse.mode === 'darken') {
+                        if (placedSprites[tileKey]) {
+                            const updatedTile = deepCopyTile(placedSprites[tileKey]);
+                            updatedTile.color = [
+                                adjustColor(updatedTile.color[0], -0.1),
+                                adjustColor(updatedTile.color[1], -0.1)
+                            ];
+                            setTile(tileKey, updatedTile);
+                        }
+                    } else if (mouse.mode === 'lighten') {
+                        if (placedSprites[tileKey]) {
+                            const updatedTile = deepCopyTile(placedSprites[tileKey]);
+                            updatedTile.color = [
+                                adjustColor(updatedTile.color[0], 0.1),
+                                adjustColor(updatedTile.color[1], 0.1)
+                            ];
+                            setTile(tileKey, updatedTile);
+                        }
                     }
                     break;
                 case 'Enter': // to grab sprite or modify tile
@@ -981,7 +1325,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         for (let key in placedSprites) {
                             const [layer] = key.split(',').map(Number); // Extract layer from key
                             if (layer === currentLayer) {
-                                delete placedSprites[key];
+                                removeSprite(key);
                             }
                         }
                         console.log('Deleted all sprites in layer:', currentLayer);
@@ -989,7 +1333,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     break;
                 case 'F1': //save world
-                    saveWorld(getSpriteSheet(), boardList, world); // save world from file.js
+                    saveWorld(getSpriteSheet(), boardList, world, worldSaveData.worldSettings, boardSettings); // save world from file.js
                     if (event.repeat) { return }
                     break;
                 case 'F3': //load world
@@ -997,17 +1341,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (event.repeat) { return }
                     break;
                 case 'F9': // extra terrain tiles
-                    popup.active = true;
-                    popup.type = 'extraTerrain';
-                    overlay.style.display = 'block';
-                    document.getElementById('extraTerrain').style.display = 'flex';
+                    togglePopup('extraTerrain');
                     if (event.repeat) { return }
                     break;
                 case 'F10': // extra item tiles
-                    popup.active = true;
-                    popup.type = 'extraItems';
-                    overlay.style.display = 'block';
-                    document.getElementById('extraItems').style.display = 'flex';
+                    togglePopup('extraItems');
                     if (event.repeat) { return }
                     break;
             }
@@ -1093,8 +1431,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         hiddenLayers.add(currentLayer);
                         console.log('hiding layer: ', currentLayer);
                     }
+                    updateLayers(currentLayer);
                     if (event.repeat) { return }
                     drawBoard();
+                    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
                     return;
                 case 's': // Save board & sprite sheet
                     saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
@@ -1117,9 +1457,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     mouse.mode = 'fill';
                     console.log('flood fill mode');
                     break;
-                case 'd':
+                case 'd': // draw mode
                     mouse.mode = 'draw';
                     console.log('draw mode');
+                    break;
+                case '/': // lighten brush mode
+                    mouse.mode = 'lighten';
+                    console.log('lighten mode');
+                    break;
+                case '*': // darken brush mode
+                    mouse.mode = 'darken';
+                    console.log('darken mode');
                     break;
                 case 'z':
                     // move player sprite to new location
@@ -1145,6 +1493,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Handle key combinations for both Windows/Linux (Ctrl) and Mac (Cmd)
                 key.ctrl = true;
                 switch (event.key.toLowerCase()) { // Check the key
+                    case 'z':
+                        if (event.shiftKey) {
+                            redoAction();
+                        } else {
+                            undoAction();
+                        }
+                        if (event.repeat) { return }
+                        return;
+                    case 'y':
+                        redoAction();
+                        if (event.repeat) { return }
+                        return;
                     case 'b': // Handle 'Ctrl + B' to load board (no sprite sheet)
                         loadBoard(handleLoadedBoard); // from file.js
                         if (event.repeat) { return }
@@ -1158,35 +1518,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } // end of popup check
 
         if (popup.active) {
-            switch (event.key) {
-                case 'Escape':
-                case 'Enter':
-                    if (enterPressed) break;
-                    switch (popup.type) {
-                        case 'extraTerrain':
-                            document.getElementById('extraTerrain').style.display = 'none';
-                            popup.active = false;
-                            break;
-                        case 'extraItems':
-                            document.getElementById('extraItems').style.display = 'none';
-                            popup.active = false;
-                            break;
-                        case 'boardSelect':
-                            document.getElementById('boardSelect').style.display = 'none';
-                            popup.active = false;
-                            break;
-                    }
-                    overlay.style.display = 'none';
-                    canvas.focus();
-                    break;
+            if ((event.key === 'Escape' || event.key === 'Enter') && !enterPressed) {
+                closePopup();
+                return;
             }
-            //if (popup.active) {
             const handlers = popupHandlers[popup.type];
             if (handlers && handlers[event.key.toLowerCase()]) {
                 handlers[event.key.toLowerCase()](tileKey); // Call the appropriate handler
                 if (event.repeat) return;
             }
-            //}
         }
 
         /*if (mouse.mode === 'paint') {
@@ -1266,4 +1606,5 @@ document.addEventListener('DOMContentLoaded', () => {
     world[currentBoard] = placedSprites; // Initialize the current board in the world object
     toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
     drawBoard();
+    clearHistory();
 });

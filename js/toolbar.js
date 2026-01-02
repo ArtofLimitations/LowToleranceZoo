@@ -20,7 +20,17 @@ const boardLayers = [null, document.getElementById('layer1'), document.getElemen
 const spriteTypes = [document.getElementById('wall'), document.getElementById('step'), document.getElementById('break'), document.getElementById('push'), document.getElementById('other')];
 const terrainButton = document.getElementById('terrainButton');
 const itemButton = document.getElementById('itemButton');
+const creatureButton = document.getElementById('creatureButton');
 const editMode = document.getElementById('editMode');
+const undoButton = document.getElementById('undoButton');
+const redoButton = document.getElementById('redoButton');
+const modeButtons = {
+  draw: document.getElementById('modeButtonDraw'),
+  fill: document.getElementById('modeButtonFill'),
+  paint: document.getElementById('modeButtonPaint'),
+  lighten: document.getElementById('modeButtonLighten'),
+  darken: document.getElementById('modeButtonDarken'),
+};
 
 //const toolBarSize = 320; // Right side toolbar sized in tiles
 let colors = [[0, 0, 0, 1], [255, 255, 255, 1]];
@@ -74,6 +84,15 @@ layerButtons.forEach((element, index) => {
   }
 });
 
+export function updateLayers(layer) {
+  const button = layerButtons[layer];
+  if (!button) return;
+
+  const isHidden = hidden.has(layer);
+  button.innerText = isHidden ? 'visibility_off' : 'visibility';
+}
+
+
 spriteTypes.forEach((element) => { 
   element.onclick = () => {
     const type = element.id;
@@ -82,9 +101,42 @@ spriteTypes.forEach((element) => {
   }
 });
 
-terrainButton.onclick = () => {
-  
+if (terrainButton) {
+  terrainButton.onclick = () => {
+    callbackFunction({ popup: 'extraTerrain' });
+  };
 }
+
+if (itemButton) {
+  itemButton.onclick = () => {
+    callbackFunction({ popup: 'extraItems' });
+  };
+}
+
+if (creatureButton) {
+  creatureButton.onclick = () => {
+    callbackFunction({ popup: 'extraCreatures' });
+  };
+}
+
+if (undoButton) {
+  undoButton.onclick = () => {
+    callbackFunction({ history: 'undo' });
+  };
+}
+
+if (redoButton) {
+  redoButton.onclick = () => {
+    callbackFunction({ history: 'redo' });
+  };
+}
+
+Object.entries(modeButtons).forEach(([mode, button]) => {
+  if (!button) return;
+  button.onclick = () => {
+    callbackFunction({ mode });
+  };
+});
 
 export function toolbar(current, currentColors, layer, mouse, hiddenLayers, callback, currentType) { // Main toolbar function
   //console.log('Function called from toolbar.js');
@@ -142,7 +194,18 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
 
   spriteType.innerText = currentType || 'wall';
 
-  editMode.innerText = mouseStatus.mode;
+  const modeLabel = mouseStatus.mode || 'draw';
+  const formattedMode = modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1);
+  editMode.innerText = formattedMode;
+
+  Object.entries(modeButtons).forEach(([mode, button]) => {
+    if (!button) return;
+    if (modeLabel === mode) {
+      button.classList.add('modeButton-active');
+    } else {
+      button.classList.remove('modeButton-active');
+    }
+  });
 }
 
 export function updateType (type) { // Update sprite type in toolbar
