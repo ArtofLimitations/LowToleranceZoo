@@ -290,6 +290,62 @@ h3 {
   color: #131313;
 }
 
+/* Custom Tooltips */
+.tooltip-wrapper {
+  position: relative;
+  display: flex;
+}
+
+.tooltip-wrapper .custom-tooltip {
+  visibility: hidden;
+  background-color: rgba(30, 30, 30, 0.95);
+  color: #ffffff;
+  text-align: left;
+  border-radius: 4px;
+  padding: 8px 12px;
+  position: absolute;
+  z-index: 10000;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-wrapper .custom-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(30, 30, 30, 0.95) transparent transparent transparent;
+}
+
+.tooltip-wrapper:hover .custom-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+.tooltip-wrapper .custom-tooltip .tooltip-key {
+  color: #ffd700;
+  font-weight: bold;
+  background-color: rgba(255, 215, 0, 0.15);
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.tooltip-wrapper .custom-tooltip .tooltip-desc {
+  color: #cccccc;
+}
+
 .lowToleranceToolbar .imageBox {
   background-color: #131313;
   width: 32px;

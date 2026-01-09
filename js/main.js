@@ -2,7 +2,7 @@ import { toolbar, updateType, updateLayers } from './toolbar.js';
 import { drawSprite, createDataURL, adjustColor } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
-import { pickColor, currentColors, updateColor } from './palette.js';
+import { pickColor, currentColors, updateColor, toolbarSwapColor } from './palette.js';
 import { saveCombinedData, loadCombinedData, saveWorld, loadWorld, loadSpriteSheetDialog } from './file.js';
 import { editObject, getObjectData } from './object-editor.js';
 
@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentAmount = 1;               // current value for item amount (ammo, coins, health, etc)
     let tileData = { script: '' };       // extra data for tile (script, amount, etc)
     let popup = { active: false, type: null };
+    let colorIntensity = 10;             // lighten/darken intensity (1-50)
+    let intensityTooltip = { visible: false, timeout: null }; // tooltip for intensity changes
     let boardList = [[1, 'Title Screen'], [2, 'Default']];
     let currentBoard = 2;                // current board ID
     let world = {};                      // default type for placed sprites
@@ -59,39 +61,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 coins: 0,
                 // ...add more as needed
             },
-            deathBoard: 2,          // Board ID to go to on death
-            globalScripts: "",      // Any global script text
+            switchBoardOnDeath: false,   // Whether to switch boards on player death
+            deathBoard: 1,               // Board ID to go to on death
+            globalScripts: "",           // Any global script text
             // ...future global settings
         },
 
-        // Per-board settings and scripts
-        boardSettings: {
-            // Example for board 1
-            1: {
-                playerStart: { x: 10, y: 5, layer: 2 },
-                reenterAtStart: true,
-                linkedBoards: { east: 2, west: null, north: null, south: null },
-                dark: false,
-                nightmode: false,
-                playerLocked: false,
-                playerCanAttack: true,
-                boardScript: "", // Board-specific script
-                // ...future board settings
-            },
-            // Example for board 2
-            2: {
-                playerStart: { x: 20, y: 10, layer: 2 },
-                reenterAtStart: false,
-                linkedBoards: { east: null, west: 1, north: null, south: null },
-                dark: true,
-                nightmode: false,
-                playerLocked: false,
-                playerCanAttack: true,
-                boardScript: "",
-            }
-            // ...add more boards as needed
-        }
+        // Per-board settings and scripts (dynamically populated)
+        boardSettings: {}
     };
+
+    // Helper function to create default board settings
+    function createDefaultBoardSettings(boardId, options = {}) {
+        return {
+            playerStart: options.playerStart || { x: 10, y: 5, layer: 2 },
+            reenterWhenHurt: options.reenterWhenHurt !== undefined ? options.reenterWhenHurt : false,
+            linkedBoards: options.linkedBoards || { east: null, west: null, north: null, south: null },
+            dark: options.dark || false,
+            nightmode: options.nightmode || false,
+            layer1Opacity: options.layer1Opacity !== undefined ? options.layer1Opacity : 1.0,
+            layer2Opacity: options.layer2Opacity !== undefined ? options.layer2Opacity : 1.0,
+            layer3Opacity: options.layer3Opacity !== undefined ? options.layer3Opacity : 1.0,
+            playerLocked: options.playerLocked || false,
+            playerCanAttack: options.playerCanAttack !== undefined ? options.playerCanAttack : true,
+            boardName: options.boardName || `Board ${boardId}`,
+            boardScript: options.boardScript || "",
+            // ...future board settings can be added here
+        };
+    }
+
+    // Initialize board settings for a specific board
+    function initializeBoardSettings(boardId, options = {}) {
+        if (!worldSaveData.boardSettings[boardId]) {
+            worldSaveData.boardSettings[boardId] = createDefaultBoardSettings(boardId, options);
+        }
+        return worldSaveData.boardSettings[boardId];
+    }
     let key = { ctrl: false, shift: false, alt: false, lastClick: 0, clickDelay: 100 };   // keyboard status object. click delay in ms
     let mouse = {
         x: cursorX, y: cursorY, oldX: cursorX, oldY: cursorY, down: false,
@@ -151,13 +156,26 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const [boardId, boardName] of boardList) {
             world[boardId] = {}; // Create an empty object for each board
             resetBoardHistory(boardId);
+            // Initialize board settings with board name
+            initializeBoardSettings(boardId, { boardName: boardName });
         }
         console.log('World:', world);
+        console.log('Board Settings:', worldSaveData.boardSettings);
     }
 
     // ######################################
     // DRAWING FUNCTIONS
     // ######################################
+
+    function showIntensityTooltip() {
+        intensityTooltip.visible = true;
+        if (intensityTooltip.timeout) clearTimeout(intensityTooltip.timeout);
+        intensityTooltip.timeout = setTimeout(() => {
+            intensityTooltip.visible = false;
+            drawBoard();
+        }, 800); // Fade after 0.8 seconds
+        drawBoard();
+    }
 
     function getSpriteImage() {
         const data = getDataFromSheet(currentSprite); // from sprite-sheet.js
@@ -222,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-       for (const [l, sx, sy] of sortedKeys) {
+        for (const [l, sx, sy] of sortedKeys) {
             // Skip hidden layers
             if (hiddenLayers.has(l)) continue;
 
@@ -278,14 +296,105 @@ document.addEventListener('DOMContentLoaded', () => {
         drawCursor();
     }
 
-    // draw the top red cursor
+    // draw the top cursor with mode and layer indicators
     function drawCursor() {
         const posX = cursorX * tileSizeX;
         const posY = cursorY * tileSizeY;
+        
+        // Determine cursor color based on mode
+        let cursorColor = 'rgba(255, 10, 10, 0.8)'; // Default red for draw mode
+        let showModeLabel = false;
+        let modeLabel = '';
+        
+        switch (mouse.mode) {
+            case 'fill':
+                cursorColor = 'rgba(0, 100, 255, 0.8)'; // Blue
+                break;
+            case 'paint':
+                cursorColor = 'rgba(12, 248, 0, 0.8)'; // Hot pink
+                break;
+            case 'lighten':
+                showModeLabel = true;
+                modeLabel = 'L';
+                break;
+            case 'darken':
+                showModeLabel = true;
+                modeLabel = 'D';
+                break;
+        }
+        
+        // Draw cursor rectangle
         ctx.beginPath();
         ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgba(255, 10, 10, 0.8)';
-        ctx.strokeRect(posX + 1, posY + 1, tileSizeX - 2, tileSizeY - 2);
+        
+        if (showModeLabel) {
+            // Special handling for lighten/darken - dark sides, dark top/bottom
+            ctx.strokeStyle = 'rgba(58, 58, 58, 0.6)';
+            ctx.beginPath();
+            ctx.moveTo(posX + 1, posY + 1);
+            ctx.lineTo(posX + 1, posY + tileSizeY - 1); // Left side
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(posX + tileSizeX - 1, posY + 1);
+            ctx.lineTo(posX + tileSizeX - 1, posY + tileSizeY - 1); // Right side
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(57, 57, 57, 0.8)';
+            ctx.beginPath();
+            ctx.moveTo(posX + 1, posY + 1);
+            ctx.lineTo(posX + tileSizeX - 1, posY + 1); // Top
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(posX + 1, posY + tileSizeY - 1);
+            ctx.lineTo(posX + tileSizeX - 1, posY + tileSizeY - 1); // Bottom
+            ctx.stroke();
+            
+            // Draw inner white square for better visibility
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(posX + 4, posY + 4, tileSizeX - 8, tileSizeY - 8);
+            ctx.lineWidth = 2; // Reset line width
+        } else {
+            ctx.strokeStyle = cursorColor;
+            ctx.strokeRect(posX + 1, posY + 1, tileSizeX - 2, tileSizeY - 2);
+        }
+        
+        // Draw layer number in upper right
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.font = 'bold 10px monospace';
+        ctx.lineWidth = 2;
+        const layerText = currentLayer.toString();
+        const textX = posX + tileSizeX - 8;
+        const textY = posY + 10;
+        ctx.strokeText(layerText, textX, textY);
+        ctx.fillText(layerText, textX, textY);
+        
+        // Draw mode label for lighten/darken in upper right (below layer number)
+        if (showModeLabel) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.strokeStyle = 'rgba(57, 57, 57, 0.9)';
+            ctx.font = 'bold 9px monospace';
+            const modeLabelX = posX + tileSizeX - 8;
+            const modeLabelY = posY + 20;
+            ctx.strokeText(modeLabel, modeLabelX, modeLabelY);
+            ctx.fillText(modeLabel, modeLabelX, modeLabelY);
+        }
+        
+        // Draw temporary intensity tooltip (centered in cursor)
+        if (intensityTooltip.visible) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = 1;
+            const tooltipText = colorIntensity.toString();
+            ctx.font = '16px monospace';
+            const textWidth = ctx.measureText(tooltipText).width;
+            const centerX = posX + (tileSizeX - textWidth) / 2;
+            const centerY = posY + tileSizeY / 2 + 6;
+            //ctx.strokeText(tooltipText, centerX, centerY);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            ctx.fillText(tooltipText, centerX, centerY);
+        }
     }
 
     // ######################################
@@ -641,9 +750,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (mouse.mode === 'darken') {
                     if (placedSprites[tileKey]) {
                         const updatedTile = deepCopyTile(placedSprites[tileKey]);
+                        const factor = -colorIntensity / 100;
                         updatedTile.color = [
-                            adjustColor(updatedTile.color[0], -0.1),
-                            adjustColor(updatedTile.color[1], -0.1)
+                            adjustColor(updatedTile.color[0], factor),
+                            adjustColor(updatedTile.color[1], factor)
                         ];
                         setTile(tileKey, updatedTile);
                     }
@@ -651,9 +761,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (mouse.mode === 'lighten') {
                     if (placedSprites[tileKey]) {
                         const updatedTile = deepCopyTile(placedSprites[tileKey]);
+                        const factor = colorIntensity / 100;
                         updatedTile.color = [
-                            adjustColor(updatedTile.color[0], 0.1),
-                            adjustColor(updatedTile.color[1], 0.1)
+                            adjustColor(updatedTile.color[0], factor),
+                            adjustColor(updatedTile.color[1], factor)
                         ];
                         setTile(tileKey, updatedTile);
                     }
@@ -941,7 +1052,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 world[newBoardId] = {}; // Initialize the new board in the world object
                 clearHistory(newBoardId);
                 createPlayerInBoard(newBoardId); // Create player in the new board
+                // Initialize board settings for the new board
+                initializeBoardSettings(newBoardId, {
+                    boardName: newBoardName,
+                    playerStart: { x: 10, y: 5, layer: 2 }
+                });
                 console.log('New Board Added: ', newBoardId, newBoardName);
+                console.log('Board Settings:', worldSaveData.boardSettings[newBoardId]);
 
                 boardSelect(); // Refresh the board selector to show the new board
             }
@@ -1231,262 +1348,288 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!popup.active) { // use different key events for popups like the board selector
 
-            switch (event.key) {
+            if (!event.ctrlKey && !event.metaKey) {
+                switch (event.key) {
 
-                case 'ArrowUp':
-                    if (cursorY > 0) cursorY -= 1;          // Move up
-                    break;
-                case 'ArrowDown':
-                    if (cursorY < tilesY - 1) cursorY += 1; // Move down
-                    break;
-                case 'ArrowLeft':
-                    if (cursorX > 0) cursorX -= 1;          // Move left
-                    break;
-                case 'ArrowRight':
-                    if (cursorX < tilesX - 1) cursorX += 1; // Move right
-                    break;
-                case ' ':
-                    if (mouse.mode === 'draw') {
-                        if (placedSprites[tileKey]) {
-                            removeSprite(tileKey);
-                        } else {
-                            placeSprite(tileKey, currentSprite, type); // Place sprite
-                        }
-                    }
-                    else if (mouse.mode === 'darken') {
-                        if (placedSprites[tileKey]) {
-                            const updatedTile = deepCopyTile(placedSprites[tileKey]);
-                            updatedTile.color = [
-                                adjustColor(updatedTile.color[0], -0.1),
-                                adjustColor(updatedTile.color[1], -0.1)
-                            ];
-                            setTile(tileKey, updatedTile);
-                        }
-                    } else if (mouse.mode === 'lighten') {
-                        if (placedSprites[tileKey]) {
-                            const updatedTile = deepCopyTile(placedSprites[tileKey]);
-                            updatedTile.color = [
-                                adjustColor(updatedTile.color[0], 0.1),
-                                adjustColor(updatedTile.color[1], 0.1)
-                            ];
-                            setTile(tileKey, updatedTile);
-                        }
-                    }
-                    break;
-                case 'Enter': // to grab sprite or modify tile
-                    grabSprite(tileKey);
-                    if (placedSprites[tileKey]) {
-                        if (placedSprites[tileKey].type === 'sign') {
-                            editObject('text', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
-                            //placedSprites[tileKey].data.text = getObjectData(tileKey);
-                        }
-                        if (placedSprites[tileKey].type === 'object') {
-                            editObject('object', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
-                            //placedSprites[tileKey].data.script = getObjectData(tileKey);
-                        }
-                        if (placedSprites[tileKey].type === 'passage') { // need to set passage ID
-                            boardSelect(true, tileKey, placedSprites[tileKey].data.board); // open board selector for selecting board ID Only (true)
-                            console.log('passage board: ', placedSprites[tileKey].data.board);
-                        }
-                        if (placedSprites[tileKey].type === 'coin' || placedSprites[tileKey].type === 'ammo') {
-
-                            if (!placedSprites[tileKey].data) {
-                                placedSprites[tileKey].data = {}; // Initialize the data object if it doesn't exist
-                            }
-                            placedSprites[tileKey].data.value = placedSprites[tileKey].data.value || 1; // Set default amount if not set
-
-                            selectAmount('Enter quantity:', placedSprites[tileKey].data.value, tileKey); // open item selector for selecting amount of items
-                            console.log('item amount: ', placedSprites[tileKey].data.value);
-                        }
-                        if (placedSprites[tileKey].type === 'push') {
-                            selectPushType(placedSprites[tileKey].data.pushType || 'ANY', tileKey); // open push type selector for selecting push type
-                            console.log('push type: ', placedSprites[tileKey].data.pushType);
-                        }
-                        console.log('grabbed:, ', placedSprites[tileKey]);
-                        enterPressed = true; // Lock it
-                    }
-                    if (event.repeat) { return }
-                    break;
-                case 'Tab': // Paint Mode
-                    if (mouse.mode === 'paint') mouse.mode = 'draw';
-                    else mouse.mode = 'paint';
-                    console.log('paint mode');
-                case 'PageUp':
-                    console.log('type: ', type);
-                    if (event.repeat) { return }
-                    break;
-                case 'Insert':
-                    // nothing here yet
-                    console.log('placed sprites: ', placedSprites);
-                    if (event.repeat) { return }
-                    break;
-                case 'Delete': // delete all sprites in current layer
-                    if (confirm('Are you sure you want to delete all sprites in this layer?')) {
-                        for (let key in placedSprites) {
-                            const [layer] = key.split(',').map(Number); // Extract layer from key
-                            if (layer === currentLayer) {
-                                removeSprite(key);
+                    case 'ArrowUp':
+                        if (cursorY > 0) cursorY -= 1;          // Move up
+                        break;
+                    case 'ArrowDown':
+                        if (cursorY < tilesY - 1) cursorY += 1; // Move down
+                        break;
+                    case 'ArrowLeft':
+                        if (cursorX > 0) cursorX -= 1;          // Move left
+                        break;
+                    case 'ArrowRight':
+                        if (cursorX < tilesX - 1) cursorX += 1; // Move right
+                        break;
+                    case ' ':
+                        if (mouse.mode === 'draw') {
+                            if (placedSprites[tileKey]) {
+                                removeSprite(tileKey);
+                            } else {
+                                placeSprite(tileKey, currentSprite, type); // Place sprite
                             }
                         }
-                        console.log('Deleted all sprites in layer:', currentLayer);
-                        drawBoard();
-                    }
-                    break;
-                case 'F1': //save world
-                    saveWorld(getSpriteSheet(), boardList, world, worldSaveData.worldSettings, boardSettings); // save world from file.js
-                    if (event.repeat) { return }
-                    break;
-                case 'F3': //load world
-                    loadWorld(handleLoadedWorld); // load world from file.js
-                    if (event.repeat) { return }
-                    break;
-                case 'F9': // extra terrain tiles
-                    togglePopup('extraTerrain');
-                    if (event.repeat) { return }
-                    break;
-                case 'F10': // extra item tiles
-                    togglePopup('extraItems');
-                    if (event.repeat) { return }
-                    break;
-            }
+                        else if (mouse.mode === 'darken') {
+                            if (placedSprites[tileKey]) {
+                                const updatedTile = deepCopyTile(placedSprites[tileKey]);
+                                const factor = -colorIntensity / 100;
+                                updatedTile.color = [
+                                    adjustColor(updatedTile.color[0], factor),
+                                    adjustColor(updatedTile.color[1], factor)
+                                ];
+                                setTile(tileKey, updatedTile);
+                            }
+                        } else if (mouse.mode === 'lighten') {
+                            if (placedSprites[tileKey]) {
+                                const updatedTile = deepCopyTile(placedSprites[tileKey]);
+                                const factor = colorIntensity / 100;
+                                updatedTile.color = [
+                                    adjustColor(updatedTile.color[0], factor),
+                                    adjustColor(updatedTile.color[1], factor)
+                                ];
+                                setTile(tileKey, updatedTile);
+                            }
+                        }
+                        break;
+                    case 'Enter': // to grab sprite or modify tile
+                        grabSprite(tileKey);
+                        if (placedSprites[tileKey]) {
+                            if (placedSprites[tileKey].type === 'sign') {
+                                editObject('text', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
+                                //placedSprites[tileKey].data.text = getObjectData(tileKey);
+                            }
+                            if (placedSprites[tileKey].type === 'object') {
+                                editObject('object', placedSprites[tileKey].data.script, tileKey, handleObjectScript); // open object script editor from object-editor.js
+                                //placedSprites[tileKey].data.script = getObjectData(tileKey);
+                            }
+                            if (placedSprites[tileKey].type === 'passage') { // need to set passage ID
+                                boardSelect(true, tileKey, placedSprites[tileKey].data.board); // open board selector for selecting board ID Only (true)
+                                console.log('passage board: ', placedSprites[tileKey].data.board);
+                            }
+                            if (placedSprites[tileKey].type === 'coin' || placedSprites[tileKey].type === 'ammo') {
 
-            switch (event.key.toLowerCase()) {
-                case 'e':
-                    removeMainEvents();
-                    editSprite(currentSprite, (newIndex) => {
-                        // callback from sprite editor when it changes or closes
-                        currentSprite = newIndex;
-                        updateSpriteData(currentSprite);
+                                if (!placedSprites[tileKey].data) {
+                                    placedSprites[tileKey].data = {}; // Initialize the data object if it doesn't exist
+                                }
+                                placedSprites[tileKey].data.value = placedSprites[tileKey].data.value || 1; // Set default amount if not set
+
+                                selectAmount('Enter quantity:', placedSprites[tileKey].data.value, tileKey); // open item selector for selecting amount of items
+                                console.log('item amount: ', placedSprites[tileKey].data.value);
+                            }
+                            if (placedSprites[tileKey].type === 'push') {
+                                selectPushType(placedSprites[tileKey].data.pushType || 'ANY', tileKey); // open push type selector for selecting push type
+                                console.log('push type: ', placedSprites[tileKey].data.pushType);
+                            }
+                            console.log('grabbed:, ', placedSprites[tileKey]);
+                            enterPressed = true; // Lock it
+                        }
+                        if (event.repeat) { return }
+                        break;
+                    case 'Tab': // Paint Mode
+                        if (mouse.mode === 'paint') mouse.mode = 'draw';
+                        else mouse.mode = 'paint';
+                        console.log('paint mode');
+                    case 'PageUp':
+                        console.log('type: ', type);
+                        if (event.repeat) { return }
+                        break;
+                    case 'Insert':
+                        // nothing here yet
+                        console.log('placed sprites: ', placedSprites);
+                        if (event.repeat) { return }
+                        break;
+                    case 'Delete': // delete all sprites in current layer
+                        if (confirm('Are you sure you want to delete all sprites in this layer?')) {
+                            for (let key in placedSprites) {
+                                const [layer] = key.split(',').map(Number); // Extract layer from key
+                                if (layer === currentLayer) {
+                                    removeSprite(key);
+                                }
+                            }
+                            console.log('Deleted all sprites in layer:', currentLayer);
+                            drawBoard();
+                        }
+                        break;
+                    case 'F1': //save world
+                        saveWorld(getSpriteSheet(), boardList, world, worldSaveData.worldSettings, worldSaveData.boardSettings); // save world from file.js
+                        if (event.repeat) { return }
+                        break;
+                    case 'F3': //load world
+                        loadWorld(handleLoadedWorld); // load world from file.js
+                        if (event.repeat) { return }
+                        break;
+                    case 'F9': // extra terrain tiles
+                        togglePopup('extraTerrain');
+                        if (event.repeat) { return }
+                        break;
+                    case 'F10': // extra item tiles
+                        togglePopup('extraItems');
+                        if (event.repeat) { return }
+                        break;
+                }
+
+                switch (event.key.toLowerCase()) {
+                    case 'e':
+                        removeMainEvents();
+                        editSprite(currentSprite, (newIndex) => {
+                            // callback from sprite editor when it changes or closes
+                            currentSprite = newIndex;
+                            updateSpriteData(currentSprite);
+                            toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+                            drawBoard();
+                            canvas.focus();
+                        });
+                        if (event.repeat) { return }
+                        break;
+                    case 'c':
+                        removeMainEvents();
+                        pickColor(); // Open color picker from palette.js
+                        if (event.repeat) { return }
+                        break;
+                    case 'x':
+                        // Swap light and dark colors
+                        colors = toolbarSwapColor();
+                        updateColor(colors);
                         toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
                         drawBoard();
-                        canvas.focus();
-                    });
-                    if (event.repeat) { return }
-                    break;
-                case 'c':
-                    removeMainEvents();
-                    pickColor(); // Open color picker from palette.js
-                    if (event.repeat) { return }
-                    break;
-                case '=':
-                    if (currentSprite < tileSetLength) currentSprite += 1; // iterate through sprite sheet
-                    console.log('current sprite: ' + currentSprite);
-                    updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
-                    break;
-                case '-':
-                    if (currentSprite > 1) currentSprite -= 1;
-                    console.log('current sprite: ' + currentSprite);
-                    updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
-                    break;
-                case '+':
-                    loadSpriteSheetDialog((spriteSheet) => {
-                        replaceSpriteSheet(spriteSheet); // Update the in-memory spritesheet
-                        drawBoard(); // Redraw to reflect new sprites
-                        console.log('Spritesheet loaded!');
-                    });
-                    break;
-                case 'v':
-                    // open the sprite sheet selector here
-                    spriteSelect(); // Open sprite sheet selector from sprite-sheet.js
-                    if (event.repeat) { return }
-                    break;
-                case 'b':
-                    // open the board selector here
-                    boardSelect();
-                    break;
-                case '.':
-                    placeSprite(tileKey, currentSprite, 'sign'); // Place sprite
-                    if (placedSprites[tileKey]) {
-                        editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
-                    }
-                    if (event.repeat) { return }
-                    break;
-                case 'o':
-                    placeSprite(tileKey, currentSprite, 'object'); // Place sprite
-                    if (placedSprites[tileKey]) {
-                        editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
-                    }
-                    if (event.repeat) { return }
-                    break;
-                case '1':
-                    currentLayer = 1; // change layer for placing sprites
-                    if (event.repeat) { return }
-                    break;
-                case '2':
-                    currentLayer = 2;
-                    if (event.repeat) { return }
-                    break;
-                case '3':
-                    currentLayer = 3;
-                    if (event.repeat) { return }
-                    break;
-                case 'h': // for hiding or showing layers
-                    if (hiddenLayers.has(currentLayer)) {
-                        //showLayer(currentLayer);
-                        hiddenLayers.delete(currentLayer);
-                        console.log('showing layer: ', currentLayer);
-                    }
-                    else {
-                        //hideLayer(currentLayer);
-                        hiddenLayers.add(currentLayer);
-                        console.log('hiding layer: ', currentLayer);
-                    }
-                    updateLayers(currentLayer);
-                    if (event.repeat) { return }
-                    drawBoard();
-                    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
-                    return;
-                case 's': // Save board & sprite sheet
-                    saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
-                    break;
-                case 'l': // load board & sprite sheet
-                    loadCombinedData(handleLoadedBoard); // load board and sprite sheet from file.js
-                    break;
-                case 'r': // reset board
-                    if (confirm('Are you sure you want reset board?')) {
-                        placedSprites = {}; // Clear the current board
-                        world[currentBoard] = placedSprites; // Update the world object with the reset board
-                        console.log('Board reset');
-                        createPlayer(); // Recreate the player sprite
-                        drawBoard(); // Redraw the board
-                    } else {
-                        console.log('Board not reset');
-                    }
-                    break;
-                case 'f': // flood fill
-                    mouse.mode = 'fill';
-                    console.log('flood fill mode');
-                    break;
-                case 'd': // draw mode
-                    mouse.mode = 'draw';
-                    console.log('draw mode');
-                    break;
-                case '/': // lighten brush mode
-                    mouse.mode = 'lighten';
-                    console.log('lighten mode');
-                    break;
-                case '*': // darken brush mode
-                    mouse.mode = 'darken';
-                    console.log('darken mode');
-                    break;
-                case 'z':
-                    // move player sprite to new location
-                    if (currentBoard !== 1) { // no player on title screen
-                        const playerKey = `${player.layer},${player.x},${player.y}`;
-                        placedSprites[`${currentLayer},${cursorX},${cursorY}`] = {
-                            sprite: 1,
-                            image: getSpriteImage(),
-                            color: [[0, 0, 255, .5], [255, 255, 255, 1]],
-                            type: 'player',
-                            direction: 'down',
-                            layer: currentLayer,
-                        };
-                        [player.oldLayer, player.oldX, player.oldY] = [player.layer, player.x, player.y]; // save old location
-                        [player.layer, player.x, player.y] = [currentLayer, cursorX, cursorY]; // move player to new location
-                        delete placedSprites[playerKey]; // remove player sprite from old location
-                        DrawSingleTile(player.oldX, player.oldY);
-                    }
-                    break;
+                        if (event.repeat) { return }
+                        break;
+                    case '=':
+                        if (currentSprite < tileSetLength) currentSprite += 1; // iterate through sprite sheet
+                        console.log('current sprite: ' + currentSprite);
+                        updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
+                        break;
+                    case '-':
+                        if (currentSprite > 1) currentSprite -= 1;
+                        console.log('current sprite: ' + currentSprite);
+                        updateSpriteData(currentSprite); // update sprite data from sprite-editor.js
+                        break;
+                    case '+':
+                        loadSpriteSheetDialog((spriteSheet) => {
+                            replaceSpriteSheet(spriteSheet); // Update the in-memory spritesheet
+                            drawBoard(); // Redraw to reflect new sprites
+                            console.log('Spritesheet loaded!');
+                        });
+                        break;
+                    case 'v':
+                        // open the sprite sheet selector here
+                        spriteSelect(); // Open sprite sheet selector from sprite-sheet.js
+                        if (event.repeat) { return }
+                        break;
+                    case 'b':
+                        // open the board selector here
+                        boardSelect();
+                        break;
+                    case '.':
+                        placeSprite(tileKey, currentSprite, 'sign'); // Place sprite
+                        if (placedSprites[tileKey]) {
+                            editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
+                        }
+                        if (event.repeat) { return }
+                        break;
+                    case 'o':
+                        placeSprite(tileKey, currentSprite, 'object'); // Place sprite
+                        if (placedSprites[tileKey]) {
+                            editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
+                        }
+                        if (event.repeat) { return }
+                        break;
+                    case '1':
+                        currentLayer = 1; // change layer for placing sprites
+                        if (event.repeat) { return }
+                        break;
+                    case '2':
+                        currentLayer = 2;
+                        if (event.repeat) { return }
+                        break;
+                    case '3':
+                        currentLayer = 3;
+                        if (event.repeat) { return }
+                        break;
+                    case 'h': // for hiding or showing layers
+                        if (hiddenLayers.has(currentLayer)) {
+                            //showLayer(currentLayer);
+                            hiddenLayers.delete(currentLayer);
+                            console.log('showing layer: ', currentLayer);
+                        }
+                        else {
+                            //hideLayer(currentLayer);
+                            hiddenLayers.add(currentLayer);
+                            console.log('hiding layer: ', currentLayer);
+                        }
+                        updateLayers(currentLayer);
+                        if (event.repeat) { return }
+                        drawBoard();
+                        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+                        return;
+                    case 's': // Save board & sprite sheet
+                        saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
+                        break;
+                    case 'l': // load board & sprite sheet
+                        loadCombinedData(handleLoadedBoard); // load board and sprite sheet from file.js
+                        break;
+                    case 'r': // reset board
+                        if (confirm('Are you sure you want reset board?')) {
+                            placedSprites = {}; // Clear the current board
+                            world[currentBoard] = placedSprites; // Update the world object with the reset board
+                            console.log('Board reset');
+                            createPlayer(); // Recreate the player sprite
+                            drawBoard(); // Redraw the board
+                        } else {
+                            console.log('Board not reset');
+                        }
+                        break;
+                    case 'f': // flood fill
+                        mouse.mode = 'fill';
+                        console.log('flood fill mode');
+                        break;
+                    case 'd': // draw mode
+                        mouse.mode = 'draw';
+                        console.log('draw mode');
+                        break;
+                    case '/': // lighten brush mode
+                        mouse.mode = 'lighten';
+                        console.log('lighten mode');
+                        break;
+                    case '*': // darken brush mode
+                        mouse.mode = 'darken';
+                        console.log('darken mode');
+                        break;
+                    case '[':
+                        if (colorIntensity > 1) {
+                            colorIntensity--;
+                            console.log('Color intensity:', colorIntensity);
+                            showIntensityTooltip();
+                        }
+                        break;
+                    case ']':
+                        if (colorIntensity < 50) {
+                            colorIntensity++;
+                            console.log('Color intensity:', colorIntensity);
+                            showIntensityTooltip();
+                        }
+                        break;
+                    case 'z':
+                        // move player sprite to new location
+                        if (currentBoard !== 1) { // no player on title screen
+                            const playerKey = `${player.layer},${player.x},${player.y}`;
+                            placedSprites[`${currentLayer},${cursorX},${cursorY}`] = {
+                                sprite: 1,
+                                image: getSpriteImage(),
+                                color: [[0, 0, 255, .5], [255, 255, 255, 1]],
+                                type: 'player',
+                                direction: 'down',
+                                layer: currentLayer,
+                            };
+                            [player.oldLayer, player.oldX, player.oldY] = [player.layer, player.x, player.y]; // save old location
+                            [player.layer, player.x, player.y] = [currentLayer, cursorX, cursorY]; // move player to new location
+                            delete placedSprites[playerKey]; // remove player sprite from old location
+                            DrawSingleTile(player.oldX, player.oldY);
+                        }
+                        break;
+                }
             }
 
             if (event.ctrlKey || event.metaKey) {

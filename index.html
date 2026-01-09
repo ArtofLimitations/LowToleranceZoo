@@ -27,14 +27,26 @@
                     class="shades">├</span></span>
             <div class="fieldContainer">
                 <div class="fieldRow">
-                    <button class="material-symbols-outlined" id="spriteButton" title="Sprite Editor">edit</button><span class="fieldText">Sprite<br> Editor</span>&nbsp;
-                    <button class="material-symbols-outlined" id="paletteButton" title="Color Palette">palette</button><span class="fieldText">Color</span>
+                    <div class="tooltip-wrapper">
+                        <button class="material-symbols-outlined" id="spriteButton">edit</button>
+                        <span class="custom-tooltip"><span class="tooltip-key">E</span> <span class="tooltip-desc">- Sprite Editor</span></span>
+                    </div>
+                    <span class="fieldText">Sprite<br> Editor</span>&nbsp;
+                    <div class="tooltip-wrapper">
+                        <button class="material-symbols-outlined" id="paletteButton">palette</button>
+                        <span class="custom-tooltip"><span class="tooltip-key">C</span> <span class="tooltip-desc">- Color Palette</span></span>
+                    </div>
+                    <span class="fieldText">Color</span>
                 </div>
                 <div class="fieldRow"><span class="valueBox" id="currentSprite">1</span><span class="imageBox"
                         id="currentSpriteImage"> </span><span class="fieldText">Current<br> Sprite</span></div>
-                <div class="fieldRow"><span class="colorBox" id="colorBoxDark">D </span><button
-                        class="material-symbols-outlined" id="swapButton" title="Swap colors">swap_horiz</button> <span
-                        class="colorBox" id="colorBoxLight">L </span></div>
+                <div class="fieldRow"><span class="colorBox" id="colorBoxDark">D </span>
+                    <div class="tooltip-wrapper">
+                        <button class="material-symbols-outlined" id="swapButton">swap_horiz</button>
+                        <span class="custom-tooltip"><span class="tooltip-key">X</span> <span class="tooltip-desc">- Swap Colors</span></span>
+                    </div>
+                    <span class="colorBox" id="colorBoxLight">L </span>
+                </div>
                 <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
                 <div class="fieldRow"><button class="material-symbols-outlined" id="layer3Button" title="Layer 3">visibility</button><span class="layerBox" id="layer3">Layer 3</span> <label class="slider"><input type="range" class="level" id="3-opacity" name="Layer 3 opacity" min="0" max="20" value="20"/></label> </div>
 
@@ -72,11 +84,26 @@
                 </div>
                 <div class="fieldRow">
                     <div class="modeButtonGroup">
-                        <button class="modeButton" id="modeButtonDraw">Draw</button>
-                        <button class="modeButton" id="modeButtonFill">Fill</button>
-                        <button class="modeButton" id="modeButtonPaint">Paint</button>
-                        <button class="modeButton" id="modeButtonLighten">Lighten</button>
-                        <button class="modeButton" id="modeButtonDarken">Darken</button>
+                        <div class="tooltip-wrapper" style="flex: 1;">
+                            <button class="modeButton" id="modeButtonDraw">Draw</button>
+                            <span class="custom-tooltip"><span class="tooltip-key">D</span> <span class="tooltip-desc">- Place or remove tiles</span></span>
+                        </div>
+                        <div class="tooltip-wrapper" style="flex: 1;">
+                            <button class="modeButton" id="modeButtonFill">Fill</button>
+                            <span class="custom-tooltip"><span class="tooltip-key">F</span> <span class="tooltip-desc">- Flood fill area</span></span>
+                        </div>
+                        <div class="tooltip-wrapper" style="flex: 1;">
+                            <button class="modeButton" id="modeButtonPaint">Paint</button>
+                            <span class="custom-tooltip"><span class="tooltip-key">Tab</span> <span class="tooltip-desc">- Continuous painting</span></span>
+                        </div>
+                        <div class="tooltip-wrapper" style="flex: 1;">
+                            <button class="modeButton" id="modeButtonLighten">Lighten</button>
+                            <span class="custom-tooltip"><span class="tooltip-key">/</span> <span class="tooltip-desc">- Lighten colors</span><br><span class="tooltip-desc">Use </span><span class="tooltip-key">[ ]</span> <span class="tooltip-desc">to adjust intensity</span></span>
+                        </div>
+                        <div class="tooltip-wrapper" style="flex: 1;">
+                            <button class="modeButton" id="modeButtonDarken">Darken</button>
+                            <span class="custom-tooltip"><span class="tooltip-key">*</span> <span class="tooltip-desc">- Darken colors</span><br><span class="tooltip-desc">Use </span><span class="tooltip-key">[ ]</span> <span class="tooltip-desc">to adjust intensity</span></span>
+                        </div>
                     </div>
                 </div>
                 <div class="fieldRow undoRedoRow">

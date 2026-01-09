@@ -1282,6 +1282,10 @@ function runImmediateLabel(obj, labelType) {
 }
 
 canvas.addEventListener('click', function (event) {
+    // If a dialog is currently visible, ignore board clicks until it closes
+    const dialog = document.getElementById('dialog-box');
+    if (dialog && dialog.style.display !== 'none') return;
+
     const rect = canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
@@ -1364,27 +1368,48 @@ function showDialog(text, object = null) {
     }
 
     let inputBlocked = true;
+    let dialogActive = true;
     updateDialog();
 
     setTimeout(() => inputBlocked = false, 300); // Block input for 300ms
 
-    document.addEventListener('keydown', function nextPage(event) {
-        if (inputBlocked) return;
-        if (event.key === 'Enter' || event.key === ' ') {
-            inputBlocked = true;
-            pageIndex++;
+    function cleanupDialog() {
+        if (!dialogActive) return; // Prevent multiple cleanups
+        dialogActive = false;
+        dialog.style.display = 'none';
+        gamePaused = false;
+        document.removeEventListener('keydown', handleKeydown);
+        document.removeEventListener('click', handleClick);
+        requestAnimationFrame(animateGame);
+    }
 
-            if (pageIndex < pages.length) {
-                updateDialog();
-                setTimeout(() => inputBlocked = false, 300);
-            } else {
-                dialog.style.display = 'none';
-                gamePaused = false;
-                document.removeEventListener('keydown', nextPage);
-                requestAnimationFrame(animateGame);
-            }
+    function advanceDialog() {
+        if (inputBlocked || !dialogActive) return;
+        inputBlocked = true;
+        pageIndex++;
+
+        if (pageIndex < pages.length) {
+            updateDialog();
+            setTimeout(() => inputBlocked = false, 300);
+        } else {
+            cleanupDialog();
         }
-    });
+    }
+
+    function handleKeydown(event) {
+        if (event.key === 'Enter' || event.key === ' ' || event.key === 'Escape') {
+            event.preventDefault();
+            advanceDialog();
+        }
+    }
+
+    function handleClick(event) {
+        event.preventDefault();
+        advanceDialog();
+    }
+
+    document.addEventListener('keydown', handleKeydown);
+    document.addEventListener('click', handleClick);
 }
 
 // Single status message 
