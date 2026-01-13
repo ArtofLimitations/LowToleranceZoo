@@ -3,7 +3,7 @@ body {
   justify-content: center;
   align-items: center;
   flex-direction: column;
-  height: 100vh;
+  height: 105vh;
   margin: 0;
   background-color: #1a1a1a;
   font-family: "Fira Code", serif;
@@ -130,6 +130,14 @@ h3 {
   height: 800px;
 }
 
+.info {
+  display:block; 
+  margin-top:12px; 
+  clear:both; 
+  font-family:'Fira Code'; 
+  color:#ccc;
+}
+
 .lowToleranceCanvas,
 .playCanvas {
   position: absolute;
@@ -219,8 +227,6 @@ h3 {
   margin-right: 8px;
 }
 
-.lowToleranceToolbar .fieldContainer span {}
-
 .lowToleranceToolbar .fieldRow {
   display: flex;
   justify-content: flex-start;
@@ -250,7 +256,7 @@ h3 {
 }
 
 .lowToleranceToolbar .undoRedoRow {
-  gap: 8px;
+  /*gap: 8px;*/
 }
 
 .lowToleranceToolbar .toolbarActionButton {
@@ -462,6 +468,11 @@ h3 {
 
 .lowToleranceToolbar .fieldCategory:hover {
   background-color: #5f76aa;
+}
+
+.lowToleranceToolbar .undoRedoButton {
+  padding: 6px;
+  font-size: 24px;
 }
 
 .playCanvas {

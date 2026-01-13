@@ -20,6 +20,7 @@
         <!-- Main Canvas -->
         <canvas class="lowToleranceCanvas dashed-grid-paper" id="lowToleranceCanvas" tabindex='1'
             oncontextmenu="event.preventDefault();"></canvas>
+            
         <div class="lowToleranceToolbar" id="lowToleranceToolbar">
             <div class="overlay" id="overlay"></div>
             <span class="title"><span class="shades">┤</span>
@@ -107,8 +108,14 @@
                     </div>
                 </div>
                 <div class="fieldRow undoRedoRow">
-                    <button class="toolbarActionButton" id="undoButton">Undo</button>
-                    <button class="toolbarActionButton" id="redoButton">Redo</button>
+                    <div class="tooltip-wrapper">
+                        <button class="toolbarActionButton material-symbols-outlined undoRedoButton" id="undoButton">undo</button>
+                        <span class="custom-tooltip"><span class="tooltip-key">Ctrl+Z</span> <span class="tooltip-desc">- Undo</span></span>
+                    </div>
+                    <div class="tooltip-wrapper">
+                        <button class="toolbarActionButton material-symbols-outlined undoRedoButton" id="redoButton">redo</button>
+                        <span class="custom-tooltip"><span class="tooltip-key">Ctrl+Y</span> <span class="tooltip-desc">- Redo</span></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -188,16 +195,10 @@
             <p class="fieldText">Creature presets are coming soon. Use scripted objects for interactive actors.</p>
         </div>
     </div>
+    
     <canvas id="exportedSpriteCanvas" width="32" height="32" style="margin-top: 20px;"></canvas>
 
-    <!-- Controls for switching between modes and managing the sprite sheet -->
-    <div id="controls">
-        <button id="saveSpriteSheet">Save Sprite Sheet</button>
-        <input type="file" id="loadSpriteSheet" accept=".json" style="display: none;">
-        <button id="loadSpriteSheetButton">Load Sprite Sheet</button>
-        <input type="file" id="fileInput" />
-        <button id="loadFileButton">Load File</button>
-    </div>
+    <div class="info"><span id="versionInfo">LTZ v0.9.3</span></div>
     <script type="module" src="js/main.js"></script>
 </body>
 <!--  http-server ./ -c-1 -->

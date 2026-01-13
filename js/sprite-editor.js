@@ -336,6 +336,22 @@ function handleKeyboard(event) {
                 if (onCloseCallback) onCloseCallback(currentSprite);
             }
             break;
+        case '%': // generate a checked pattern sprite
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    spriteData[y][x] = (x + y) % 2 === 0 ? 1 : 0;
+                }
+            }
+            drawGrid();
+            break;
+        case '^': // generate a striped pattern sprite (checkered but 2 pixels down, 1 pixel right)
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    spriteData[y][x] = (Math.floor(y / 2) + x) % 2 === 0 ? 1 : 0;
+                }
+            }
+            drawGrid();
+            break;
         case 'Escape':
             removeSpriteEvents()
             container.style.display = 'none';

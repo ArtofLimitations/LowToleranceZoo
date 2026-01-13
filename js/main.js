@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button: 0, mode: 'draw', lastClick: 0, clickDelay: 50
     };                                                                                    // mouse status object. click delay. see handleMouseMove function. click delay in ms
     let player = { x: 20, y: 20, oldX: 20, oldY: 20, layer: 2, oldLayer: 2 };             // basic stats for player
+    let statusMessageTimeout = null; // timer for temporary canvas messages
 
     // ######################################
     //          LOW TOLERANCE ZOO
@@ -184,6 +185,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function rgba(colorArray) {
         return `rgba(${colorArray[0]}, ${colorArray[1]}, ${colorArray[2]}, ${colorArray[3]})`;
+    }
+
+    // Show a temporary message near the bottom of the canvas
+    function showStatusMessage(message, duration = 2000) {
+        if (!message) return;
+        const container = document.getElementById('block') || document.body;
+        let el = document.getElementById('canvasMessage');
+
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'canvasMessage';
+            el.style.position = 'absolute';
+            el.style.left = '50%';
+            el.style.bottom = '24px';
+            el.style.transform = 'translateX(-50%)';
+            el.style.padding = '10px 20px';
+            el.style.borderRadius = '10px';
+            el.style.background = 'rgba(0, 0, 0, 0.8)';
+            el.style.color = '#fff';
+            el.style.fontFamily = "'Fira Code', monospace";
+            el.style.fontSize = '24px';
+            el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.45)';
+            el.style.pointerEvents = 'none';
+            el.style.opacity = '0';
+            el.style.transition = 'opacity 200ms ease-in-out';
+            el.style.zIndex = '200';
+            container.appendChild(el);
+        }
+
+        el.textContent = message;
+        el.style.display = 'block';
+        // force reflow to ensure transition runs
+        void el.offsetWidth;
+        el.style.opacity = '1';
+
+        if (statusMessageTimeout) clearTimeout(statusMessageTimeout);
+        statusMessageTimeout = setTimeout(() => {
+            el.style.opacity = '0';
+            statusMessageTimeout = setTimeout(() => {
+                el.style.display = 'none';
+            }, 250);
+        }, Math.max(0, duration));
     }
 
     // DRAW EVERY TILE
@@ -1431,9 +1474,30 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (mouse.mode === 'paint') mouse.mode = 'draw';
                         else mouse.mode = 'paint';
                         console.log('paint mode');
-                    case 'PageUp':
-                        console.log('type: ', type);
-                        if (event.repeat) { return }
+                        break;
+                    case 'PageUp': // quickly switch boards (previous)
+                        {
+                            const currentIndex = boardList.findIndex(item => item[0] === currentBoard);
+                            const previousIndex = (currentIndex - 1 + boardList.length) % boardList.length;
+                            currentBoard = boardList[previousIndex][0];
+                            placedSprites = world[currentBoard];
+                            findPlayerSprite();
+                            drawBoard();
+                            console.log('Switched to previous board:', currentBoard);
+                            showStatusMessage('Switched to previous board: ' + currentBoard);
+                        }
+                        break;
+                    case 'PageDown': // quickly switch boards (next)
+                        {
+                            const currentIndex = boardList.findIndex(item => item[0] === currentBoard);
+                            const nextIndex = (currentIndex + 1) % boardList.length;
+                            currentBoard = boardList[nextIndex][0];
+                            placedSprites = world[currentBoard];
+                            findPlayerSprite();
+                            drawBoard();
+                            console.log('Switched to next board:', currentBoard);
+                            showStatusMessage('Switched to next board: ' + currentBoard);
+                        }
                         break;
                     case 'Insert':
                         // nothing here yet
@@ -1572,10 +1636,33 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'r': // reset board
                         if (confirm('Are you sure you want reset board?')) {
-                            placedSprites = {}; // Clear the current board
-                            world[currentBoard] = placedSprites; // Update the world object with the reset board
-                            console.log('Board reset');
-                            createPlayer(); // Recreate the player sprite
+                            const existingKeys = Object.keys(placedSprites);
+                            beginHistoryTransaction();
+                            try {
+                                // Remove everything on the board
+                                existingKeys.forEach(key => setTile(key, null));
+
+                                // Recreate the player sprite and log it in history
+                                const playerKey = `${player.layer},${player.x},${player.y}`;
+                                const playerPayload = {
+                                    sprite: 1,
+                                    image: getSpriteImage(),
+                                    color: [[0, 0, 255, .5], [255, 255, 255, 1]],
+                                    type: 'player',
+                                    direction: 'down',
+                                    layer: player.layer,
+                                    oldKey: playerKey,
+                                };
+                                setTile(playerKey, playerPayload);
+
+                                // Update world reference after reset
+                                world[currentBoard] = placedSprites;
+
+                                console.log('Board reset');
+                            } finally {
+                                commitHistoryTransaction();
+                            }
+
                             drawBoard(); // Redraw the board
                         } else {
                             console.log('Board not reset');
@@ -1629,6 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             DrawSingleTile(player.oldX, player.oldY);
                         }
                         break;
+                    
                 }
             }
 
@@ -1639,13 +1727,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'z':
                         if (event.shiftKey) {
                             redoAction();
+                            showStatusMessage('Redo');
                         } else {
                             undoAction();
+                            showStatusMessage('Undo');
                         }
                         if (event.repeat) { return }
                         return;
                     case 'y':
                         redoAction();
+                        showStatusMessage('Redo');
                         if (event.repeat) { return }
                         return;
                     case 'b': // Handle 'Ctrl + B' to load board (no sprite sheet)
@@ -1654,6 +1745,55 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     case 'n':
                         if (!event.ctrlKey) saveBoard(placedSprites); // save board (not sprite sheet)
+                        if (event.repeat) { return }
+                        break;
+                    case 's': // save sprite sheet only
+                        saveSpriteSheet(getSpriteSheet()); // UPDATE
+                        if (event.repeat) { return }
+                        break;
+                    case 'l': // load sprite sheet only
+                        loadSpriteSheet(handleLoadedSpriteSheet);
+                        if (event.repeat) { return }
+                        break;
+                    case 'r': // reset current layer
+                        if (confirm('Are you sure you want reset this layer?')) {
+                            beginHistoryTransaction();
+                            try {
+                                for (let key in placedSprites) {
+                                    const [layer] = key.split(',').map(Number); // Extract layer from key
+                                    if (layer === currentLayer) {
+                                        removeSprite(key);
+                                    }
+                                }
+                            } finally {
+                                commitHistoryTransaction();
+                            }
+                        }
+                        showStatusMessage(`Layer ${currentLayer} reset.`);
+                        if (event.repeat) { return }
+                        break;
+                    case 'c': // copy board to clipboard
+                        navigator.clipboard.writeText(JSON.stringify(placedSprites))
+                            .then(() => console.log('Board copied to clipboard'))
+                            .catch(err => console.error('Copy failed:', err));
+                        showStatusMessage('Board copied to clipboard.');
+                        if (event.repeat) { return }
+                        break;
+                    case 'v': // paste board from clipboard
+                        navigator.clipboard.readText()
+                            .then(text => {
+                                const data = JSON.parse(text);
+                                if (data && typeof data === 'object') {
+                                    placedSprites = data;
+                                    world[currentBoard] = placedSprites;
+                                    drawBoard();
+                                    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+                                    clearHistory();
+                                    console.log('Board pasted from clipboard');
+                                }
+                            })
+                            .catch(err => console.error('Paste failed:', err));
+                        showStatusMessage('Board pasted from clipboard.');
                         if (event.repeat) { return }
                         break;
                 }
