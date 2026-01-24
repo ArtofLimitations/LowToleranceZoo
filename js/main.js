@@ -279,10 +279,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .map(key => key.split(',').map(Number)) // Convert "l,x,y" to [l, x, y]
             .sort(([l1], [l2]) => l1 - l2); // Sort by layer (ascending)
 
-
-
-
-
         for (const [l, sx, sy] of sortedKeys) {
             // Skip hidden layers
             if (hiddenLayers.has(l)) continue;
@@ -1435,6 +1431,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 setTile(tileKey, updatedTile);
                             }
                         }
+                        event.preventDefault();
                         break;
                     case 'Enter': // to grab sprite or modify tile
                         grabSprite(tileKey);
