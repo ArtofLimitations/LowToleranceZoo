@@ -1,7 +1,7 @@
 import { loadCombinedData, loadWorld } from './file.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
-import { createBullet, deactivateAllBullets } from './weapons.js';
+import { createBullet, deactivateAllBullets, weaponDefinitions } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
 import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
@@ -35,6 +35,7 @@ let placedPassages = {};             // Stores passages on the board
 let gamePaused = false;              // Game pause state
 let playerPaused = false;            // Player pause state
 let bulletArray = [];
+let shiftAiming = false;             // When true, arrows aim+shoot without moving
 const scriptGlobals = {};            // Global variables for scripts
 const spriteCache = {};              // Cache for sprites to avoid redundant redrawing
 //const namedColors = namedColorList;// Named colors for easy reference
@@ -57,6 +58,20 @@ let player = structuredClone(defaultPlayerStats); // Player object
 let playerStats = structuredClone(defaultPlayerStats);
 //let stats = playerStats;
 const stepSize = player.stepSize;    // Step size for player movement
+
+// Resolve the currently equipped weapon to a concrete config with safe defaults
+function getEquippedWeaponConfig() {
+    const equippedId = player.weapons?.equipped || 'pistol';
+    const def = weaponDefinitions[equippedId] || weaponDefinitions.pistol || {};
+    return {
+        id: equippedId,
+        speed: def.speed ?? 16,
+        color: def.color ?? 'white',
+        size: def.projectileSize ?? 8,
+        damage: def.damage ?? 1,
+        fireRate: def.fireRate ?? 0
+    };
+}
 
 // File info
 export let filename = ''; // ############ File to load ###############
@@ -344,6 +359,49 @@ function drawDefaultTitleScreen() {
     ctx.restore();
 }
 
+function canvasFade({ duration = 1000, color = 'black', direction = 'out', pauseDuringFade = true } = {}) { // Fades the canvas in or out and resolves when finished
+    return new Promise(resolve => {
+        const fadeOut = String(direction).toLowerCase() === 'out';
+        const wasPaused = gamePaused;
+        if (pauseDuringFade) gamePaused = true;
+
+        const start = performance.now();
+
+        // If we're fading in, start from a fully covered canvas
+        if (!fadeOut) {
+            ctx.save();
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = color;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+        }
+
+        function frame(now) {
+            const elapsed = now - start;
+            const t = Math.min(elapsed / duration, 1);
+            const alpha = fadeOut ? t : 1 - t;
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = color;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            if (t < 1) {
+                requestAnimationFrame(frame);
+            } else {
+                if (pauseDuringFade && !wasPaused) {
+                    gamePaused = false;
+                    requestAnimationFrame(animateGame);
+                }
+                resolve();
+            }
+        }
+
+        requestAnimationFrame(frame);
+    });
+}
+
 // ##########################################
 // ############ Object functions ############
 // ##########################################
@@ -504,14 +562,23 @@ function executeObjectCommand(obj, command) {
                 case "step": // STEP NEEDS TO COME BEFORE MOVE
                     // Set fullStep to true to use full-tile step
                     obj.fullStep = true;
-                case "step": // STEP NEEDS TO COME BEFORE MOVE
-                    obj.fullStep = true;
                 case "move": {
                     const moveParams = resolveMoveParams(obj, command.args);
                     if (!moveParams) {
                         console.warn(`Invalid direction "${command.args.join(' ')}" provided for #${command.name}`);
                         break;
                     }
+                    moveObject(obj, moveParams.direction, obj.layer, moveParams.step);
+                    break;
+                }
+                case "push": {
+                    const moveParams = resolveMoveParams(obj, command.args);
+                    if (!moveParams) {
+                        console.warn(`Invalid direction "${command.args.join(' ')}" provided for #push`);
+                        break;
+                    }
+                    // Enable a one-shot push attempt for this move
+                    obj._attemptPushOnce = true;
                     moveObject(obj, moveParams.direction, obj.layer, moveParams.step);
                     break;
                 }
@@ -1478,6 +1545,23 @@ function resetAllMessageStyles() {
     }
 }
 
+// Pause Message
+function showPauseMessage() {
+    const dialog = document.getElementById('pause-box');
+    if (!dialog) return;
+    dialog.innerHTML = '<center><b style="font-size: 48px">Game Paused</b><br>Press P to Resume</center>';
+    dialog.style.display = 'flex';
+    // Restart animation for repeated pauses
+    dialog.style.animation = 'none';
+    void dialog.offsetWidth; // force reflow
+    dialog.style.animation = '';
+}
+
+function hidePauseMessage() {
+    const dialog = document.getElementById('pause-box');
+    if (dialog) dialog.style.display = 'none';
+}
+
 // Game Over dialog
 
 function showGameOver(text) {
@@ -1700,8 +1784,13 @@ function canMoveTo(x, y, object = player) {
                 return false; // Block movement while dialog is open
             }
             if (sprite.type === 'player' && object.type === 'object') {
-                // Block object from moving into the player
-                console.log('Object cannot move into player!');
+                // Objects only push when explicitly requested (e.g., #push command)
+                if (object._attemptPushOnce) {
+                    object._attemptPushOnce = false; // consume flag
+                    const pushed = tryPushPlayer(player.x, player.y, object.direction || 'right', layer);
+                    if (pushed) return true;
+                }
+
                 const objectKey = `${object.layer},${object.x},${object.y}`;
                 handleObjectInteraction(objectKey, ":bump"); // Trigger bump interaction for the object bumping into player
                 return false;
@@ -1876,6 +1965,8 @@ function tryPushPlayer(startX, startY, direction, layer) {
         case 'down': dy = 1; break;
         case 'left': dx = -1; break;
         case 'right': dx = 1; break;
+        default:
+            return false;
     }
 
     const newX = player.x + dx;
@@ -1884,40 +1975,63 @@ function tryPushPlayer(startX, startY, direction, layer) {
     // Prevent pushing out of bounds
     if (newX < 0 || newY < 0 || newX >= tilesX || newY >= tilesY) return false;
 
-    // Check if player is roughly aligned to the grid
-    //const aligned = Math.abs(player.x - Math.round(player.x)) < 0.5 &&
-    //                Math.abs(player.y - Math.round(player.y)) < 0.5;
-    //if (!aligned) return false;
+    // Examine the destination tiles for obstacles/items
+    const tiles = checkTiles(newX * tileSizeX, newY * tileSizeY, direction);
+    let shouldRender = false;
 
-    // Check if the tile ahead is empty
-    const tiles = checkTiles(newX * tileSizeX, newY * tileSizeY, direction)
-    //console.log(tiles);
     for (let tile of tiles) {
+        const tileKey = `${layer},${tile.x},${tile.y}`;
+        const destSprite = placedSprites[tileKey];
+        if (!destSprite) continue;
 
-        let tileKey = `${layer},${tile.x},${tile.y}`;
+        if (destSprite.type === 'push') {
+            const success = tryPushTiles(tile.x, tile.y, direction, layer);
+            if (!success) return false; // Block if we cannot push the push-tile chain
+            continue;
+        }
 
-        if (placedSprites[tileKey]) {
-            if (placedSprites[tileKey].type === 'push') {
-                const success = tryPushTiles(tile.x, tile.y, direction, layer);
-                if (!success) return false; // If push fails, don't push player
-            } else {
-                return false; // Something else is in the way
-            }
+        if (destSprite.type === 'coin' || destSprite.type === 'ammo' || destSprite.type === 'key') {
+            if (destSprite.type === 'coin') player.stats.coin += destSprite.data?.value || 1;
+            if (destSprite.type === 'ammo') player.stats.ammo += destSprite.data?.value || 1;
+            if (destSprite.type === 'key') player.stats.keys += destSprite.data?.value || 1;
+            delete placedSprites[tileKey];
+            updateTile(layer, tile.x, tile.y);
+            shouldRender = true;
+            continue;
+        }
+
+        if (destSprite.type === 'step') {
+            delete placedSprites[tileKey];
+            updateTile(layer, tile.x, tile.y);
+            shouldRender = true;
+            continue;
+        }
+
+        // Block on walls, objects, signs, breaks, invisible, etc.
+        if (destSprite.type === 'wall' || destSprite.type === 'object' || destSprite.type === 'break' || destSprite.type === 'sign' || destSprite.type === 'invisible') {
+            return false;
         }
     }
 
-    // Push the player
+    // Push the player one tile
+    const oldKey = `${player.layer},${player.x},${player.y}`;
+    const newKey = `${player.layer},${newX},${newY}`;
     player.x = newX;
     player.y = newY;
+
+    placedSprites[newKey] = placedSprites[oldKey];
+    delete placedSprites[oldKey];
 
     for (const key in placedObjects) {
         if (placedObjects[key].pendingRemoval) {
             delete placedObjects[key];
             delete placedSprites[key];
             updateTile(...key.split(',').map(Number));
+            shouldRender = true;
         }
     }
 
+    if (shouldRender) renderLayersToMainCanvas();
     return true;
 }
 
@@ -2014,6 +2128,10 @@ function handleLoadedBoard(spriteSheetData, boardData) {
     document.getElementById('dialog-box').style.display = 'none';
     document.getElementById('game-over-box').style.display = 'none';
     gamePaused = false;
+    if (playerPaused) {
+        hidePauseMessage();
+        playerPaused = false;
+    }
     player.locked = false;
  
     //stats = player.stats;
@@ -2074,6 +2192,10 @@ function handleLoadedGame(spriteSheetData, boardList, worldData) {
     player = { ...playerStats, ...player };
     nightMode = false;
     gamePaused = false;
+    if (playerPaused) {
+        hidePauseMessage();
+        playerPaused = false;
+    }
     player.locked = false;
     player.gameOver = false; // Reset game over state
 
@@ -2105,7 +2227,12 @@ function loadPassagesFromGameData(gameData, board) {
     return worldPassages[board]; // Return the passages for the current board
 }
 
-function switchBoard(board, colorKey) {
+async function switchBoard(board, colorKey) {
+    const wasPaused = gamePaused;
+    gamePaused = true;
+
+    await canvasFade({ duration: 100, direction: 'out', pauseDuringFade: false });
+
     deactivateAllBullets(bulletArray); // Deactivate all bullets
 
     placedSprites = world[board]; // Get the current board from the world object
@@ -2148,6 +2275,11 @@ function switchBoard(board, colorKey) {
     currentBoard = board;
     drawBoard();
     renderLayersToMainCanvas(); // Draw them onto the main canvas
+
+    await canvasFade({ duration: 100, direction: 'in', pauseDuringFade: false });
+
+    gamePaused = wasPaused;
+    if (!gamePaused && !playerPaused) requestAnimationFrame(animateGame);
 }
 
 function findPlayerSprite() {
@@ -2162,10 +2294,52 @@ function findPlayerSprite() {
 }
 
 // Key mapping (now using key names instead of key codes)
-let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10", F11: "F11", F12: "F12" };
+let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10",  F12: "F12" };
 
 document.addEventListener("keydown", (event) => {
     keys[event.key] = true;
+
+    // Shift-first aim/shoot: hold Shift, press arrow to shoot without moving
+    if (event.key === 'Shift') {
+        shiftAiming = true;
+        event.preventDefault();
+
+        // Stop movement when entering aim mode
+        keys['ArrowUp']    = false;
+        keys['ArrowDown']  = false;
+        keys['ArrowLeft']  = false;
+        keys['ArrowRight'] = false;
+        return;
+    }
+
+    if (shiftAiming && (
+        event.key === 'ArrowUp'   ||
+        event.key === 'ArrowDown' ||
+        event.key === 'ArrowLeft' ||
+        event.key === 'ArrowRight')) {
+        // Prevent movement while aiming
+        event.preventDefault();
+        keys[event.key] = false;
+
+        // Update direction based on the arrow pressed
+        if (event.key === 'ArrowUp') player.direction = 'up';
+        else if (event.key === 'ArrowDown') player.direction = 'down';
+        else if (event.key === 'ArrowLeft') player.direction = 'left';
+        else if (event.key === 'ArrowRight') player.direction = 'right';
+        const w = getEquippedWeaponConfig();
+        bulletArray.push(createBullet(
+            canvas,
+            player.x + 0.5,
+            player.y + 0.5,
+            player.direction,
+            w.speed,
+            w.color,
+            'player',
+            w.size,
+            w.damage
+        ));
+        return;
+    }
 
     var key = event.code; // Use event.code
     if (util[key]) {
@@ -2190,20 +2364,32 @@ document.addEventListener("keydown", (event) => {
             renderLayersToMainCanvas(); // Draw them onto the main canvas
         }
 
-        if (event.key === 'p') {
-            if (!gamePaused) {
+        if (event.key === 'p') { // P to Pause/Resume
+            if (!gamePaused) {   // The difference between gamePaused and playerPaused is that gamePaused is for dialogs and locking the game, playerPaused is for user pausing
                 playerPaused = !playerPaused;
                 if (!playerPaused) {
+                    hidePauseMessage();
                     requestAnimationFrame(animateGame);
+                } else {
+                    showPauseMessage();
                 }
                 // Optionally show/hide your pause UI here
             }
-            //gamePaused = !gamePaused;
-            //if (!gamePaused) requestAnimationFrame(animateGame);
         }
 
         if (event.key === ' ' && !gamePaused) { // Space bar to shoot
-            bulletArray.push(createBullet(canvas, player.x + 0.5, player.y + 0.5, player.direction));
+            const w = getEquippedWeaponConfig();
+            bulletArray.push(createBullet(
+                canvas,
+                player.x + 0.5,
+                player.y + 0.5,
+                player.direction,
+                w.speed,
+                w.color,
+                'player',
+                w.size,
+                w.damage
+            ));
         }
 
         if (event.key === 'n') { // M to toggle night mode (TEMPORARY)
@@ -2225,9 +2411,14 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener('keyup', (event) => {
     if (!loaded) return; // Ignore input if game not loaded
     keys[event.key] = false;
+
+    if (event.key === 'Shift') {
+        shiftAiming = false;
+    }
+
     updateDirection(); // Update direction when key is released
     if (
-        event.key === 'ArrowUp' ||
+        event.key === 'ArrowUp'   ||
         event.key === 'ArrowDown' ||
         event.key === 'ArrowLeft' ||
         event.key === 'ArrowRight'

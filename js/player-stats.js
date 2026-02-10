@@ -20,6 +20,15 @@ export let defaultPlayerStats = {
     experience: 0,
     experienceToNextLevel: 100,
     gameOver: false,
+    // Player-specific weapon ownership and equipped state
+    weapons: {
+        owned: {
+            // Weapon ID -> per-player data (e.g., ammo)
+            pistol: { ammo: 24 }
+        },
+        equipped: "pistol" // Default selected weapon
+    },
+
     inventory: [],
     equipped: {
         weapon: null,

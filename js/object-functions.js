@@ -51,6 +51,14 @@ export const defaultStatusMessageStyle = {
 // Global mixin storage
 export const scriptMixins = {}; // <-- Added for mixin support
 
+// Commands that should halt further script processing for the current tick
+const BLOCKING_COMMANDS = [
+    'wait', 'sleep', 'end', 'cycle',
+    'move', 'moveto', 'step', 'push', 'try',
+    'change', 'changesprite', 'changecolor', 'color',
+    'text', 'die', 'shoot'
+];
+
 export function loadObjectsFromGameData(gameData) {
     let placedObjects = {}; // Reset objects
     const placedSprites = gameData;
@@ -152,7 +160,7 @@ function parseScript(text) {
             // --- MIXIN: Support #commands, *status, and text blocks ---
             if (line.startsWith("#")) {
                 const [cmd, ...args] = line.slice(1).split(" ");
-                const blocking = ["wait", "sleep", "end", "cycle", "move", "moveto", "moveTo", "change", "changeSprite", "changesprite", "changeColor", "changecolor", "color", "text", "die", "shoot"].includes(cmd.toLowerCase());
+                const blocking = BLOCKING_COMMANDS.includes(cmd.toLowerCase());
                 currentMixinCommands.push({ type: "command", name: cmd.toLowerCase(), args, blocking });
             } else if (line.startsWith("*")) {
                 currentMixinCommands.push({ type: "status", text: line.slice(1).trim() });
@@ -220,7 +228,7 @@ function parseScript(text) {
         // Commands
         if (line.startsWith("#")) {
             const [cmd, ...args] = line.slice(1).split(" ");
-            const blocking = ["wait", "sleep", "end", "cycle", "move", "moveto", "moveTo", "change", "changeSprite", "changesprite", "changeColor", "changecolor", "color", "text", "die", "shoot"].includes(cmd.toLowerCase());
+            const blocking = BLOCKING_COMMANDS.includes(cmd.toLowerCase());
             script.push({ type: "command", name: cmd.toLowerCase(), args, blocking });
             index++;
             continue;

@@ -58,6 +58,44 @@ function updateRecentColors() {
     }
 }
 
+function handleRecentMouseDown(event) {
+    const id = event.currentTarget.id; // e.g., "color1"
+    const index = Number(id.replace('color', '')) - 1;
+    if (index < 0 || index >= recentColors.length) return;
+
+    const [rgbaArray, rgbaString] = recentColors[index];
+
+    if (event.button === 0) { // left click assigns dark
+        dark = rgbaArray;
+        colorDark.style.background = rgbaString;
+    } else if (event.button === 2) { // right click assigns light
+        light = rgbaArray;
+        colorLight.style.background = rgbaString;
+    } else {
+        return;
+    }
+
+    currentColors = [dark, light];
+    updateColor(currentColors);
+}
+
+function addRecentColorHandlers() {
+    for (let i = 1; i <= recentLength; i++) {
+        const el = document.getElementById(`color${i}`);
+        if (!el) continue;
+        el.addEventListener('contextmenu', (e) => e.preventDefault());
+        el.addEventListener('mousedown', handleRecentMouseDown);
+    }
+}
+
+function removeRecentColorHandlers() {
+    for (let i = 1; i <= recentLength; i++) {
+        const el = document.getElementById(`color${i}`);
+        if (!el) continue;
+        el.removeEventListener('mousedown', handleRecentMouseDown);
+    }
+}
+
 function blendColors(color1, color2, alpha = 0.5) {
     const blendedColor = color1.map((channel, index) => 
         Math.round(channel * alpha + color2[index] * (1 - alpha))
@@ -114,12 +152,14 @@ function addPaletteEvents() {
     document.addEventListener('keydown', handleKeyboard);
     document.getElementById('swapColorButton').addEventListener('click', swapColor);
     document.getElementById('blendRightButton').addEventListener('click', blendColor);
+    addRecentColorHandlers();
 }
 
 function removePaletteEvents() {
     document.removeEventListener('keydown', handleKeyboard);
     document.getElementById('swapColorButton').removeEventListener('click', swapColor);
     document.getElementById('blendRightButton').removeEventListener('click', blendColor);
+    removeRecentColorHandlers();
 }
 
 export function pickColor() {

@@ -1509,7 +1509,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     removeSprite(key);
                                 }
                             }
-                            console.log('Deleted all sprites in layer:', currentLayer);
+                            showStatusMessage('All sprites in layer ' + currentLayer + ' deleted');
                             drawBoard();
                         }
                         break;
@@ -1627,9 +1627,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     case 's': // Save board & sprite sheet
                         saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
+                        showStatusMessage('Board and Sprite Sheet saved');
                         break;
                     case 'l': // load board & sprite sheet
                         loadCombinedData(handleLoadedBoard); // load board and sprite sheet from file.js
+                        showStatusMessage('Board and Sprite Sheet loaded');
                         break;
                     case 'r': // reset board
                         if (confirm('Are you sure you want reset board?')) {
@@ -1660,6 +1662,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 commitHistoryTransaction();
                             }
 
+                            showStatusMessage("Board's been reset");
                             drawBoard(); // Redraw the board
                         } else {
                             console.log('Board not reset');
@@ -1738,6 +1741,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     case 'b': // Handle 'Ctrl + B' to load board (no sprite sheet)
                         loadBoard(handleLoadedBoard); // from file.js
+                        showStatusMessage('Board loaded');
                         if (event.repeat) { return }
                         return;
                     case 'n':
@@ -1746,10 +1750,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 's': // save sprite sheet only
                         saveSpriteSheet(getSpriteSheet()); // UPDATE
+                        showStatusMessage('Sprite sheet saved');
                         if (event.repeat) { return }
                         break;
                     case 'l': // load sprite sheet only
-                        loadSpriteSheet(handleLoadedSpriteSheet);
+                        loadSpriteSheet(handleLoadedSpriteSheet); // UPDATE
+                        showStatusMessage('Sprite sheet loaded');
                         if (event.repeat) { return }
                         break;
                     case 'r': // reset current layer
@@ -1766,14 +1772,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                 commitHistoryTransaction();
                             }
                         }
-                        showStatusMessage(`Layer ${currentLayer} reset.`);
+                        showStatusMessage(`Layer ${currentLayer} reset`);
                         if (event.repeat) { return }
                         break;
                     case 'c': // copy board to clipboard
                         navigator.clipboard.writeText(JSON.stringify(placedSprites))
                             .then(() => console.log('Board copied to clipboard'))
                             .catch(err => console.error('Copy failed:', err));
-                        showStatusMessage('Board copied to clipboard.');
+                        showStatusMessage('Board copied to clipboard');
                         if (event.repeat) { return }
                         break;
                     case 'v': // paste board from clipboard
@@ -1790,7 +1796,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }
                             })
                             .catch(err => console.error('Paste failed:', err));
-                        showStatusMessage('Board pasted from clipboard.');
+                        showStatusMessage('Board pasted from clipboard');
                         if (event.repeat) { return }
                         break;
                 }

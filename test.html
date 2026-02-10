@@ -1,0 +1,240 @@
+<html>
+
+<head>
+    <title>Test Page</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .playCanvas {
+            border: 1px solid #555;
+            background-color: #222;
+        }
+        </style>
+</head>
+
+<body>
+    <h1>Test Page for Canvas Explosions</h1>
+    <canvas class="playCanvas" id="testCanvas" tabindex='1'></canvas>
+    <script>
+        // Tunable settings
+        const SETTINGS = {
+            step: 1,            // movement granularity in buffer pixels
+            useTrails: true,      // if false, no background fade each frame
+            crispEdges: true,      // legacy toggle (squares); overridden by shapeOverride
+            shapeOverride: null,   // 'square' | 'circle' | null to defer to per-type/crispEdges
+            forceOpaque: false     // if true, particles draw at full opacity
+        };
+
+        // Per-type configs (counts, speeds, radii, colors)
+        const TYPE_CONFIG = {
+            classic: {
+                count: 20,
+                speedBase: 6,
+                speedJitter: 2,
+                radiusBase: 2,
+                radiusJitter: 0.5,
+                lifeMin: 35,
+                lifeMax: 50,
+                baseColor: '255, 165, 0',
+                trailColor: '96, 96, 96',
+                radial: false,
+                shape: 'square'
+            },
+            radial: {
+                count: 12,
+                speedBase: 6,
+                speedJitter: 2,
+                radiusBase: 30,
+                radiusJitter: 0.5,
+                lifeMin: 40,
+                lifeMax: 55,
+                baseColor: '255, 220, 128',
+                trailColor: '96, 96, 96',
+                radial: true,
+                shape: 'circle'
+            },
+            smoke: {
+                count: 10,
+                speedBase: 1.5,
+                speedJitter: 1,
+                radiusBase: 30,
+                radiusJitter: 4,
+                lifeMin: 20,
+                lifeMax: 50,
+                baseColor: '180, 180, 180',
+                trailColor: '180, 180, 180',
+                radial: true,
+                rise: -0.5,
+                shape: 'circle'
+            }
+        };
+
+        const canvas = document.getElementById('testCanvas');        
+        const ctx = canvas.getContext('2d');
+        canvas.width = 800;
+        canvas.height = 600;
+        ctx.imageSmoothingEnabled = false;
+
+        // Low-res buffer to get chunky 2x pixels
+        const SCALE = 1;
+        const buffer = document.createElement('canvas');
+        buffer.width = Math.floor(canvas.width / SCALE);
+        buffer.height = Math.floor(canvas.height / SCALE);
+        const bctx = buffer.getContext('2d');
+        bctx.imageSmoothingEnabled = false;
+        bctx.fillStyle = '#222';
+        bctx.fillRect(0, 0, buffer.width, buffer.height);
+
+        // Explosion presets (switch with number keys 1/2/3)
+        let activeExplosion = 1;
+
+        function randRange(min, max) { return min + Math.random() * (max - min); }
+
+        function buildExplosion(typeKey, x, y) {
+            const cfg = TYPE_CONFIG[typeKey] || TYPE_CONFIG.classic;
+            const particles = [];
+            for (let i = 0; i < cfg.count; i++) {
+                const step = SETTINGS.step;
+                let angle;
+                if (cfg.radial) {
+                    angle = (i / cfg.count) * Math.PI * 2;
+                } else {
+                    angle = Math.random() * Math.PI * 2;
+                }
+                const speed = cfg.speedBase + (Math.random() - 0.5) * cfg.speedJitter * 2;
+                const vx = Math.cos(angle) * speed * step + (cfg.radial ? 0 : 0);
+                const vy = Math.sin(angle) * speed * step + (cfg.rise || 0);
+                const radius = cfg.radiusBase + Math.random() * cfg.radiusJitter;
+                const life = randRange(cfg.lifeMin, cfg.lifeMax);
+                particles.push({
+                    x, y,
+                    vx,
+                    vy,
+                    life,
+                    initialLife: life,
+                    radius,
+                    baseColor: cfg.baseColor,
+                    trailColor: cfg.trailColor,
+                    typeKey: typeKey
+                });
+            }
+            return particles;
+        }
+
+        const explosionFactories = {
+            1: (x, y) => buildExplosion('classic', x, y),
+            2: (x, y) => buildExplosion('radial', x, y),
+            3: (x, y) => buildExplosion('smoke', x, y)
+        };
+
+        function createExplosion(x, y) {
+            const factory = explosionFactories[activeExplosion] || explosionFactories[1];
+            return factory(x, y);
+        }
+        let explosions = [];
+        let animHandle = null;
+        let comboMode = false; // when true, spawn all three on click
+
+        function parseRGB(str) {
+            return str.split(',').map(s => parseInt(s.trim(), 10)).slice(0, 3);
+        }
+
+        function lerp(a, b, t) { return a + (b - a) * t; }
+
+        function mixColor(baseStr, trailStr, t) {
+            const b = parseRGB(baseStr);
+            const tr = parseRGB(trailStr);
+            return `${Math.round(lerp(tr[0], b[0], t))}, ${Math.round(lerp(tr[1], b[1], t))}, ${Math.round(lerp(tr[2], b[2], t))}`;
+        }
+
+        function resolveShape(particle) {
+            if (SETTINGS.shapeOverride) return SETTINGS.shapeOverride;
+            const cfgShape = TYPE_CONFIG[particle.typeKey]?.shape;
+            if (cfgShape) return cfgShape;
+            return SETTINGS.crispEdges ? 'square' : 'circle';
+        }
+
+        function updateExplosions() {
+            bctx.fillStyle = 'rgba(34, 34, 34, 0.2)';
+            bctx.fillRect(0, 0, buffer.width, buffer.height);
+            if (!SETTINGS.useTrails) {
+                bctx.fillStyle = '#222';
+                bctx.fillRect(0, 0, buffer.width, buffer.height);
+            }
+            explosions.forEach((explosion, index) => {
+                explosion.forEach((particle, pIndex) => {
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    particle.life--;
+                    const lifeFrac = Math.max(0, particle.life / particle.initialLife);
+                    const alpha = SETTINGS.forceOpaque ? 1 : lifeFrac;
+                    const colorStr = particle.trailColor
+                        ? mixColor(particle.baseColor || '255, 165, 0', particle.trailColor, lifeFrac)
+                        : (particle.baseColor || '255, 165, 0');
+                    bctx.fillStyle = `rgba(${colorStr}, ${alpha})`;
+
+                    const shape = resolveShape(particle);
+                    if (shape === 'square') {
+                        const size = (particle.radius || 3);
+                        const px = Math.round(particle.x - size / 2);
+                        const py = Math.round(particle.y - size / 2);
+                        bctx.fillRect(px, py, Math.ceil(size), Math.ceil(size));
+                    } else {
+                        bctx.beginPath();
+                        bctx.arc(particle.x, particle.y, particle.radius || 3, 0, Math.PI * 2);
+                        bctx.fill();
+                    }
+                    if (particle.life <= 0) {
+                        explosion.splice(pIndex, 1);
+                    }
+                });
+                if (explosion.length === 0) {
+                    explosions.splice(index, 1);
+                }
+            });
+
+            if (explosions.length) {
+                animHandle = requestAnimationFrame(updateExplosions);
+            } else {
+                animHandle = null; // stop until next click starts it again
+            }
+
+            // Blit low-res buffer to main canvas scaled 2x with nearest-neighbor
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(buffer, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+        }
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / SCALE;
+            const y = (e.clientY - rect.top) / SCALE;
+
+            if (comboMode) {
+                explosions.push(buildExplosion('classic', x, y));
+                explosions.push(buildExplosion('radial', x, y));
+                explosions.push(buildExplosion('smoke', x, y));
+            } else {
+                explosions.push(createExplosion(x, y));
+            }
+            if (!animHandle) {
+                updateExplosions();
+            }   
+        });
+
+        // Switch explosion type with number keys 1/2/3
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '1' || e.key === '2' || e.key === '3') {
+                activeExplosion = Number(e.key);
+            }
+            if (e.key === '0') {
+                comboMode = !comboMode;
+            }
+        });
+
+    </script>
+</body>
+
+</html>

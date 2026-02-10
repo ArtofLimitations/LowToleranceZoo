@@ -3,6 +3,18 @@
 //const canvas = document.getElementById('lowToleranceCanvas');
 //const ctx = canvas.getContext('2d'); 
 
+// Centralized weapon definitions keyed by ID for reference from player-stats
+export const weaponDefinitions = {
+    pistol: {
+        name: "Pistol",
+        damage: 10,
+        fireRate: 400,
+        projectileSize: 8,
+        speed: 16,
+        color: "white"
+    }
+};
+
 export function createBullet (canvas, x, y, direction, speed = 16, color = 'white', origin = 'player', size = 8, damage = 1) {
     return {
         canvas: canvas,
