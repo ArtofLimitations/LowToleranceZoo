@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>LTZ</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="js/modules/vanilla-picker.csp.css">
@@ -20,7 +23,7 @@
         <!-- Main Canvas -->
         <canvas class="lowToleranceCanvas dashed-grid-paper" id="lowToleranceCanvas" tabindex='1'
             oncontextmenu="event.preventDefault();"></canvas>
-            
+
         <div class="lowToleranceToolbar" id="lowToleranceToolbar">
             <div class="overlay" id="overlay"></div>
             <span class="title"><span class="shades">┤</span>
@@ -30,12 +33,14 @@
                 <div class="fieldRow">
                     <div class="tooltip-wrapper">
                         <button class="material-symbols-outlined" id="spriteButton">edit</button>
-                        <span class="custom-tooltip"><span class="tooltip-key">E</span> <span class="tooltip-desc">- Sprite Editor</span></span>
+                        <span class="custom-tooltip"><span class="tooltip-key">E</span> <span class="tooltip-desc">-
+                                Sprite Editor</span></span>
                     </div>
                     <span class="fieldText">Sprite<br> Editor</span>&nbsp;
                     <div class="tooltip-wrapper">
                         <button class="material-symbols-outlined" id="paletteButton">palette</button>
-                        <span class="custom-tooltip"><span class="tooltip-key">C</span> <span class="tooltip-desc">- Color Palette</span></span>
+                        <span class="custom-tooltip"><span class="tooltip-key">C</span> <span class="tooltip-desc">-
+                                Color Palette</span></span>
                     </div>
                     <span class="fieldText">Color</span>
                 </div>
@@ -44,16 +49,22 @@
                 <div class="fieldRow"><span class="colorBox" id="colorBoxDark">D </span>
                     <div class="tooltip-wrapper">
                         <button class="material-symbols-outlined" id="swapButton">swap_horiz</button>
-                        <span class="custom-tooltip"><span class="tooltip-key">X</span> <span class="tooltip-desc">- Swap Colors</span></span>
+                        <span class="custom-tooltip"><span class="tooltip-key">X</span> <span class="tooltip-desc">-
+                                Swap Colors</span></span>
                     </div>
                     <span class="colorBox" id="colorBoxLight">L </span>
                 </div>
                 <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
-                <div class="fieldRow"><button class="material-symbols-outlined" id="layer3Button" title="Layer 3">visibility</button><span class="layerBox" id="layer3">Layer 3</span> <label class="slider"><input type="range" class="level" id="3-opacity" name="Layer 3 opacity" min="0" max="20" value="20"/></label> </div>
+                <div class="fieldRow"><button class="material-symbols-outlined" id="layer3Button"
+                        title="Layer 3">visibility</button><span class="layerBox" id="layer3">Layer 3</span> <label
+                        class="slider"><input type="range" class="level" id="3-opacity" name="Layer 3 opacity" min="0"
+                            max="20" value="20" /></label> </div>
 
-                <div class="fieldRow"><button class="material-symbols-outlined" id="layer2Button" title="Layer 2">visibility</button><span class="layerBox" id="layer2">Layer 2</span> </div>
+                <div class="fieldRow"><button class="material-symbols-outlined" id="layer2Button"
+                        title="Layer 2">visibility</button><span class="layerBox" id="layer2">Layer 2</span> </div>
 
-                <div class="fieldRow"><button class="material-symbols-outlined" id="layer1Button" title="Layer 1">visibility</button><span class="layerBox" id="layer1">Layer 1</span> </div>
+                <div class="fieldRow"><button class="material-symbols-outlined" id="layer1Button"
+                        title="Layer 1">visibility</button><span class="layerBox" id="layer1">Layer 1</span> </div>
                 <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
                 <div class="fieldRow">
                     <div class="container">
@@ -73,7 +84,8 @@
                     </div><span class="fieldText">Quick<br>Types</span>
                 </div>
                 <!--  Currently selected tile type -->
-                <div class="fieldRow"><span class="valueBox valueText" id="spriteType"></span><span class="fieldText">Current <br>Type </span></div>
+                <div class="fieldRow"><span class="valueBox valueText" id="spriteType"></span><span
+                        class="fieldText">Current <br>Type </span></div>
                 <!-- Other types (menu) -->
                 <div class="fieldRow"><span class="fieldCategory" id="terrainButton">Terrain</span></div>
                 <div class="fieldRow"><span class="fieldCategory" id="itemButton">Item</span></div>
@@ -81,40 +93,53 @@
                 <div class="fieldRow">
                     <span class="valueBox valueText" id="editMode">Draw</span>
                     <span class="fieldText">Edit<br> Mode</span>
-                    
+
                 </div>
                 <div class="fieldRow">
                     <div class="modeButtonGroup">
                         <div class="tooltip-wrapper" style="flex: 1;">
                             <button class="modeButton" id="modeButtonDraw">Draw</button>
-                            <span class="custom-tooltip"><span class="tooltip-key">D</span> <span class="tooltip-desc">- Place or remove tiles</span></span>
+                            <span class="custom-tooltip"><span class="tooltip-key">D</span> <span class="tooltip-desc">-
+                                    Place or remove tiles</span></span>
                         </div>
                         <div class="tooltip-wrapper" style="flex: 1;">
                             <button class="modeButton" id="modeButtonFill">Fill</button>
-                            <span class="custom-tooltip"><span class="tooltip-key">F</span> <span class="tooltip-desc">- Flood fill area</span></span>
+                            <span class="custom-tooltip"><span class="tooltip-key">F</span> <span class="tooltip-desc">-
+                                    Flood fill area</span></span>
                         </div>
                         <div class="tooltip-wrapper" style="flex: 1;">
                             <button class="modeButton" id="modeButtonPaint">Paint</button>
-                            <span class="custom-tooltip"><span class="tooltip-key">Tab</span> <span class="tooltip-desc">- Continuous painting</span></span>
+                            <span class="custom-tooltip"><span class="tooltip-key">Tab</span> <span
+                                    class="tooltip-desc">- Continuous painting</span></span>
                         </div>
                         <div class="tooltip-wrapper" style="flex: 1;">
                             <button class="modeButton" id="modeButtonLighten">Lighten</button>
-                            <span class="custom-tooltip"><span class="tooltip-key">/</span> <span class="tooltip-desc">- Lighten colors</span><br><span class="tooltip-desc">Use </span><span class="tooltip-key">[ ]</span> <span class="tooltip-desc">to adjust intensity</span></span>
+                            <span class="custom-tooltip"><span class="tooltip-key">/</span> <span class="tooltip-desc">-
+                                    Lighten colors</span><br><span class="tooltip-desc">Use </span><span
+                                    class="tooltip-key">[ ]</span> <span class="tooltip-desc">to adjust
+                                    intensity</span></span>
                         </div>
                         <div class="tooltip-wrapper" style="flex: 1;">
                             <button class="modeButton" id="modeButtonDarken">Darken</button>
-                            <span class="custom-tooltip"><span class="tooltip-key">*</span> <span class="tooltip-desc">- Darken colors</span><br><span class="tooltip-desc">Use </span><span class="tooltip-key">[ ]</span> <span class="tooltip-desc">to adjust intensity</span></span>
+                            <span class="custom-tooltip"><span class="tooltip-key">*</span> <span class="tooltip-desc">-
+                                    Darken colors</span><br><span class="tooltip-desc">Use </span><span
+                                    class="tooltip-key">[ ]</span> <span class="tooltip-desc">to adjust
+                                    intensity</span></span>
                         </div>
                     </div>
                 </div>
                 <div class="fieldRow undoRedoRow">
                     <div class="tooltip-wrapper">
-                        <button class="toolbarActionButton material-symbols-outlined undoRedoButton" id="undoButton">undo</button>
-                        <span class="custom-tooltip"><span class="tooltip-key">Ctrl+Z</span> <span class="tooltip-desc">- Undo</span></span>
+                        <button class="toolbarActionButton material-symbols-outlined undoRedoButton"
+                            id="undoButton">undo</button>
+                        <span class="custom-tooltip"><span class="tooltip-key">Ctrl+Z</span> <span
+                                class="tooltip-desc">- Undo</span></span>
                     </div>
                     <div class="tooltip-wrapper">
-                        <button class="toolbarActionButton material-symbols-outlined undoRedoButton" id="redoButton">redo</button>
-                        <span class="custom-tooltip"><span class="tooltip-key">Ctrl+Y</span> <span class="tooltip-desc">- Redo</span></span>
+                        <button class="toolbarActionButton material-symbols-outlined undoRedoButton"
+                            id="redoButton">redo</button>
+                        <span class="custom-tooltip"><span class="tooltip-key">Ctrl+Y</span> <span
+                                class="tooltip-desc">- Redo</span></span>
                     </div>
                 </div>
             </div>
@@ -131,7 +156,7 @@
             <div class="paletteColorContainer">
                 <div class="paletteColorBox" id="colorDark"><span class="paletteLabel">Dark</span>
 
-                </div>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+                </div>
                 <div class="paletteColorBox" id="colorLight"><span class="paletteLabel">Light</span>
                 </div>
             </div>
@@ -152,17 +177,92 @@
             <p><strong>Script Editor</strong></p>
             <div class="editorTextContainer" id="editorTextContainer">
                 <!--<div class="fieldContainer"><input type="text" id="objectName" placeholder="Enter name"></div>-->
-                <div class="textEditorContainer"><textarea id="textEditor" placeholder="Code here..."
-                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                <div class="textEditorContainer"><textarea id="textEditor" placeholder="Code here..." autocomplete="off"
+                        autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
                 </div>
             </div>
-        </div><!--Pop-up elements-->
+        </div>
+        <div class="boardInfoBox" id="boardInfoBox">
+            <p><strong>Board Information</strong></p>
+            <div class="boardInfoContent" id="boardInfoContent">
+                <div class="board-info-row">
+                    <label for="boardInfoName">Board name</label>
+                    <input class="inputField" type="text" id="boardInfoName" />
+                </div>
+                <div class="board-info-row">
+                    <label for="boardInfoBulletLimit">Bullet limit</label>
+                    <input class="inputField" type="number" min="0" id="boardInfoBulletLimit" />
+                </div>
+                <div class="board-info-row">
+                    <label>Player start (x, y, layer)</label>
+                    <div class="board-info-inline">
+                        <input class="inputField" type="number" min="0" id="boardInfoStartX" />
+                        <input class="inputField" type="number" min="0" id="boardInfoStartY" />
+                        <input class="inputField" type="number" min="1" max="3" id="boardInfoStartLayer" />
+                    </div>
+                </div>
+                <div class="board-info-row board-info-checkboxes">
+                    <label><input type="checkbox" id="boardInfoReenter" /> Re-enter when hurt</label>
+                    <label><input type="checkbox" id="boardInfoDark" /> Dark</label>
+                    <label><input type="checkbox" id="boardInfoNight" /> Night mode</label>
+                    <label><input type="checkbox" id="boardInfoLocked" /> Player locked</label>
+                    <label><input type="checkbox" id="boardInfoCanAttack" /> Player can attack</label>
+                </div>
+                <div class="board-info-row board-info-links">
+                    <label>Linked boards</label>
+                    <!--<div class="board-info-inline">
+                    <input class="inputField" type="number" min="1" id="boardInfoNorth" placeholder="North" />
+                    <input class="inputField" type="number" min="1" id="boardInfoEast" placeholder="East" />
+                    <input class="inputField" type="number" min="1" id="boardInfoSouth" placeholder="South" />
+                    <input class="inputField" type="number" min="1" id="boardInfoWest" placeholder="West" />
+                </div>-->
+                    <div class="board-info-inline">
+                        <label for="boardInfoNorth">North <span
+                                class="material-symbols-outlined">arrow_drop_up</span></label>
+                        <label for="boardInfoEast">East <span
+                                class="material-symbols-outlined">arrow_right</span></label>
+                        <label for="boardInfoSouth">South <span
+                                class="material-symbols-outlined">arrow_drop_down</span></label>
+                        <label for="boardInfoWest">West <span
+                                class="material-symbols-outlined">arrow_left</span></label>
+                    </div>
+
+                    <div class="board-info-inline">
+                        <select class="inputField" id="boardInfoNorth">
+                            <option value="none">None</option>
+                        </select>
+                        <select class="inputField" id="boardInfoEast">
+                            <option value="none">None</option>
+                        </select>
+                        <select class="inputField" id="boardInfoSouth">
+                            <option value="none">None</option>
+                        </select>
+                        <select class="inputField" id="boardInfoWest">
+                            <option value="none">None</option>
+                        </select>
+                    </div>
+
+                </div>
+                <div class="board-info-row">
+                    <label for="boardInfoScript">Board script</label>
+                    <textarea class="inputField" id="boardInfoScript" rows="5"></textarea>
+                </div>
+            </div>
+        </div>
+        <!--Pop-up elements-->
         <div class="selectAmount" id="selectAmount"></div>
-        <div class="boardSelect" id="boardSelect"><p><strong>Select Board</strong></p>
-            <div class="boardList" id="boardList"><ol id="boardListItems"><li>Title Board</li><li>Default</li></ol></div>
+        <div class="boardSelect" id="boardSelect">
+            <p><strong>Select Board</strong></p>
+            <div class="boardList" id="boardList">
+                <ol id="boardListItems">
+                    <li>Title Board</li>
+                    <li>Default</li>
+                </ol>
+            </div>
             <button class="material-symbols-outlined" id="addBoardButton" title="Add New Board">add</button>
         </div>
-        <div class="selectSprite" id="selectSpriteBox"><p><strong>Select Sprite</strong></p>
+        <div class="selectSprite" id="selectSpriteBox">
+            <p><strong>Select Sprite</strong></p>
             <div id="spriteGallery" class="sprite-gallery"></div>
         </div>
         <div class="extraTiles" id="extraTerrain">
@@ -170,11 +270,14 @@
             <br>
             <ul id="extraTilesList">
                 <li><span>W</span>Wall</li><span class="fieldText">Standard wall tile. Blocks movement.</span>
-                <li><span>S</span>Step Tile</li><span class="fieldText">Item like tile. Destroyed upon stepping on.</span>
+                <li><span>S</span>Step Tile</li><span class="fieldText">Item like tile. Destroyed upon stepping
+                    on.</span>
                 <li><span>B</span>Break</li><span class="fieldText">Like a wall but breaks when hit.</span>
                 <li><span>P</span>Push</li><span class="fieldText">Can be pushed by player and objects</span>
-                <li><span>A</span>Animation Tile</li><span class="fieldText">Efficient animation tile. Pre-rendered and can't be changed by objects without destroying.</span>
-                <li><span>I</span>Invisible Wall</li><span class="fieldText">Blocks player and objects but not bullets.</span>
+                <li><span>A</span>Animation Tile</li><span class="fieldText">Efficient animation tile. Pre-rendered and
+                    can't be changed by objects without destroying.</span>
+                <li><span>I</span>Invisible Wall</li><span class="fieldText">Blocks player and objects but not
+                    bullets.</span>
             </ul>
         </div>
         <div class="extraTiles" id="extraItems">
@@ -185,8 +288,10 @@
                 <li><span>A</span>Ammo</li><span class="fieldText">Standard ammo item.</span>
                 <li><span>K</span>Key</li><span class="fieldText">Key for unlocking same color door.</span>
                 <li><span>D</span>Door</li><span class="fieldText">Standard door item. Can be opened by player.</span>
-                <li><span>P</span>Passage</li><span class="fieldText">Move to another board. Use same color to dictate where player appears.</span>
-                <li><span>I</span>Sign</li><span class="fieldText">Enter text to display when touched. Use &lt;page&gt; to force pagination. Accepts some html (br, em, strong, b, i, center)</span>
+                <li><span>P</span>Passage</li><span class="fieldText">Move to another board. Use same color to dictate
+                    where player appears.</span>
+                <li><span>I</span>Sign</li><span class="fieldText">Enter text to display when touched. Use &lt;page&gt;
+                    to force pagination. Accepts some html (br, em, strong, b, i, center)</span>
             </ul>
         </div>
         <div class="extraTiles" id="extraCreatures">
@@ -195,7 +300,7 @@
             <p class="fieldText">Creature presets are coming soon. Use scripted objects for interactive actors.</p>
         </div>
     </div>
-    
+
     <canvas id="exportedSpriteCanvas" width="32" height="32" style="margin-top: 20px;"></canvas>
 
     <div class="info"><span id="versionInfo">LTZ v0.9.3</span></div>

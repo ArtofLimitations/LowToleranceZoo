@@ -40,6 +40,12 @@ const scriptGlobals = {};            // Global variables for scripts
 const spriteCache = {};              // Cache for sprites to avoid redundant redrawing
 //const namedColors = namedColorList;// Named colors for easy reference
 
+// Timing
+let fps = 60;
+let lastTime = 0;                    // Timing variables
+let moveSpeed = 80;                  // Pixels per second
+let accumulatedTime = 0;
+
 // board variables
 let currentBoard = 2;                // Current board number
 let boards = {};
@@ -51,6 +57,7 @@ let nightMode = true;
 let world = {};                      // World object
 let worldObjects = {};               // Stores objects for all boards
 let worldPassages = {};              // Stores passages for all boards
+let worldData = {};             // Stores world-level settings
 const scriptFlags = {};              // Stores all set flags as { flagName: true } 77777777777777
 
 // Player variables
@@ -75,12 +82,6 @@ function getEquippedWeaponConfig() {
 
 // File info
 export let filename = ''; // ############ File to load ###############
-
-// Timing
-let fps = 60;
-let lastTime = 0;                    // Timing variables
-let moveSpeed = 80;                  // Pixels per second
-let accumulatedTime = 0;
 
 const defaultDialogStyle = [
     'display:none',
@@ -558,6 +559,10 @@ function executeObjectCommand(obj, command) {
                     } else {
                         console.error("Error: Missing ':loop' label in script.");
                     }
+                    break;
+                case "restart":
+                    obj.scriptIndex = 0;
+                    obj.resting = false;
                     break;
                 case "step": // STEP NEEDS TO COME BEFORE MOVE
                     // Set fullStep to true to use full-tile step
@@ -1665,6 +1670,26 @@ function isAlignedWithTile(object) {
 }
 
 function canMoveTo(x, y, object = player) {
+    // Hard bounds check: if out of current board, treat as blocked so edge logic can handle it
+    if (object.type === 'player' || object.type === 'object' || object.type === 'bullet') {
+        if (x < 0 || y < 0 || x >= tilesX || y >= tilesY) {
+            return false;
+        }
+        // Also block if the bounding box would leave the board (prevents visual clipping at edges)
+        const playerLeft = x * tileSizeX;
+        const playerTop = y * tileSizeY;
+        const playerWidth = object.width || tileSizeX;
+        const playerHeight = object.height || tileSizeY;
+        if (
+            playerLeft < 0 ||
+            playerTop < 0 ||
+            playerLeft + playerWidth > tilesX * tileSizeX ||
+            playerTop + playerHeight > tilesY * tileSizeY
+        ) {
+            return false;
+        }
+    }
+
     // Calculate the player's bounding box at the new position
 
     let playerLeft = x * tileSizeX;
@@ -1850,16 +1875,79 @@ function canMoveTo(x, y, object = player) {
         }
     }
 
-    // Optionally: check for out-of-bounds
-    if (
-        playerLeft < 0 || playerTop < 0 ||
-        playerLeft + playerWidth > tilesX * tileSizeX ||
-        playerTop + playerHeight > tilesY * tileSizeY
-    ) {
-        return false;
+    return true; // No collision, movement allowed
+}
+
+// Check if movement crosses the board edge and whether the linked board allows entry
+function canMoveAcrossEdge(x, y, layer = player.layer) {
+    const playerWidth = tileSizeX; // assume player is 1 tile; adjust if player.width differs
+    const playerHeight = tileSizeY;
+    const rightEdge = (x * tileSizeX) + playerWidth > tilesX * tileSizeX;
+    const bottomEdge = (y * tileSizeY) + playerHeight > tilesY * tileSizeY;
+
+    const dir = (() => {
+        if (x < 0) return 'west';
+        if (rightEdge) return 'east';
+        if (y < 0) return 'north';
+        if (bottomEdge) return 'south';
+        return null;
+    })();
+
+    if (!dir) return { allowed: false }; // not an edge case
+
+    const link = boardData[currentBoard]?.linkedBoards?.[dir];
+    if (!link && link !== 0) return { allowed: false }; // no linked board
+
+    const targetBoard = link;
+    const targetLayer = layer;
+
+    // Compute entry coords on target board
+    let targetX = x;
+    let targetY = y;
+    switch (dir) {
+        case 'north': targetY = tilesY - 1; break;
+        case 'south': targetY = 0; break;
+        case 'west': targetX = tilesX - 1; break;
+        case 'east': targetX = 0; break;
     }
 
-    return true; // No collision, movement allowed
+    const targetKey = `${targetLayer},${targetX},${targetY}`;
+    const targetBoardData = world[targetBoard];
+    if (!targetBoardData) return { allowed: false };
+
+    // Check every tile the player's bounding box would cover on the target board (handles half-step offsets)
+    const pw = player.width || tileSizeX;
+    const ph = player.height || tileSizeY;
+    const left = targetX * tileSizeX;
+    const top = targetY * tileSizeY;
+    const right = left + pw;
+    const bottom = top + ph;
+
+    const minTileX = Math.floor(left / tileSizeX);
+    const maxTileX = Math.floor((right - 0.001) / tileSizeX);
+    const minTileY = Math.floor(top / tileSizeY);
+    const maxTileY = Math.floor((bottom - 0.001) / tileSizeY);
+
+    for (let ty = minTileY; ty <= maxTileY; ty++) {
+        for (let tx = minTileX; tx <= maxTileX; tx++) {
+            // If the target board dimensions differ from the current board, still guard against out-of-range
+            if (tx < 0 || ty < 0 || tx >= tilesX || ty >= tilesY) return { allowed: false };
+            const key = `${targetLayer},${tx},${ty}`;
+            const blocking = targetBoardData[key];
+            if (blocking && (blocking.type === 'wall' || blocking.type === 'object' || blocking.type === 'break' || blocking.type === 'sign' || blocking.type === 'invisible')) {
+                return { allowed: false };
+            }
+        }
+    }
+
+    return {
+        allowed: true,
+        targetBoard,
+        targetX,
+        targetY,
+        targetLayer,
+        dir
+    };
 }
 
 function tryPushTiles(startX, startY, direction, layer) {
@@ -2051,19 +2139,46 @@ function updatePlayer(deltaTime) {
 
     if (player.health === 0) youDied();
 
-    switch (true) {
-        case keys['ArrowUp'] && canMoveTo(player.x, player.y - stepSize):
-            newY -= stepSize;
-            break;
-        case keys['ArrowDown'] && canMoveTo(player.x, player.y + stepSize):
-            newY += stepSize;
-            break;
-        case keys['ArrowLeft'] && canMoveTo(player.x - stepSize, player.y):
-            newX -= stepSize;
-            break;
-        case keys['ArrowRight'] && canMoveTo(player.x + stepSize, player.y):
-            newX += stepSize;
-            break;
+    // Determine desired deltas (vertical priority, then horizontal), but allow sliding fallback
+    let dx = 0;
+    let dy = 0;
+    if (keys['ArrowUp']) dy = -stepSize;
+    else if (keys['ArrowDown']) dy = stepSize;
+
+    if (keys['ArrowLeft']) dx = -stepSize;
+    else if (keys['ArrowRight']) dx = stepSize;
+
+    const tryMove = (tx, ty) => {
+        if (canMoveTo(tx, ty)) {
+            player.transported = false;
+            return { moved: true, x: tx, y: ty };
+        }
+        const edge = canMoveAcrossEdge(tx, ty, player.layer);
+        if (edge.allowed) {
+            switchBoard(edge.targetBoard, null, edge);
+            return { moved: true, switched: true };
+        }
+        return { moved: false };
+    };
+
+    // Try vertical first (if any), then horizontal as a fallback to restore sliding along walls
+    let moved = false;
+    if (dy !== 0) {
+        const res = tryMove(player.x, player.y + dy);
+        if (res.switched) return; // board switch handled placement
+        if (res.moved) {
+            newY = player.y + dy;
+            moved = true;
+        }
+    }
+
+    if (!moved && dx !== 0) {
+        const res = tryMove(player.x + dx, player.y);
+        if (res.switched) return; // board switch handled placement
+        if (res.moved) {
+            newX = player.x + dx;
+            moved = true;
+        }
     }
 
     if (newX !== player.x || newY !== player.y) {
@@ -2111,9 +2226,7 @@ function movePlayer(newLayer, newX, newY) {
 // Load board and replace sprite sheet
 function handleLoadedBoard(spriteSheetData, boardData) {
     deactivateAllBullets(bulletArray); // Deactivate all bullets
-
     placedSprites = boardData;
-
     replaceSpriteSheet(spriteSheetData);
 
     placedObjects = loadObjectsFromGameData(placedSprites);
@@ -2142,10 +2255,15 @@ function handleLoadedBoard(spriteSheetData, boardData) {
     renderLayersToMainCanvas(); // Draw them onto the main canvas
 }
 
-function handleLoadedGame(spriteSheetData, boardList, worldData) {
+function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsData = {}, boardSettingsData = {}) {
     deactivateAllBullets(bulletArray); // Deactivate all bullets  
+
     boards = boardList; // Load the board list
     world = worldData; // Load the world data
+    worldData = worldSettingsData || {};
+    const savedBoardSettings = boardSettingsData || {};
+    boardData = {}; // Reset board metadata
+
     replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
 
     // Helper to get board name from boards array
@@ -2159,25 +2277,34 @@ function handleLoadedGame(spriteSheetData, boardList, worldData) {
         loadPassagesFromGameData(world[board], board);
         worldObjects[board] = loadObjectsFromGameData(world[board]);
 
-        boardData[board] = {
-            playerStart: (() => {
-                for (const key in world[board]) {
-                    if (world[board][key].type === 'player') {
-                        const [layer, x, y] = key.split(',').map(Number);
-                        return { layer, x, y };
-                    }
+        // Pull saved board settings (keys may be numeric or string)
+        const saved = savedBoardSettings[board] || savedBoardSettings[String(board)] || savedBoardSettings[Number(board)];
+
+        // Fallback player start from tile data if not provided in settings
+        const fallbackPlayerStart = (() => {
+            for (const key in world[board]) {
+                if (world[board][key].type === 'player') {
+                    const [layer, x, y] = key.split(',').map(Number);
+                    return { layer, x, y };
                 }
-                return null;
-            })(),
-            name: getBoardName(board), // Use the name from boards array
-            light: world[board].light !== undefined ? world[board].light : true,
-            nightMode: world[board].nightMode !== undefined ? world[board].nightMode : false,
-            // Add more board-specific properties as needed
+            }
+            return null;
+        })();
+
+        // Merge: saved settings win, then world-derived fallbacks
+        boardData[board] = {
+            ...(saved || {}),
+            boardName: (saved && saved.boardName) || getBoardName(board),
+            playerStart: (saved && saved.playerStart) || fallbackPlayerStart,
+            // Keep any light/night flags from world data if present, otherwise from saved, otherwise defaults
+            light: world[board].light !== undefined ? world[board].light : (saved?.light ?? true),
+            nightMode: world[board].nightMode !== undefined ? world[board].nightMode : (saved?.nightMode ?? saved?.nightmode ?? false)
         };
     }
 
-    console.log('Loaded world data:', worldData);
+    console.log('Loaded world settings:', worldData);
     console.log('Loaded world objects:', worldObjects);
+    console.log('Loaded board settings:', savedBoardSettings);
 
     currentBoard = 2;
     placedSprites = world[currentBoard]; // Get the current board from the world object
@@ -2227,7 +2354,7 @@ function loadPassagesFromGameData(gameData, board) {
     return worldPassages[board]; // Return the passages for the current board
 }
 
-async function switchBoard(board, colorKey) {
+async function switchBoard(board, colorKey = null, edgePlacement = null) {
     const wasPaused = gamePaused;
     gamePaused = true;
 
@@ -2239,34 +2366,46 @@ async function switchBoard(board, colorKey) {
     placedObjects = worldObjects[board]; // Use preloaded objects
     placedPassages = worldPassages[board] || {}; // Load passages for the current board
 
-    let foundPassage = false;
+    let placed = false;
 
-    // Lookup passage color in placedPassages for a match
-    for (const key in placedPassages) {
-        const passage = placedPassages[key];
-        const passageColorKey = passage.color.join(','); // Create a unique key for the passage color
+    // Edge-based placement overrides passage logic when provided
+    if (edgePlacement && edgePlacement.targetBoard === board) {
+        movePlayer(edgePlacement.targetLayer, edgePlacement.targetX, edgePlacement.targetY);
+        placed = true;
+    }
 
-        if (passageColorKey === colorKey) { // Compare the color keys
-            const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
-            movePlayer(layer, x, y); // Use movePlayer to update the player's position
-            foundPassage = true;
-            break; // Exit loop after finding the first match
+    if (!placed && colorKey) {
+        // Lookup passage color in placedPassages for a match
+        for (const key in placedPassages) {
+            const passage = placedPassages[key];
+            const passageColorKey = passage.color.join(','); // Create a unique key for the passage color
+
+            if (passageColorKey === colorKey) { // Compare the color keys
+                const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
+                movePlayer(layer, x, y); // Use movePlayer to update the player's position
+                placed = true;
+                break; // Exit loop after finding the first match
+            }
         }
     }
 
-    // If no matching passage found, use playerStart from boardData
-    if (!foundPassage) {
+    // If no placement yet, use playerStart from boardData
+    if (!placed) {
         const start = boardData[board]?.playerStart;
         if (start) {
             movePlayer(start.layer, start.x, start.y);
+            placed = true;
+        }
+    }
+
+    // Final fallback: find existing player sprite on the target board
+    if (!placed) {
+        let playerSprite = findPlayerSprite();
+        if (playerSprite) {
+            movePlayer(playerSprite.layer, playerSprite.x, playerSprite.y);
+            placed = true;
         } else {
-            // Fallback: try to find the player sprite on the board
-            let playerSprite = findPlayerSprite();
-            if (playerSprite) {
-                movePlayer(playerSprite.layer, playerSprite.x, playerSprite.y);
-            } else {
-                console.warn('No player start position found for board', board);
-            }
+            console.warn('No player start position found for board', board);
         }
     }
 
@@ -2280,6 +2419,19 @@ async function switchBoard(board, colorKey) {
 
     gamePaused = wasPaused;
     if (!gamePaused && !playerPaused) requestAnimationFrame(animateGame);
+}
+
+function saveGame() { // Save current world state to localStorage
+    const saveData = {
+        world,
+        playerStats,
+        boardData,
+        worldSettings: worldData,
+        boardSettings: Object.fromEntries(Object.entries(boardData).map(([k, v]) => [k, {
+            playerStart: v.playerStart
+        }]))
+    };
+    localStorage.setItem('saveData', JSON.stringify(saveData));
 }
 
 function findPlayerSprite() {
@@ -2375,6 +2527,10 @@ document.addEventListener("keydown", (event) => {
                 }
                 // Optionally show/hide your pause UI here
             }
+        }
+
+        if (event.key === 's' && !gamePaused) { // S to save
+            saveGame();
         }
 
         if (event.key === ' ' && !gamePaused) { // Space bar to shoot

@@ -199,12 +199,14 @@ export function loadWorld(callback) {
                 let spritesheet = combinedData.spritesheet;
                 const boardList = combinedData.boards;
                 const world = combinedData.world;
+                const worldSettings = combinedData.worldSettings || {};
+                const boardSettings = combinedData.boardSettings || {};
 
                 spritesheet = rebuildSpriteSheet(spritesheet);
 
                 // Pass the data to the provided callback function
                 if (callback && typeof callback === 'function') {
-                    callback(spritesheet, boardList, world);
+                    callback(spritesheet, boardList, world, worldSettings, boardSettings);
                 }
             } catch (error) {
                 console.error('Error parsing JSON:', error);

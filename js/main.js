@@ -55,6 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // World-level settings and scripts
         worldSettings: {
+            playerStyles: {
+                sprite: 1,
+                color: [[0, 0, 255, .5], [255, 255, 255, 1]]
+            },
             startingStats: {
                 health: 100,
                 ammo: 10,
@@ -82,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
             layer1Opacity: options.layer1Opacity !== undefined ? options.layer1Opacity : 1.0,
             layer2Opacity: options.layer2Opacity !== undefined ? options.layer2Opacity : 1.0,
             layer3Opacity: options.layer3Opacity !== undefined ? options.layer3Opacity : 1.0,
+            bulletLimit: options.bulletLimit !== undefined ? options.bulletLimit : 256,
             playerLocked: options.playerLocked || false,
             playerCanAttack: options.playerCanAttack !== undefined ? options.playerCanAttack : true,
             boardName: options.boardName || `Board ${boardId}`,
@@ -92,9 +97,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize board settings for a specific board
     function initializeBoardSettings(boardId, options = {}) {
-        if (!worldSaveData.boardSettings[boardId]) {
-            worldSaveData.boardSettings[boardId] = createDefaultBoardSettings(boardId, options);
+        const defaults = createDefaultBoardSettings(boardId, options);
+        const existing = worldSaveData.boardSettings[boardId];
+
+        if (!existing) {
+            worldSaveData.boardSettings[boardId] = defaults;
+        } else {
+            worldSaveData.boardSettings[boardId] = {
+                ...defaults,
+                ...existing
+            };
+
+            if (options.boardName) {
+                worldSaveData.boardSettings[boardId].boardName = options.boardName;
+            }
         }
+
         return worldSaveData.boardSettings[boardId];
     }
     let key = { ctrl: false, shift: false, alt: false, lastClick: 0, clickDelay: 100 };   // keyboard status object. click delay in ms
@@ -339,12 +357,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawCursor() {
         const posX = cursorX * tileSizeX;
         const posY = cursorY * tileSizeY;
-        
+
         // Determine cursor color based on mode
         let cursorColor = 'rgba(255, 10, 10, 0.8)'; // Default red for draw mode
         let showModeLabel = false;
         let modeLabel = '';
-        
+
         switch (mouse.mode) {
             case 'fill':
                 cursorColor = 'rgba(0, 100, 255, 0.8)'; // Blue
@@ -361,11 +379,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 modeLabel = 'D';
                 break;
         }
-        
+
         // Draw cursor rectangle
         ctx.beginPath();
         ctx.lineWidth = 2;
-        
+
         if (showModeLabel) {
             // Special handling for lighten/darken - dark sides, dark top/bottom
             ctx.strokeStyle = 'rgba(58, 58, 58, 0.6)';
@@ -377,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.moveTo(posX + tileSizeX - 1, posY + 1);
             ctx.lineTo(posX + tileSizeX - 1, posY + tileSizeY - 1); // Right side
             ctx.stroke();
-            
+
             ctx.strokeStyle = 'rgba(57, 57, 57, 0.8)';
             ctx.beginPath();
             ctx.moveTo(posX + 1, posY + 1);
@@ -387,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.moveTo(posX + 1, posY + tileSizeY - 1);
             ctx.lineTo(posX + tileSizeX - 1, posY + tileSizeY - 1); // Bottom
             ctx.stroke();
-            
+
             // Draw inner white square for better visibility
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
             ctx.lineWidth = 1;
@@ -397,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.strokeStyle = cursorColor;
             ctx.strokeRect(posX + 1, posY + 1, tileSizeX - 2, tileSizeY - 2);
         }
-        
+
         // Draw layer number in upper right
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
@@ -408,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const textY = posY + 10;
         ctx.strokeText(layerText, textX, textY);
         ctx.fillText(layerText, textX, textY);
-        
+
         // Draw mode label for lighten/darken in upper right (below layer number)
         if (showModeLabel) {
             ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
@@ -419,7 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.strokeText(modeLabel, modeLabelX, modeLabelY);
             ctx.fillText(modeLabel, modeLabelX, modeLabelY);
         }
-        
+
         // Draw temporary intensity tooltip (centered in cursor)
         if (intensityTooltip.visible) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
@@ -899,14 +917,25 @@ document.addEventListener('DOMContentLoaded', () => {
         clearHistory();
     }
 
-    function handleLoadedWorld(spriteSheetData, boardListData, worldData) {
-        boardList = boardListData; // Load the board list
-        world = worldData; // Load the world data  
+    function handleLoadedWorld(spriteSheetData, boardListData, worldData, worldSettingsData = {}, boardSettingsData = {}) {
+        boardList = boardListData || boardList; // Load the board list
+        world = worldData || world; // Load the world data
+
+        worldSaveData.worldSettings = Object.keys(worldSettingsData).length ? worldSettingsData : worldSaveData.worldSettings;
+        worldSaveData.boardSettings = boardSettingsData || {};
+
+        // Ensure every board has settings (fills in new defaults without overwriting existing values)
+        boardList.forEach(([boardId, boardName]) => {
+            initializeBoardSettings(boardId, { boardName: boardName });
+        });
+
         replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
 
         hiddenLayers = new Set();
-        currentBoard = 1; // Set the current board to the first one
-        placedSprites = world[currentBoard]; // Get the current board from the world object
+        const firstBoardId = boardList?.[0]?.[0] || 1;
+        currentBoard = firstBoardId; // Set the current board to the first one
+        placedSprites = world[currentBoard] || {}; // Get the current board from the world object
+        world[currentBoard] = placedSprites;
 
         findPlayerSprite(); // Find the player sprite on the current board
 
@@ -969,6 +998,167 @@ document.addEventListener('DOMContentLoaded', () => {
     // ######################################
     // POPUP FUNCTIONS 
     // ######################################
+
+    function boardInfo() { // Show the board info popup
+        if (popup.active) closePopup();
+
+        const boardInfoContainer = document.getElementById('boardInfoBox');
+        const boardInfoContent = document.getElementById('boardInfoContent');
+
+        if (!boardInfoContainer || !boardInfoContent) {
+            console.warn('Board info popup container is missing.');
+            return;
+        }
+
+        const boardId = currentBoard;
+        const currentBoardData = boardList.find(board => board[0] === boardId);
+        const boardName = currentBoardData ? currentBoardData[1] : `Board ${boardId}`;
+        const settings = initializeBoardSettings(boardId, { boardName: boardName });
+
+        // Build the UI inside the popup dynamically so it matches current data
+
+        // Inputs
+        const nameInput = document.getElementById('boardInfoName');
+        const bulletLimitInput = document.getElementById('boardInfoBulletLimit');
+        const startXInput = document.getElementById('boardInfoStartX');
+        const startYInput = document.getElementById('boardInfoStartY');
+        const startLayerInput = document.getElementById('boardInfoStartLayer');
+        const reenterInput = document.getElementById('boardInfoReenter');
+        const darkInput = document.getElementById('boardInfoDark');
+        const nightInput = document.getElementById('boardInfoNight');
+        const lockedInput = document.getElementById('boardInfoLocked');
+        const canAttackInput = document.getElementById('boardInfoCanAttack');
+        const northInput = document.getElementById('boardInfoNorth');
+        const eastInput = document.getElementById('boardInfoEast');
+        const southInput = document.getElementById('boardInfoSouth');
+        const westInput = document.getElementById('boardInfoWest');
+        const scriptInput = document.getElementById('boardInfoScript');
+
+        // Populate board dropdowns with current board list
+        const populateBoardSelect = (selectEl, currentValue) => {
+            if (!selectEl) return;
+            selectEl.innerHTML = '';
+            const noneOption = document.createElement('option');
+            noneOption.value = 'none';
+            noneOption.textContent = 'None';
+            selectEl.appendChild(noneOption);
+
+            boardList.forEach(([id, name]) => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = `${id}: ${name}`;
+                selectEl.appendChild(opt);
+            });
+
+            const normalized = currentValue === null || currentValue === undefined ? 'none' : String(currentValue);
+            selectEl.value = normalized;
+        };
+
+        populateBoardSelect(northInput, settings.linkedBoards?.north);
+        populateBoardSelect(eastInput, settings.linkedBoards?.east);
+        populateBoardSelect(southInput, settings.linkedBoards?.south);
+        populateBoardSelect(westInput, settings.linkedBoards?.west);
+
+        // Populate values
+        nameInput.value = settings.boardName || boardName;
+        bulletLimitInput.value = settings.bulletLimit || 0;
+        startXInput.value = settings.playerStart?.x ?? 0;
+        startYInput.value = settings.playerStart?.y ?? 0;
+        startLayerInput.value = settings.playerStart?.layer ?? 2;
+        reenterInput.checked = !!settings.reenterWhenHurt;
+        darkInput.checked = !!settings.dark;
+        nightInput.checked = !!settings.nightmode;
+        lockedInput.checked = !!settings.playerLocked;
+        canAttackInput.checked = !!settings.playerCanAttack;
+        scriptInput.value = settings.boardScript || '';
+
+        // Event handlers to keep data in sync
+        nameInput.oninput = () => {
+            const newName = nameInput.value.trim() || `Board ${boardId}`;
+            settings.boardName = newName;
+            if (currentBoardData) currentBoardData[1] = newName;
+        };
+
+        bulletLimitInput.oninput = () => {
+            const parsed = parseInt(bulletLimitInput.value, 10);
+            settings.bulletLimit = Number.isFinite(parsed) ? parsed : 0;
+        };
+
+        const updatePlayerStart = () => {
+            settings.playerStart = {
+                x: parseInt(startXInput.value, 10) || 0,
+                y: parseInt(startYInput.value, 10) || 0,
+                layer: parseInt(startLayerInput.value, 10) || 2
+            };
+        };
+        startXInput.oninput = updatePlayerStart;
+        startYInput.oninput = updatePlayerStart;
+        startLayerInput.oninput = updatePlayerStart;
+
+        reenterInput.onchange = () => {
+            settings.reenterWhenHurt = reenterInput.checked;
+        };
+
+        darkInput.onchange = () => {
+            settings.dark = darkInput.checked;
+        };
+
+        nightInput.onchange = () => {
+            settings.nightmode = nightInput.checked;
+        };
+
+        lockedInput.onchange = () => {
+            settings.playerLocked = lockedInput.checked;
+        };
+
+        canAttackInput.onchange = () => {
+            settings.playerCanAttack = canAttackInput.checked;
+        };
+
+        const parseLinkedBoardValue = (input) => {
+            if (!input) return null;
+            const val = input.value;
+            if (val === 'none' || val === '') return null;
+            const parsed = parseInt(val, 10);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const updateLinkedBoards = () => {
+            settings.linkedBoards = {
+                north: parseLinkedBoardValue(northInput),
+                east: parseLinkedBoardValue(eastInput),
+                south: parseLinkedBoardValue(southInput),
+                west: parseLinkedBoardValue(westInput)
+            };
+        };
+        [northInput, eastInput, southInput, westInput].forEach((input) => {
+            if (!input) return;
+            input.oninput = updateLinkedBoards;
+        });
+
+        scriptInput.oninput = () => {
+            settings.boardScript = scriptInput.value;
+        };
+
+        const handleClose = (event) => {
+            if (!popup.active || popup.type !== 'boardInfoBox') {
+                document.removeEventListener('keydown', handleClose);
+                return;
+            }
+            if (event.key === 'Enter' || event.key === 'Escape') {
+                event.preventDefault();
+                closePopup();
+                document.removeEventListener('keydown', handleClose);
+            }
+        };
+        document.addEventListener('keydown', handleClose);
+
+        popup.active = true;
+        popup.type = 'boardInfoBox';
+        overlay.style.display = 'block';
+        boardInfoContainer.style.display = 'flex';
+    }
+
 
     function spriteSelect() { // Select from a list of sprites
         popup.active = true;
@@ -1633,6 +1823,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         loadCombinedData(handleLoadedBoard); // load board and sprite sheet from file.js
                         showStatusMessage('Board and Sprite Sheet loaded');
                         break;
+                    case 'i': // open board info popup
+                        boardInfo();
+                        break;
                     case 'r': // reset board
                         if (confirm('Are you sure you want reset board?')) {
                             const existingKeys = Object.keys(placedSprites);
@@ -1716,7 +1909,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             DrawSingleTile(player.oldX, player.oldY);
                         }
                         break;
-                    
+
                 }
             }
 

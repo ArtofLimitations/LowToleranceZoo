@@ -55,9 +55,9 @@ export function createBullet (canvas, x, y, direction, speed = 16, color = 'whit
             //console.log('new:', this.x, this.y);
 
             // Deactivate bullet if it goes off-screen
-            if (this.x < 0 || this.x > this.canvas.width || this.y < 0 || this.y > this.canvas.height) {
-                this.active = false;
-            }
+            //if (this.x < 0 || this.x > this.canvas.width || this.y < 0 || this.y > this.canvas.height) {
+            //    this.active = false;
+            //}
         },
 
         draw() {
