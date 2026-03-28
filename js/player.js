@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets, weaponDefinitions } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets } from './object-functions.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, RESERVED_FLAG_WORDS } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 
 // Canvas Configurations
@@ -504,33 +504,24 @@ function executeObjectCommand(obj, command) {
                     break;
                 }
                 case "if": {
-                    // Basic: #if <flag> then <:label>
-                    const flag = command.args[0]?.toLowerCase();
-                    const thenIndex = command.args.indexOf("then");
-                    const label = thenIndex !== -1 ? command.args[thenIndex + 1] : null;
-
-                    // Debugging help: log the flag and current value for inspection when unexpected behavior occurs
-                    // (This will help diagnose why #if appears to always be true)
-                    try {
-                        console.debug(`#if check -> flag: '${flag}', value:`, scriptFlags[flag], 'allFlags:', scriptFlags);
-                    } catch (e) {
-                        console.debug('#if check -> unable to dump scriptFlags', e);
-                    }
-
-                    if (!flag || !label) {
-                        console.warn("#if: Invalid syntax. Usage: #if <flag> then <:label>");
-                        break;
-                    }
-
-                    // Use hasOwnProperty to avoid truthy prototype properties (e.g., "toString")
-                    if (Object.prototype.hasOwnProperty.call(scriptFlags, flag) && scriptFlags[flag]) {
-                        // Jump to the label if the flag is set
-                        let labelKey = label.startsWith(":") ? label : ":" + label;
-                        const index = resolveLabel(obj, labelKey);
-                        if (index !== null) {
-                            obj.scriptIndex = index - 1; // -1 so next tick runs the label's first command
-                        } else {
-                            console.warn(`#if: Label ${labelKey} not found.`);
+                    const ifResult = evaluateIfCondition(command.args, player, scriptGlobals, scriptFlags);
+                    if (!ifResult) break;
+                    if (ifResult.conditionMet) {
+                        if (ifResult.action.type === 'label') {
+                            const labelKey = ifResult.action.value.startsWith(':') ? ifResult.action.value : ':' + ifResult.action.value;
+                            const index = resolveLabel(obj, labelKey);
+                            if (index !== null) {
+                                obj.scriptIndex = index - 1; // -1 so next tick runs the label's first command
+                            } else {
+                                console.warn(`#if: Label "${labelKey}" not found.`);
+                            }
+                        } else if (ifResult.action.type === 'command') {
+                            executeObjectCommand(obj, {
+                                type: 'command',
+                                name: ifResult.action.name,
+                                args: ifResult.action.args,
+                                blocking: false
+                            });
                         }
                     }
                     break;
@@ -824,7 +815,17 @@ function executeObjectCommand(obj, command) {
                         console.warn("#set: No flag provided.");
                         break;
                     }
-                    const flag = command.args[0].toLowerCase();
+                    const flagRaw = command.args[0];
+                    // Only allow letters, numbers, and underscores — no dots, parens, etc.
+                    if (!/^[a-z0-9_]+$/i.test(flagRaw)) {
+                        console.warn(`#set: "${flagRaw}" contains invalid characters. Flag names may only use letters, numbers, and underscores.`);
+                        break;
+                    }
+                    const flag = flagRaw.toLowerCase();
+                    if (RESERVED_FLAG_WORDS.has(flag)) {
+                        console.warn(`#set: "${flag}" is a reserved word and cannot be used as a flag name.`);
+                        break;
+                    }
                     scriptFlags[flag] = true;
                     break;
                 }
@@ -2199,11 +2200,12 @@ function updatePlayer(deltaTime) {
     }
 }
 
-function movePlayer(newLayer, newX, newY) {
-    // Remove player from old position
+function movePlayer(newLayer, newX, newY, shouldRender = true) {
+    // Remove player from old position (always from the current board data)
+    const oldBoardSprites = world[currentBoard] || placedSprites;
     const oldKey = `${player.layer},${player.x},${player.y}`;
-    if (placedSprites[oldKey]) {
-        delete placedSprites[oldKey];
+    if (oldBoardSprites && oldBoardSprites[oldKey]) {
+        delete oldBoardSprites[oldKey];
     }
 
     // Update player object
@@ -2216,7 +2218,7 @@ function movePlayer(newLayer, newX, newY) {
     const newKey = `${newLayer},${newX},${newY}`;
     placedSprites[newKey] = { ...player, type: 'player' };
 
-    renderLayersToMainCanvas();
+    if (shouldRender) renderLayersToMainCanvas();
 }
 
 // #############################################
@@ -2370,7 +2372,7 @@ async function switchBoard(board, colorKey = null, edgePlacement = null) {
 
     // Edge-based placement overrides passage logic when provided
     if (edgePlacement && edgePlacement.targetBoard === board) {
-        movePlayer(edgePlacement.targetLayer, edgePlacement.targetX, edgePlacement.targetY);
+        movePlayer(edgePlacement.targetLayer, edgePlacement.targetX, edgePlacement.targetY, false);
         placed = true;
     }
 
@@ -2382,7 +2384,7 @@ async function switchBoard(board, colorKey = null, edgePlacement = null) {
 
             if (passageColorKey === colorKey) { // Compare the color keys
                 const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
-                movePlayer(layer, x, y); // Use movePlayer to update the player's position
+                movePlayer(layer, x, y, false); // Use movePlayer to update the player's position
                 placed = true;
                 break; // Exit loop after finding the first match
             }
@@ -2393,7 +2395,7 @@ async function switchBoard(board, colorKey = null, edgePlacement = null) {
     if (!placed) {
         const start = boardData[board]?.playerStart;
         if (start) {
-            movePlayer(start.layer, start.x, start.y);
+            movePlayer(start.layer, start.x, start.y, false);
             placed = true;
         }
     }
@@ -2402,7 +2404,7 @@ async function switchBoard(board, colorKey = null, edgePlacement = null) {
     if (!placed) {
         let playerSprite = findPlayerSprite();
         if (playerSprite) {
-            movePlayer(playerSprite.layer, playerSprite.x, playerSprite.y);
+            movePlayer(playerSprite.layer, playerSprite.x, playerSprite.y, false);
             placed = true;
         } else {
             console.warn('No player start position found for board', board);

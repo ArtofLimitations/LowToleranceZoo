@@ -51,6 +51,21 @@ export const defaultStatusMessageStyle = {
 // Global mixin storage
 export const scriptMixins = {}; // <-- Added for mixin support
 
+// Words that cannot be used as flag names in #set.
+// They conflict with #if syntax keywords, special value prefixes, or game terms.
+export const RESERVED_FLAG_WORDS = new Set([
+    // #if syntax keywords
+    'then', 'not', 'and', 'or',
+    // Special value prefixes (symbols already block these, but list for clarity)
+    'rnd', 'true', 'false',
+    // Game / world terms
+    'nightmode', 'player',
+    // Direction modifiers used in movement commands
+    'opp', 'seek', 'flow', 'rndany', 'random',
+    // Quantity keywords used in #take
+    'all', 'half',
+]);
+
 // Commands that should halt further script processing for the current tick
 const BLOCKING_COMMANDS = [
     'wait', 'sleep', 'end', 'cycle',
@@ -398,3 +413,216 @@ export const messageStylePresets = {
     subtle: { color: "#888", bgColor: "#222", duration: 1800, font: "16px monospace" },
     big: { color: "#fff", bgColor: "#000", duration: 4000, font: "bold 32px monospace" }
 };
+
+// =============================================
+// ############ #if Condition Engine ###########
+// =============================================
+
+// Joins raw command args back into a single string and re-tokenizes it,
+// properly handling quoted strings (e.g. "john smith" becomes one token).
+function retokenizeIfArgs(args) {
+    const raw = args.join(' ');
+    const tokens = [];
+    let i = 0;
+    while (i < raw.length) {
+        if (raw[i] === ' ') { i++; continue; }
+        if (raw[i] === '"') {
+            // Quoted string — collect until closing quote, strip the quotes
+            let j = i + 1;
+            while (j < raw.length && raw[j] !== '"') j++;
+            tokens.push(raw.slice(i + 1, j));
+            i = j + 1;
+            continue;
+        }
+        // Regular token — collect until next space
+        let j = i;
+        while (j < raw.length && raw[j] !== ' ') j++;
+        tokens.push(raw.slice(i, j));
+        i = j;
+    }
+    return tokens;
+}
+
+// Resolves a single token to a concrete value.
+// Handles: $var, p.stat, rnd(n), rnd(n,m), numeric literals, plain strings.
+function resolveSingleValue(token, player, scriptGlobals) {
+    if (token === undefined || token === null) return '';
+    const s = String(token);
+
+    // $variable → scriptGlobals lookup
+    if (s.startsWith('$')) {
+        const val = scriptGlobals[s];
+        return val !== undefined ? val : '';
+    }
+
+    // p.stat → player stat lookup (checks player.stats first, then player directly)
+    if (s.startsWith('p.')) {
+        const statName = s.slice(2);
+        if (player.stats && player.stats[statName] !== undefined) return player.stats[statName];
+        if (player[statName] !== undefined) return player[statName];
+        return 0;
+    }
+
+    // rnd(n) → random integer 0..n   |   rnd(n,m) → random integer n..m
+    const rndMatch = s.match(/^rnd\((\d+)(?:,(\d+))?\)$/i);
+    if (rndMatch) {
+        const a = parseInt(rndMatch[1], 10);
+        const b = rndMatch[2] !== undefined ? parseInt(rndMatch[2], 10) : null;
+        return b === null
+            ? Math.floor(Math.random() * (a + 1))
+            : Math.floor(Math.random() * (b - a + 1)) + a;
+    }
+
+    // Numeric literal
+    if (s.trim() !== '' && !isNaN(s)) return Number(s);
+
+    // Plain string
+    return s;
+}
+
+// Evaluates a sequence of tokens as a left-to-right arithmetic / string expression.
+// Arithmetic operators: + - * /
+// Strings: + concatenates; other operators on strings produce a warning.
+function evalExpression(tokens, player, scriptGlobals) {
+    if (!tokens.length) return '';
+    const MATH_OPS = ['+', '-', '*', '/'];
+
+    let result = resolveSingleValue(tokens[0], player, scriptGlobals);
+
+    let i = 1;
+    while (i < tokens.length) {
+        const opToken = tokens[i];
+        if (!MATH_OPS.includes(opToken) || i + 1 >= tokens.length) {
+            // Not a recognised operator — treat remaining token as string concat
+            result = String(result) + String(resolveSingleValue(tokens[i], player, scriptGlobals));
+            i++;
+            continue;
+        }
+        const nextVal = resolveSingleValue(tokens[i + 1], player, scriptGlobals);
+        const lNum = Number(result);
+        const rNum = Number(nextVal);
+        if (!isNaN(lNum) && !isNaN(rNum)) {
+            switch (opToken) {
+                case '+': result = lNum + rNum; break;
+                case '-': result = lNum - rNum; break;
+                case '*': result = lNum * rNum; break;
+                case '/': result = rNum !== 0 ? lNum / rNum : 0; break;
+            }
+        } else {
+            // Non-numeric: only + (concat) makes sense
+            if (opToken === '+') {
+                result = String(result) + String(nextVal);
+            } else {
+                console.warn(`#if evalExpression: Cannot apply '${opToken}' to non-numeric values`);
+                result = String(result);
+            }
+        }
+        i += 2;
+    }
+    return result;
+}
+
+// Compares two resolved values with the given operator.
+// Prefers numeric comparison when both sides parse as numbers.
+function compareValues(lhs, rhs, op) {
+    const lNum = Number(lhs);
+    const rNum = Number(rhs);
+    const bothNumeric = !isNaN(lNum) && !isNaN(rNum)
+        && String(lhs).trim() !== '' && String(rhs).trim() !== '';
+    const a = bothNumeric ? lNum : String(lhs);
+    const b = bothNumeric ? rNum : String(rhs);
+    switch (op) {
+        case '=':  case '==': return a == b;
+        case '!=': case '<>': return a != b;
+        case '<':  return a < b;
+        case '>':  return a > b;
+        case '<=': return a <= b;
+        case '>=': return a >= b;
+        default: return false;
+    }
+}
+
+/**
+ * Evaluates a full #if condition from raw command args.
+ *
+ * Syntax:
+ *   #if <flag>                    then :label          ← flag truthy check (backwards-compatible)
+ *   #if $var                      then :label          ← variable truthy check
+ *   #if $num = 3                  then :label
+ *   #if $num + 5 >= 10            then :dosomething
+ *   #if $a + $b + $c = 20         then :explode
+ *   #if rnd(8) = 4                then :label          ← random 0–8
+ *   #if rnd(3,8) = 5              then :funlabel       ← random 3–8
+ *   #if p.ammo < 1                then :warning        ← player stat
+ *   #if $first + $last = "john smith" then #die        ← inline command action
+ *
+ * Returns { conditionMet: bool, action: { type, value?, name?, args? } } or null on error.
+ */
+export function evaluateIfCondition(args, player, scriptGlobals, scriptFlags) {
+    const tokens = retokenizeIfArgs(args);
+    const thenIdx = tokens.findIndex(t => t.toLowerCase() === 'then');
+
+    if (thenIdx === -1) {
+        console.warn("#if: missing 'then' keyword. Usage: #if <condition> then <:label|#command>");
+        return null;
+    }
+
+    const condTokens = tokens.slice(0, thenIdx);
+    const actionTokens = tokens.slice(thenIdx + 1);
+
+    if (!condTokens.length) { console.warn("#if: empty condition before 'then'."); return null; }
+    if (!actionTokens.length) { console.warn("#if: missing action after 'then'."); return null; }
+
+    // Parse action: :label  OR  #command [args...]
+    const actionStr = actionTokens[0];
+    let action;
+    if (actionStr.startsWith(':')) {
+        action = { type: 'label', value: actionStr };
+    } else if (actionStr.startsWith('#')) {
+        action = { type: 'command', name: actionStr.slice(1).toLowerCase(), args: actionTokens.slice(1) };
+    } else {
+        console.warn(`#if: action must start with ':' (label) or '#' (command), got: "${actionStr}"`);
+        return null;
+    }
+
+    // Find comparison operator — multi-char ops checked first to avoid partial matches
+    const COMPARE_OPS = ['<=', '>=', '<>', '!=', '==', '<', '>', '='];
+    let opIdx = -1;
+    let op = null;
+    for (const candidate of COMPARE_OPS) {
+        const idx = condTokens.indexOf(candidate);
+        if (idx !== -1) { opIdx = idx; op = candidate; break; }
+    }
+
+    let conditionMet;
+
+    if (opIdx === -1) {
+        // No comparison operator → single-value truthy check.
+        // Priority: $variable → p.stat → rnd() → flag
+        // This prevents a flag named e.g. "p.ammo" from shadowing the real stat.
+        const single = condTokens[0];
+        if (single && single.startsWith('$')) {
+            // $variable truthy check
+            const val = scriptGlobals[single];
+            conditionMet = val !== undefined && val !== '' && val !== '0' && val !== 'false';
+        } else if (single && single.startsWith('p.')) {
+            // Player stat truthy check: #if p.ammo then :label
+            const resolved = resolveSingleValue(single, player, scriptGlobals);
+            conditionMet = resolved !== 0 && resolved !== '' && resolved !== false && resolved !== '0';
+        } else if (single && /^rnd\(/i.test(single)) {
+            // rnd() truthy check (edge case: #if rnd(5) then :label — true when result !== 0)
+            const resolved = resolveSingleValue(single, player, scriptGlobals);
+            conditionMet = resolved !== 0;
+        } else {
+            // Plain flag lookup
+            const flagKey = (single || '').toLowerCase();
+            conditionMet = Object.prototype.hasOwnProperty.call(scriptFlags, flagKey) && !!scriptFlags[flagKey];
+        }
+    } else {
+        const lhs = evalExpression(condTokens.slice(0, opIdx), player, scriptGlobals);
+        const rhs = evalExpression(condTokens.slice(opIdx + 1), player, scriptGlobals);
+        conditionMet = compareValues(lhs, rhs, op);
+    }
+
+    return { conditionMet, action };
+}

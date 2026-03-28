@@ -458,83 +458,63 @@ document.addEventListener('DOMContentLoaded', () => {
     // PLACE SPRITE FUNCTIONS
     // ######################################
 
-    // Helper Function for Color Similarity
-    function isSimilarColor(color1, color2, tolerance = 0) {
-        if (!color1 || !color2) return false; // Prevent errors if one is empty
-        const [r1, g1, b1] = color1[0]; // Extract primary color (ignoring alpha)
-        const [r2, g2, b2] = color2[0];
-
-        return (
-            Math.abs(r1 - r2) < tolerance &&
-            Math.abs(g1 - g2) < tolerance &&
-            Math.abs(b1 - b2) < tolerance
-        );
-    }
-
-    // Flood fill algorithm
-    function floodFill(startX, startY, newSpriteData, useColorComparison = true) {
+    // Flood fill algorithm.
+    // Normal mode: fills all connected tiles that share the same sprite number as the starting tile
+    //   (null = empty tile, so starting on empty fills connected empty space).
+    // fillAllMatching mode (Shift): replaces every tile on the current layer that has the same
+    //   sprite number as the starting tile, regardless of connectivity.
+    // Never overwrites the player tile.
+    function floodFill(startX, startY, newSpriteData, fillAllMatching = false) {
         const startKey = `${currentLayer},${startX},${startY}`;
-        const startTile = placedSprites[startKey] || null; // Get starting tile or null if empty
+        const startTile = placedSprites[startKey] || null;
+        const startSprite = startTile ? startTile.sprite : null; // null means empty tile
 
-        // Store the starting color or sprite type
-        const startColor = startTile ? startTile.color : null;
-        const startSprite = startTile ? startTile.sprite : null;
+        // True if this tile should be replaced
+        function matches(key) {
+            const tile = placedSprites[key] || null;
+            if (tile && tile.type === 'player') return false; // never overwrite the player
+            const tileSprite = tile ? tile.sprite : null;
+            return tileSprite === startSprite;
+        }
 
-        // Stack for iterative flood fill
-        const stack = [[startX, startY]];
-        const visited = new Set();
-
-        while (stack.length > 0) {
-            const [x, y] = stack.pop();
-            const key = `${currentLayer},${x},${y}`;
-
-            // **Boundary Check**: Ensure x and y are within valid board range
-            if (x < 0 || y < 0 || x >= 36 || y >= 25) continue;
-
-            // Avoid re-processing the same tile
-            if (visited.has(key)) continue;
-            visited.add(key);
-
-            const currentTile = placedSprites[key] || null; // Get tile, or null if empty
-            const currentColor = currentTile ? currentTile.color : null;
-            const currentSprite = currentTile ? currentTile.sprite : null;
-
-            if (currentTile && currentTile.type === 'player') continue; // Skip player
-
-            // **Determine if the tile should be filled**
-            let shouldFill = false;
-            if (useColorComparison) {
-                shouldFill = !currentTile || isSimilarColor(startColor, currentColor);
-            } else {
-                shouldFill = !currentTile || currentSprite === startSprite;
-            }
-
-            if (!shouldFill) continue; // Skip if the tile doesn't match the criteria
-
-            // Fill the tile with the new sprite and color
-            const tilePayload = {
+        function buildPayload(key) {
+            const existing = placedSprites[key] || null;
+            return {
                 ...newSpriteData,
                 layer: currentLayer,
                 oldKey: key,
-                type: newSpriteData.type || (currentTile ? currentTile.type : "wall"),
+                type: newSpriteData.type || (existing ? existing.type : 'wall'),
             };
-            setTile(key, tilePayload);
+        }
 
-            // Add neighboring tiles to the stack
-            const neighbors = [
-                [x + 1, y], // Right
-                [x - 1, y], // Left
-                [x, y + 1], // Down
-                [x, y - 1], // Up
-            ];
-            for (const [nx, ny] of neighbors) {
-                const neighborKey = `${currentLayer},${nx},${ny}`;
-                if (!visited.has(neighborKey)) {
-                    stack.push([nx, ny]);
+        const eraseMode = newSpriteData.type === 'empty';
+
+        if (fillAllMatching) {
+            // Replace (or erase) every matching tile on this layer (non-contiguous global replace)
+            for (let x = 0; x < tilesX; x++) {
+                for (let y = 0; y < tilesY; y++) {
+                    const key = `${currentLayer},${x},${y}`;
+                    if (matches(key)) setTile(key, eraseMode ? null : buildPayload(key));
                 }
             }
+        } else {
+            // Standard iterative 4-directional flood fill
+            const stack = [[startX, startY]];
+            const visited = new Set();
+
+            while (stack.length > 0) {
+                const [x, y] = stack.pop();
+                if (x < 0 || y < 0 || x >= tilesX || y >= tilesY) continue;
+                const key = `${currentLayer},${x},${y}`;
+                if (visited.has(key)) continue;
+                visited.add(key);
+                if (!matches(key)) continue;
+
+                setTile(key, eraseMode ? null : buildPayload(key));
+                stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+            }
         }
-        // Redraw the board after flood fill
+
         drawBoard();
     }
 
@@ -774,7 +754,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 0: // Left mouse button
                 if (mouse.mode === 'draw') {
-                    if (placedSprites[tileKey]) {
+                    if (type === 'empty') {
+                        removeSprite(tileKey); // Eraser mode: always delete
+                    } else if (placedSprites[tileKey]) {
                         // Remove sprite if it exists (except player)
                         removeSprite(tileKey);
                     } else {
@@ -782,19 +764,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         placeSprite(tileKey, currentSprite, type); // Place sprite
                     }
                 } else if (mouse.mode === 'fill') {
-                    // Pressing SHIFT enables color-based filling
-                    const useColorComparison = key.shift;
+                    // Shift = fill ALL tiles on the layer with the same sprite (non-contiguous)
+                    const fillAllMatching = event.shiftKey;
 
                     // Perform Flood Fill
                     beginHistoryTransaction();
                     try {
                         floodFill(cursorX, cursorY, {
                             sprite: currentSprite,
-                            //image: getSpriteImage(),
                             color: colors,
                             type: type,
                             data: getObjectData()
-                        }, useColorComparison);
+                        }, fillAllMatching);
                         commitHistoryTransaction();
                     } catch (err) {
                         console.error('Flood fill failed:', err);
@@ -1450,6 +1431,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 type = 'invisible'; // Set type to invisible tile
                 placeSprite(tileKey, currentSprite, 'invisible'); // Place sprite
                 closePopup();
+            },
+            e: (tileKey) => {
+                type = 'empty'; // Set type to empty (eraser)
+                closePopup();
             }
         },
         extraCreatures: {
@@ -1594,13 +1579,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case ' ':
                         if (mouse.mode === 'draw') {
-                            if (placedSprites[tileKey]) {
+                            if (placedSprites[tileKey] || type === 'empty') {
                                 removeSprite(tileKey);
                             } else {
                                 placeSprite(tileKey, currentSprite, type); // Place sprite
                             }
                         }
                         else if (mouse.mode === 'darken') {
+                            if (type === 'empty') break; // Don't darken if no tile type is selected
                             if (placedSprites[tileKey]) {
                                 const updatedTile = deepCopyTile(placedSprites[tileKey]);
                                 const factor = -colorIntensity / 100;
@@ -1611,6 +1597,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 setTile(tileKey, updatedTile);
                             }
                         } else if (mouse.mode === 'lighten') {
+                            if (type === 'empty') break; // Don't lighten if no tile type is selected
                             if (placedSprites[tileKey]) {
                                 const updatedTile = deepCopyTile(placedSprites[tileKey]);
                                 const factor = colorIntensity / 100;
@@ -1620,6 +1607,25 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ];
                                 setTile(tileKey, updatedTile);
                             }
+                        } else if (mouse.mode === 'fill') {
+                            // Shift = fill ALL tiles on the layer with the same sprite (non-contiguous)
+                            const fillAllMatching = event.shiftKey;
+
+                            // Perform Flood Fill
+                            beginHistoryTransaction();
+                            try {
+                                floodFill(cursorX, cursorY, {
+                                    sprite: currentSprite,
+                                    color: colors,
+                                    type: type,
+                                    data: getObjectData()
+                                }, fillAllMatching);
+                                commitHistoryTransaction();
+                            } catch (err) {
+                                console.error('Flood fill failed:', err);
+                                cancelHistoryTransaction();
+                            }
+                            mouse.mode = 'draw'; // Switch back to draw mode after filling
                         }
                         event.preventDefault();
                         break;
@@ -1700,6 +1706,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }
                             }
                             showStatusMessage('All sprites in layer ' + currentLayer + ' deleted');
+                            drawBoard();
+                        }
+                        break;
+                    case 'backspace': // delete sprite on cursor and set type to 'empty'
+                        if (placedSprites[tileKey]) {
+                            removeSprite(tileKey);
+                            type = 'empty';
+                            showStatusMessage('Sprite removed');
                             drawBoard();
                         }
                         break;
@@ -2016,9 +2030,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mouse.mode === 'paint') {
             const tileKey = `${currentLayer},${cursorX},${cursorY}`;
 
-            // Skip placing the player sprite
+            // Skip the player tile regardless
             if (!(placedSprites[tileKey] && placedSprites[tileKey].type === 'player')) {
-                placeSprite(tileKey, currentSprite, type); // Place the sprite
+                if (type === 'empty') {
+                    removeSprite(tileKey); // Eraser mode: delete tile
+                } else {
+                    placeSprite(tileKey, currentSprite, type);
+                }
             }
         }
 
