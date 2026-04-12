@@ -10,6 +10,9 @@ A ZZT-inspired, tile-based game maker and player built with vanilla JavaScript a
 ![low tolerance editor](https://github.com/ArtofLimitations/LowToleranceZoo/blob/new-main/Screenshot%202026-04-11%20214350.png)
 ---
 
+[Try Editor Demo](https://lowtolerance.app/) -
+[Player Demo Here](https://lowtolerance.app/player.html)
+
 ## Features
 
 - Tile-based world editor with multi-layer support (floor, default, ceiling)
