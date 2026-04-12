@@ -6,8 +6,8 @@ A ZZT-inspired, tile-based game maker and player built with vanilla JavaScript a
 
 ## Screenshot
 
-> 📸 *Screenshot coming soon.*
-
+> 📸 
+![low tolerance editor](https://github.com/ArtofLimitations/LowToleranceZoo/blob/new-main/Screenshot%202026-04-11%20214350.png)
 ---
 
 ## Features
