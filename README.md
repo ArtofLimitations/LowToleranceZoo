@@ -1,6 +1,6 @@
 # Low Tolerance Zoo
 
-A ZZT-inspired, tile-based game maker and player built with vanilla JavaScript and HTML5 Canvas.
+A ZZT or MegaZeux-inspired, tile-based game maker and player built with vanilla JavaScript and HTML5 Canvas. A built in sprite editor that creates reusable sprites with a light and dark color inspired by text-mode (codepage 437) graphics. A modern reinterpretation.
 
 ---
 
