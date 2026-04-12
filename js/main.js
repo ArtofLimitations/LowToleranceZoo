@@ -940,7 +940,10 @@ document.addEventListener('DOMContentLoaded', () => {
             redoAction();
             return;
         }
-        if (options.layer !== undefined) currentLayer = options.layer;
+        if (options.layer !== undefined) {
+            currentLayer = options.layer;
+            showStatusMessage(`Current layer ${currentLayer}`);
+        }
         if (options.hidden !== undefined) hiddenLayers = options.hidden;
         if (options.type !== undefined) type = options.type;
         if (options.mode !== undefined) mouse.mode = options.mode;
@@ -1237,6 +1240,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!onlySelect) {
                     currentBoard = item[0]; // Set the selected board
                     console.log('Selected Board: ', currentBoard);
+                    showStatusMessage(`Selected Board: ${item[1]} (ID: ${item[0]})`); // Show status message with board name and ID
                     placedSprites = world[currentBoard]; // Get the selected board from the world object
                     findPlayerSprite(); // Find the player sprite on the selected board
                     drawBoard();
