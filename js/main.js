@@ -115,6 +115,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return worldSaveData.boardSettings[boardId];
     }
+
+    function getCurrentBoardSettings() {
+        return initializeBoardSettings(currentBoard);
+    }
+
+    function getLayerOpacity(layer) {
+        const settings = getCurrentBoardSettings();
+        const key = `layer${layer}Opacity`;
+        const value = settings?.[key];
+        if (typeof value !== 'number') return 1;
+        return Math.max(0, Math.min(1, value));
+    }
+
     let key = { ctrl: false, shift: false, alt: false, lastClick: 0, clickDelay: 100 };   // keyboard status object. click delay in ms
     let mouse = {
         x: cursorX, y: cursorY, oldX: cursorX, oldY: cursorY, down: false,
@@ -265,13 +278,18 @@ document.addEventListener('DOMContentLoaded', () => {
             // Skip the layer if it is in the hiddenLayers set
             if (hiddenLayers.has(l)) continue;
 
+            const layerOpacity = getLayerOpacity(l);
+            if (layerOpacity <= 0) continue;
+
             if (x < tilesX && y < tilesY) {
                 const spriteInfo = placedSprites[`${l},${x},${y}`];
                 //drawSprite(x, y, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color); // draw sprite from sprite.js with array data
                 if (spriteInfo) {
+                    ctx.save();
+                    ctx.globalAlpha = layerOpacity;
                     if (spriteInfo.type === 'passage') {
                         ctx.save()
-                        ctx.globalAlpha = 0.5
+                        ctx.globalAlpha = layerOpacity * 0.5
                         ctx.fillStyle = rgba(colors[0]); // Set color for the passage
                         ctx.fillRect(x * tileSizeX, y * tileSizeY, tileSizeX, tileSizeY); // Draw the passage area
                         ctx.fillStyle = rgba(colors[1]); // Set color for the passage
@@ -286,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         drawSprite(x, y, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
                     }
+                    ctx.restore();
                 }
             }
         }
@@ -301,15 +320,20 @@ document.addEventListener('DOMContentLoaded', () => {
             // Skip hidden layers
             if (hiddenLayers.has(l)) continue;
 
+            const layerOpacity = getLayerOpacity(l);
+            if (layerOpacity <= 0) continue;
+
             // If x and y are provided, only draw the sprite(s) at (x, y)
             if (x !== null && y !== null && (sx !== x || sy !== y)) continue;
 
             const spriteInfo = placedSprites[`${l},${sx},${sy}`];
             if (spriteInfo) {
+                ctx.save();
+                ctx.globalAlpha = layerOpacity;
                 switch (spriteInfo.type) {
                     case 'passage':
                         ctx.save()
-                        ctx.globalAlpha = 0.5
+                        ctx.globalAlpha = layerOpacity * 0.5
                         ctx.fillStyle = rgba(spriteInfo.color[0]); // Set color for the passage
                         ctx.fillRect(sx * tileSizeX, sy * tileSizeY, tileSizeX, tileSizeY); // Draw the passage area
                         ctx.fillStyle = rgba(spriteInfo.color[1]); // Set color for the passage
@@ -325,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'invisible':
                         ctx.save()
-                        ctx.globalAlpha = 0.7;
+                        ctx.globalAlpha = layerOpacity * 0.7;
                         ctx.globalCompositeOperation = 'exclusion'; // Set composite mode to source-over
                         ctx.fillStyle = 'rgb(255, 0, 55)'; // Set color of invisible tile
                         ctx.fillRect(sx * tileSizeX, sy * tileSizeY, tileSizeX, tileSizeY);
@@ -340,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     default:
                         drawSprite(sx, sy, tileSizeX, tileSizeY, spriteInfo.sprite, spriteInfo.color);
                 }
+                ctx.restore();
             }
         }
     }
@@ -950,6 +975,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (options.current !== undefined) {
             currentSprite = options.current;
             updateSpriteData(currentSprite);
+        }
+        if (options.layerOpacity3 !== undefined) {
+            const settings = getCurrentBoardSettings();
+            settings.layer3Opacity = options.layerOpacity3;
         }
 
         console.log('current layer: ', currentLayer);
