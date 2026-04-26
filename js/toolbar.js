@@ -188,8 +188,12 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
     }
   });
 
-  layerOpacity.onchange = () => {
-    console.log('opacity:', layerOpacity.value * 5);
+  if (layerOpacity) {
+    layerOpacity.oninput = () => {
+      const opacity = Number(layerOpacity.value) / 20;
+      console.log('opacity:', opacity);
+      callbackFunction({ layerOpacity3: opacity });
+    }
   }
 
   spriteType.innerText = currentType || 'wall';

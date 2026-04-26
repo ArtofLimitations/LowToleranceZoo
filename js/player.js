@@ -250,7 +250,10 @@ function renderLayersToMainCanvas() {
         }
 
         if (layerCanvases[layer]) {
+            ctx.save();
+            ctx.globalAlpha = boardData[currentBoard]?.[`layer${layer}Opacity`] ?? 1; // Apply layer opacity if set
             ctx.drawImage(layerCanvases[layer], 0, 0);
+            ctx.restore();
         } else {
             console.warn(`Layer ${layer} is missing!`); // Debugging
         }
@@ -2304,6 +2307,9 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
         };
     }
 
+    // if there is any board data for layer opacity:
+    console.log('layer opacity settings (board 2):', boardData[2]?.layer3Opacity);
+    console.log('all board opacity settings:', Object.fromEntries(Object.entries(boardData).map(([k, v]) => [k, { layer1Opacity: v.layer1Opacity, layer2Opacity: v.layer2Opacity, layer3Opacity: v.layer3Opacity }])));
     console.log('Loaded world settings:', worldData);
     console.log('Loaded world objects:', worldObjects);
     console.log('Loaded board settings:', savedBoardSettings);

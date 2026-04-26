@@ -1,14 +1,17 @@
 # Low Tolerance Zoo
 
-A ZZT-inspired, tile-based game maker and player built with vanilla JavaScript and HTML5 Canvas.
+A ZZT or MegaZeux-inspired, tile-based game maker and player built with vanilla JavaScript and HTML5 Canvas. A built in sprite editor that creates reusable sprites with a light and dark color inspired by text-mode (codepage 437) graphics. A modern reinterpretation.
 
 ---
 
 ## Screenshot
 
-> 📸 *Screenshot coming soon.*
-
+> 📸 
+![low tolerance editor](https://github.com/ArtofLimitations/LowToleranceZoo/blob/new-main/Screenshot%202026-04-11%20214350.png)
 ---
+
+[Try Editor Demo](https://lowtolerance.app/) -
+[Player Demo Here](https://lowtolerance.app/player.html)
 
 ## Features
 
@@ -61,9 +64,19 @@ npm run start-player
 | `C` | Open Color Palette |
 | Arrow keys | Move cursor |
 | Left click | Place tile |
-| Right click | Erase tile |
+| Right click | Grab tile |
+| `Ctrl-Right` Click | Grab Tile Color |
 | `Ctrl+Z` | Undo |
-| `Ctrl+S` | Save world |
+| `Ctrl+R` | Redo
+| `Ctrl+S` | Save Board with Spritesheet |
+| `F1` | Save World |
+| `F3` | Load World |
+| `D` | Draw Mode |
+| `F` | Fill Mode |
+| `Tab` | Paint Mode |
+| `/` | Lighten Mode |
+| `*` | Darken Mode |
+| `O` | Place Object |
 
 Tile types that can be placed: `wall`, `object`, `sign`, `passage`, `item`, `coin`, `ammo`, `invisible`
 
@@ -107,8 +120,10 @@ These labels are triggered automatically by the engine:
 |-------|-------------------|
 | `:touch` | The player walks into the object |
 | `:thud` | The object bumps into a wall or blocked tile |
-| `:shoot` | The object is hit by a bullet |
+| `:shot` | The object is hit by a bullet |
 | `:click` | The player clicks the object |
+| `:bump` | The object bumps into the player |
+| `:collect` | Like :touch but executes following code in one tick |
 
 ---
 
@@ -254,6 +269,14 @@ Direction values and modifiers (`seek`, `flow`, `opp`) work the same as movement
 | `#dialog default` | Reset dialog style to default |
 
 **Message style presets:** `alert`, `info`, `warning`, `success`, `error`, `tip`, `subtle`, `big`, `centered`
+
+```
+@MyObjectName
+
+:touch
+Hello there! I Have a lot to say! <page> Which is why I will paginate this text!
+#end
+```
 
 ---
 
