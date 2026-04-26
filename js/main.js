@@ -852,6 +852,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseMove(event) {
+        canvas.style.cursor = 'default'; // reset cursor to default on every move. specific tool cursors will be set in drawCursor function
+
         // detect possible changes in mouse position
         if (mouse.down) {
             const rect = canvas.getBoundingClientRect();
@@ -1565,6 +1567,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!popup.active) { // use different key events for popups like the board selector
+
+            canvas.style.cursor = 'none'; // Hide the default cursor when using keyboard controls
 
             if (!event.ctrlKey && !event.metaKey) {
                 switch (event.key) {
