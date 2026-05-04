@@ -13,6 +13,9 @@ A ZZT or MegaZeux-inspired, tile-based game maker and player built with vanilla 
 [Try Editor Demo](https://lowtolerance.app/) -
 [Player Demo Here](https://lowtolerance.app/player.html)
 
+<a href="https://discord.gg/rcgEt8jY"><img src="https://github.com/ArtofLimitations/LowToleranceZoo/blob/e2f9bd4095b6a3e696786a6ea104764fd8d049e5/discord-logo-1.svg" align="left" height="24"></a>  <br><br>
+
+
 ## Features
 
 - Tile-based world editor with multi-layer support (floor, default, ceiling)
