@@ -93,9 +93,9 @@
                 <div class="fieldRow"><span class="valueBox valueText" id="spriteType"></span><span
                         class="fieldText">Current <br>Type </span></div>
                 <!-- Other types (menu) -->
-                <div class="fieldRow"><span class="fieldCategory" id="terrainButton">Terrain</span></div>
-                <div class="fieldRow"><span class="fieldCategory" id="itemButton">Item</span></div>
-                <div class="fieldRow"><span class="fieldCategory" id="creatureButton">Creatures</span></div>
+                <div class="fieldRow"><span class="fieldCategory" id="terrainButton">Terrain</span><span class="fieldCategory alternate" id="worldInfoButton">World Info</span></div>
+                <div class="fieldRow"><span class="fieldCategory" id="itemButton">Item</span><span class="fieldCategory alternate" id="boardInfoButton">Board Info</span></div>
+                <div class="fieldRow"><span class="fieldCategory" id="creatureButton">Creatures</span><span class="fieldCategory alternate" id="audioButton">Audio</span></div>
                 <div class="fieldRow">
                     <span class="valueBox valueText" id="editMode">Draw</span>
                     <span class="fieldText">Edit<br> Mode</span>
@@ -188,6 +188,7 @@
                 </div>
             </div>
         </div>
+        
         <div class="boardInfoBox" id="boardInfoBox">
             <p><strong>Board Information</strong></p>
             <div class="boardInfoContent" id="boardInfoContent">
@@ -255,7 +256,34 @@
                 </div>
             </div>
         </div>
-        <!--Pop-up elements-->
+
+        <div class="audioImporterBox" id="audioImporterBox">
+            <p><strong>Audio Importer</strong></p>
+            <div class="audioImportContent" id="audioImportContent">
+                <div class="audio-import-row">
+                    <label for="audioCategorySelect">Category</label>
+                    <select class="audio-input-field" id="audioCategorySelect">
+                        <option value="sfx">SFX</option>
+                        <option value="music">Music</option>
+                    </select>
+                </div>
+                <div class="audio-import-row">
+                    <label for="audioFileInput">Audio file (.ogg, .mp3, .wav)</label>
+                    <input class="audio-input-field" type="file" id="audioFileInput" accept=".ogg,.mp3,.wav,audio/*" />
+                </div>
+                <div class="audio-import-row">
+                    <label for="audioNameInput">Save as name <span class="audio-hint">(leave blank to use filename)</span></label>
+                    <input class="audio-input-field" type="text" id="audioNameInput" placeholder="e.g. coin.ogg" autocomplete="off" />
+                </div>
+                <button class="material-symbols-outlined audio-import-submit" id="importAudioButton" title="Import">file_upload</button>
+                <div class="audio-import-row audio-list-section">
+                    <label>Imported audio</label>
+                    <ul id="audioImportList" class="audio-import-list"></ul>
+                </div>
+            </div>
+            <button class="material-symbols-outlined audio-close-btn" id="audioImporterClose" title="Close (Esc)">close</button>
+        </div>
+        
         <div class="selectAmount" id="selectAmount"></div>
         <div class="boardSelect" id="boardSelect">
             <p><strong>Select Board</strong></p>

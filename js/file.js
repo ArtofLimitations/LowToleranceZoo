@@ -1,5 +1,6 @@
 import { getSpriteSheet, replaceSpriteSheet, rebuildSpriteSheet } from './sprite-sheet.js';
 import { convertToImageData } from './sprite.js';
+import { packLtz, openLtzDialog, downloadBytes, getAudioStore, clearAudioStore } from './ltz.js';
 const canvas = document.getElementById('lowToleranceCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -72,6 +73,68 @@ export function saveWorld(spritesheet, boardList, world, worldSettings = {}, boa
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// ################ LTZ Save / Load
+
+export async function saveLtz(spritesheet, boardList, world, worldSettings = {}, boardSettings = {}, filename = 'world') {
+    const worldData = {
+        spritesheet: spritesheet.map(element => element[0]),
+        boards: boardList,
+        world: world,
+        worldSettings: worldSettings,
+        boardSettings: boardSettings
+    };
+    const bytes = packLtz(worldData, filename);
+    const suggestedName = (worldSettings.filename || filename || 'world').replace(/\.ltz$/i, '') + '.ltz';
+
+    // Use the File System Access API when available (Chrome/Edge)
+    // This opens a real OS Save dialog with the filename pre-filled.
+    if (window.showSaveFilePicker) {
+        try {
+            const fileHandle = await window.showSaveFilePicker({
+                suggestedName,
+                types: [{
+                    description: 'Low Tolerance Zoo project',
+                    accept: { 'application/octet-stream': ['.ltz'] }
+                }]
+            });
+            const writable = await fileHandle.createWritable();
+            await writable.write(bytes);
+            await writable.close();
+            console.log(`Saved: ${fileHandle.name}`);
+        } catch (err) {
+            // User cancelled the dialog — not an error
+            if (err.name !== 'AbortError') {
+                console.error('Save failed:', err);
+                alert('Save failed: ' + err.message);
+            }
+        }
+    } else {
+        // Fallback for Firefox: trigger a download with the suggested name
+        downloadBytes(bytes, suggestedName);
+    }
+}
+
+export function loadLtz(callback) {
+    openLtzDialog()
+        .then(({ worldData, isLegacy }) => {
+            if (isLegacy) {
+                console.log('Loaded legacy .json world file — save as .ltz with F1 to convert.');
+            }
+            let spritesheet = rebuildSpriteSheet(worldData.spritesheet);
+            const boardList     = worldData.boards         || {};
+            const world         = worldData.world          || {};
+            const worldSettings = worldData.worldSettings  || {};
+            const boardSettings = worldData.boardSettings  || {};
+            if (typeof callback === 'function') {
+                callback(spritesheet, boardList, world, worldSettings, boardSettings);
+            }
+        })
+        .catch(err => {
+            console.error('Error loading file:', err);
+            alert('Could not load file: ' + err.message);
+        });
 }
 
 // ################ Load Functions

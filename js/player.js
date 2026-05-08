@@ -1,4 +1,4 @@
-import { loadCombinedData, loadWorld } from './file.js';
+import { loadCombinedData, loadWorld, loadLtz } from './file.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets, weaponDefinitions } from './weapons.js';
@@ -2457,6 +2457,7 @@ function findPlayerSprite() {
 let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10",  F12: "F12" };
 
 document.addEventListener("keydown", (event) => {
+    canvas.style.cursor = 'none'; // Hide the default cursor when using keyboard controls
     keys[event.key] = true;
 
     // Shift-first aim/shoot: hold Shift, press arrow to shoot without moving
@@ -2507,7 +2508,7 @@ document.addEventListener("keydown", (event) => {
     }
     //console.log(event.key, event.code); // Debugging
     if (event.key === 'F3') { // loading whole worlds
-        loadWorld(handleLoadedGame);
+        loadLtz(handleLoadedGame);
     }
 
     // Block all other keys if not loaded
@@ -2603,6 +2604,10 @@ function updateDirection() {
         player.direction = 'right';
     }
 }
+
+document.addEventListener('mousemove', (event) => {
+    canvas.style.cursor = 'default'; // Show default cursor when mouse is moved (indicating interactivity)
+});
 
 // Start the animation
 //requestAnimationFrame(animateGame);

@@ -466,7 +466,13 @@ h3 {
   width: 100px;
   background-color: #2e4675;
   line-height: 2;
-  padding-left: 8px;
+  padding: 0 8px;
+  margin-right: 8px;
+}
+
+.lowToleranceToolbar .fieldCategory.alternate {
+  background-color: #fff;
+  color: #131313;
 }
 
 .lowToleranceToolbar .fieldCategory:hover {
@@ -721,13 +727,155 @@ h3 {
   height: 38px;
   line-height: 1.2;
   padding: 8px;
-  width: 
+  /* width: */
 }
 
 .boardInfoBox textarea {
   min-height: 120px;
   resize: vertical;
 }
+
+/* ── Audio Importer Popup ───────────────────────────────── */
+.audioImporterBox {
+  display: none;
+  flex-direction: column;
+  align-items: flex-start;
+  box-sizing: content-box;
+  position: absolute;
+  top: 0;
+  left: 219px;
+  width: 420px;
+  max-height: 70vh;
+  background-color: #222;
+  padding: 48px 56px;
+  box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  z-index: 6;
+  overflow: hidden;
+}
+
+.audioImporterBox p {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #fff;
+  align-self: center;
+}
+
+.audioImportContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.audio-import-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.audio-import-row label {
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+.audio-hint {
+  font-size: 11px;
+  color: #888;
+}
+
+.audio-input-field {
+  padding: 6px 8px;
+  font-family: 'Fira Code', monospace;
+  font-size: 14px;
+  color: #222;
+  background: #f0f0f0;
+  border: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.audio-import-submit {
+  align-self: flex-start;
+  margin-bottom: 12px;
+}
+
+.audio-list-section {
+  margin-top: 4px;
+}
+
+.audio-import-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.audio-import-empty {
+  font-size: 13px;
+  color: #888;
+  padding: 4px 0;
+}
+
+.audio-import-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #333;
+  font-size: 13px;
+}
+
+.audio-import-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c8e6ff;
+}
+
+.audio-import-size {
+  color: #888;
+  min-width: 50px;
+  text-align: right;
+  font-size: 12px;
+}
+
+.audio-remove-btn {
+  font-size: 16px !important;
+  padding: 2px 4px;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  color: #e55;
+  cursor: pointer;
+}
+
+.audio-remove-btn:hover {
+  color: #ff8888;
+}
+
+.audio-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.audio-close-btn:hover {
+  color: #fff;
+}
+/* ── End Audio Importer ─────────────────────────────────── */
 
 .paletteContainer {
   display: none;

@@ -3,7 +3,8 @@ import { drawSprite, createDataURL, adjustColor } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor, toolbarSwapColor } from './palette.js';
-import { saveCombinedData, loadCombinedData, saveWorld, loadWorld, loadSpriteSheetDialog } from './file.js';
+import { saveCombinedData, loadCombinedData, saveWorld, loadWorld, saveLtz, loadLtz, loadSpriteSheetDialog } from './file.js';
+import { addAudioToStore, removeAudioFromStore, getAudioStore } from './ltz.js';
 import { editObject, getObjectData } from './object-editor.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -55,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // World-level settings and scripts
         worldSettings: {
+            filename: 'world',           // Default save filename (no extension)
             playerStyles: {
                 sprite: 1,
                 color: [[0, 0, 255, .5], [255, 255, 255, 1]]
@@ -877,7 +879,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseMove(event) {
-        canvas.style.cursor = 'default'; // reset cursor to default on every move. specific tool cursors will be set in drawCursor function
 
         // detect possible changes in mouse position
         if (mouse.down) {
@@ -1013,6 +1014,114 @@ document.addEventListener('DOMContentLoaded', () => {
     // ######################################
     // POPUP FUNCTIONS 
     // ######################################
+
+    function audioImporter() { // Show the audio importer popup
+        if (popup.active) closePopup();
+
+        const container = document.getElementById('audioImporterBox');
+        if (!container) { console.warn('audioImporterBox not found'); return; }
+
+        // Render the current audio list
+        function renderAudioList() {
+            const list = document.getElementById('audioImportList');
+            if (!list) return;
+            list.innerHTML = '';
+            const store = getAudioStore();
+            const keys  = Object.keys(store);
+            if (keys.length === 0) {
+                const empty = document.createElement('li');
+                empty.className = 'audio-import-empty';
+                empty.textContent = 'No audio imported yet.';
+                list.appendChild(empty);
+                return;
+            }
+            keys.forEach(key => {
+                // key = 'audio/sfx/coin.ogg'
+                const parts = key.split('/');
+                const cat  = parts[1];               // 'sfx' or 'music'
+                const name = parts.slice(2).join('/');
+                const li = document.createElement('li');
+                li.className = 'audio-import-item';
+
+                const label = document.createElement('span');
+                label.className = 'audio-import-name';
+                label.textContent = `[${cat}] ${name}`;
+
+                const sizeLabel = document.createElement('span');
+                sizeLabel.className = 'audio-import-size';
+                const kb = (store[key].byteLength / 1024).toFixed(1);
+                sizeLabel.textContent = `${kb} KB`;
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'material-symbols-outlined audio-remove-btn';
+                removeBtn.title = 'Remove';
+                removeBtn.textContent = 'delete';
+                removeBtn.onclick = () => {
+                    removeAudioFromStore(key);
+                    renderAudioList();
+                };
+
+                li.appendChild(label);
+                li.appendChild(sizeLabel);
+                li.appendChild(removeBtn);
+                list.appendChild(li);
+            });
+        }
+
+        renderAudioList();
+
+        // Wire up the import button
+        const importBtn  = document.getElementById('importAudioButton');
+        const fileInput  = document.getElementById('audioFileInput');
+        const nameInput  = document.getElementById('audioNameInput');
+        const categorySelect = document.getElementById('audioCategorySelect');
+
+        // Remove old listeners by replacing the button
+        const freshBtn = importBtn.cloneNode(true);
+        importBtn.parentNode.replaceChild(freshBtn, importBtn);
+        freshBtn.textContent = 'file_upload';
+
+        freshBtn.onclick = () => {
+            const file = fileInput.files[0];
+            if (!file) { alert('Please select an audio file first.'); return; }
+            const category = categorySelect ? categorySelect.value : 'sfx';
+            const rawName  = nameInput.value.trim() || file.name;
+            // Normalise: keep only the filename, strip path
+            const safeName = rawName.replace(/[\\/:*?"<>|]/g, '_');
+
+            file.arrayBuffer().then(buffer => {
+                addAudioToStore(category, safeName, new Uint8Array(buffer));
+                fileInput.value  = '';
+                nameInput.value  = '';
+                renderAudioList();
+                showStatusMessage(`Audio imported: ${safeName}`);
+            });
+        };
+
+        // Close on Escape
+        const handleClose = (event) => {
+            if (!popup.active || popup.type !== 'audioImporterBox') {
+                document.removeEventListener('keydown', handleClose);
+                return;
+            }
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closePopup();
+                document.removeEventListener('keydown', handleClose);
+            }
+        };
+        document.addEventListener('keydown', handleClose);
+
+        // Wire close button
+        const closeBtn = document.getElementById('audioImporterClose');
+        if (closeBtn) closeBtn.onclick = () => closePopup();
+
+        popup.active = true;
+        popup.type   = 'audioImporterBox';
+        overlay.style.display = 'block';
+        container.style.display = 'flex';
+    }
+
 
     function boardInfo() { // Show the board info popup
         if (popup.active) closePopup();
@@ -1597,8 +1706,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!popup.active) { // use different key events for popups like the board selector
 
-            canvas.style.cursor = 'none'; // Hide the default cursor when using keyboard controls
-
             if (!event.ctrlKey && !event.metaKey) {
                 switch (event.key) {
 
@@ -1755,11 +1862,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         break;
                     case 'F1': //save world
-                        saveWorld(getSpriteSheet(), boardList, world, worldSaveData.worldSettings, worldSaveData.boardSettings); // save world from file.js
+                        saveLtz(getSpriteSheet(), boardList, world, worldSaveData.worldSettings, worldSaveData.boardSettings, worldSaveData.worldSettings.filename || 'world'); // save as .ltz
                         if (event.repeat) { return }
                         break;
                     case 'F3': //load world
-                        loadWorld(handleLoadedWorld); // load world from file.js
+                        loadLtz(handleLoadedWorld); // load .ltz file
                         if (event.repeat) { return }
                         break;
                     case 'F9': // extra terrain tiles
@@ -2000,6 +2107,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'l': // load sprite sheet only
                         loadSpriteSheet(handleLoadedSpriteSheet); // UPDATE
                         showStatusMessage('Sprite sheet loaded');
+                        if (event.repeat) { return }
+                        break;
+                    case 'm': // open audio importer popup
+                        audioImporter();
                         if (event.repeat) { return }
                         break;
                     case 'r': // reset current layer

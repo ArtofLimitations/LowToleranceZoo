@@ -78,7 +78,7 @@ npm run start-player
 | `*` | Darken Mode |
 | `O` | Place Object |
 
-Tile types that can be placed: `wall`, `object`, `sign`, `passage`, `item`, `coin`, `ammo`, `invisible`
+Tile types that can be placed: `wall`, `object`, `sign`, `passage`, `coin`, `ammo`, `invisible` Wall, `break`able, `empty`, `push`, `step`, more to come
 
 Layers: **1** = Floor, **2** = Default, **3** = Ceiling
 
