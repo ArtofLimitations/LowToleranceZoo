@@ -3,8 +3,14 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets, weaponDefinitions } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, RESERVED_FLAG_WORDS } from './object-functions.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, resolveNumericArg, RESERVED_FLAG_WORDS } from './object-functions.js';
+import { getAudioStore } from './ltz.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
+
+// Audio
+const _audioCtx = new AudioContext();
+const _audioBufferCache = {};
+let _currentMusicSource = null;
 
 // Canvas Configurations
 const displayWidth = 1154;
@@ -532,18 +538,24 @@ function executeObjectCommand(obj, command) {
 
                 // Status Messages go here
 
-                case "wait":
-                    obj.waitTime = Number(command.args[0]) * 50 || 50;
+                case "wait": {
+                    const waitAmount = resolveNumericArg(command.args[0]);
+                    obj.waitTime = (Number(waitAmount) * 50) || 50;
                     obj.waiting = true;
                     break;
+                }
                 case 'idle':
-                case "sleep":
-                    obj.waitTime = Number(command.args[0]) * 1000 || 1000;
+                case "sleep": {
+                    const sleepAmount = resolveNumericArg(command.args[0]);
+                    obj.waitTime = (Number(sleepAmount) * 1000) || 1000;
                     obj.waiting = true;
                     break;
-                case "cycle":
-                    obj.moveInterval = (Number(command.args[0]) || 1) * (1000 / fps); // n ticks
+                }
+                case "cycle": {
+                    const cycleCount = resolveNumericArg(command.args[0]);
+                    obj.moveInterval = ((Number(cycleCount) || 1) * (1000 / fps)); // n ticks
                     break;
+                }
                 case "end":
                     obj.resting = true;
                     break;
@@ -624,10 +636,10 @@ function executeObjectCommand(obj, command) {
                     }
 
                     if (args.length === 1 && args[0].includes(',')) {
-                        [targetX, targetY] = args[0].split(',').map(s => parseInt(s.trim(), 10));
+                        [targetX, targetY] = args[0].split(',').map(s => resolveNumericArg(s.trim()));
                     } else if (args.length >= 2) {
-                        targetX = parseInt(args[0].replace(',', ''), 10);
-                        targetY = parseInt(args[1].replace(',', ''), 10);
+                        targetX = resolveNumericArg(args[0].replace(',', '').trim());
+                        targetY = resolveNumericArg(args[1].replace(',', '').trim());
                     }
                     if (
                         isNaN(targetX) || isNaN(targetY) ||
@@ -665,11 +677,11 @@ function executeObjectCommand(obj, command) {
                     break;
                 }
                 case "change": {
-                    if (!command.args[0] || isNaN(parseInt(command.args[0], 10))) {
+                    const spriteNumber = resolveNumericArg(command.args[0]);
+                    if (isNaN(spriteNumber)) {
                         console.warn(`#change: Missing or invalid sprite number: ${command.args[0]}`);
                         break;
                     }
-                    let spriteNumber = parseInt(command.args[0], 10);
 
                     // Check for enough arguments for colors
                     if (!command.args[1]) {
@@ -728,12 +740,12 @@ function executeObjectCommand(obj, command) {
                 case "changesprite":
                 case "changeSprite":
                 case "sprite": {
-                    if (!command.args[0] || isNaN(command.args[0])) {
+                    const spriteNum = resolveNumericArg(command.args[0]);
+                    if (isNaN(spriteNum)) {
                         console.warn("#changesprite: No sprite provided or NaN");
                         break;
                     }
                     let spriteKey = `${obj.layer},${obj.x},${obj.y}`;
-                    let spriteNum = parseInt(command.args[0], 10);
                     if (placedSprites[spriteKey]) {
                         placedSprites[spriteKey].sprite = spriteNum;
                     }
@@ -746,7 +758,7 @@ function executeObjectCommand(obj, command) {
                 }
                 case "give": {
                     let item = command.args[0];
-                    let amount = parseInt(command.args[1], 10);
+                    let amount = resolveNumericArg(command.args[1]);
                     if (isNaN(amount)) amount = 1; // Default to 1 if not specified
                     adjustStat(player, item, amount);
                     console.log(`Gave ${amount} ${item}(s)`);
@@ -764,7 +776,7 @@ function executeObjectCommand(obj, command) {
                     } else if (typeof amountArg === "string" && amountArg.toLowerCase() === "half") {
                         amount = Math.floor((player.stats[item] || 0) / 2);
                     } else {
-                        amount = parseInt(amountArg, 10);
+                        amount = resolveNumericArg(amountArg);
                         if (isNaN(amount)) amount = 1; // Default to 1 if not specified
                     }
 
@@ -902,19 +914,19 @@ function executeObjectCommand(obj, command) {
                         if (value === undefined) break;
 
                         if (key === "x") {
-                            const n = Number(value);
+                            const n = resolveNumericArg(value);
                             obj.statusMessageStyle.x = isNaN(n) ? null : n;
                             i++;
                             continue;
                         }
                         if (key === "y") {
-                            const n = Number(value);
+                            const n = resolveNumericArg(value);
                             obj.statusMessageStyle.y = isNaN(n) ? null : n;
                             i++;
                             continue;
                         }
                         if (key === "duration") {
-                            const n = Number(value);
+                            const n = resolveNumericArg(value);
                             if (!isNaN(n)) obj.statusMessageStyle.duration = n;
                             i++;
                             continue;
@@ -1121,7 +1133,7 @@ function executeObjectCommand(obj, command) {
                 }
                 case "hideLayer":
                 case "hidelayer": {
-                    let layerToHide = parseInt(command.args[0], 10);
+                    let layerToHide = resolveNumericArg(command.args[0]);
                     if (isNaN(layerToHide) || layerToHide < 1 || layerToHide > 3) {
                         console.warn(`#hidelayer: Invalid layer number: ${command.args[0]}`);
                         break;
@@ -1136,7 +1148,7 @@ function executeObjectCommand(obj, command) {
                 }
                 case "showLayer":
                 case "showlayer": {
-                    let layerToShow = parseInt(command.args[0], 10);
+                    let layerToShow = resolveNumericArg(command.args[0]);
                     if (isNaN(layerToShow) || layerToShow < 1 || layerToShow > 3) {
                         console.warn(`#showlayer: Invalid layer number: ${command.args[0]}`);
                         break;
@@ -1179,6 +1191,19 @@ function executeObjectCommand(obj, command) {
                 case 'nightmode':
                     nightMode = !nightMode;
                     break;
+                case 'play': {
+                    // args[0] is already unquoted thanks to tokenizeCommand in the parser
+                    const trackName = command.args[0];
+                    if (!trackName) {
+                        console.warn('#play: No track name provided.');
+                        break;
+                    }
+                    const loopFlag = command.args.includes('loop');
+                    playAudio(trackName, { loop: loopFlag });
+                    break;
+                }
+                case 'stop':
+                    
                 case "debug":
                     console.log("DEBUG: Object script:", obj.script);
                     console.log("DEBUG: Object labels:", obj.labels);
@@ -1236,7 +1261,7 @@ function resolveMoveParams(obj, args = []) {
     }
 
     let direction;
-    if (token === 'rndany' || token === 'random') {
+    if (token === 'rndany' || token === 'random' || token === 'rndAny') {
         const dirs = ['up', 'down', 'left', 'right'];
         direction = dirs[Math.floor(Math.random() * dirs.length)];
     } else if (token === 'seek') {
@@ -1384,6 +1409,33 @@ function substituteGlobals(args) {
             ? scriptGlobals[arg]
             : arg
     );
+}
+
+async function playAudio(trackName, { loop = false, stopCurrent = true } = {}) {
+    // Keys in the store are 'audio/sfx/name' or 'audio/music/name'
+    const store = getAudioStore();
+    // Search by exact key first, then fall back to name-only match
+    let key = Object.keys(store).find(k => k === trackName) ||
+               Object.keys(store).find(k => k.endsWith('/' + trackName));
+    if (!key) {
+        console.warn(`#play: Track "${trackName}" not found in audio store.`);
+        return;
+    }
+    if (stopCurrent && _currentMusicSource) {
+        try { _currentMusicSource.stop(); } catch (_) {}
+        _currentMusicSource = null;
+    }
+    if (_audioCtx.state === 'suspended') await _audioCtx.resume();
+    if (!_audioBufferCache[key]) {
+        _audioBufferCache[key] = await _audioCtx.decodeAudioData(store[key].buffer.slice(0));
+    }
+    const source = _audioCtx.createBufferSource();
+    source.buffer = _audioBufferCache[key];
+    source.loop = loop;
+    source.connect(_audioCtx.destination);
+    source.start(0);
+    if (loop) _currentMusicSource = source;
+    return source;
 }
 
 // ##############################################

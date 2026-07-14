@@ -957,6 +957,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleToolbarClick(options = {}) {
         if (options.popup) {
+            if (options.popup === 'boardInfo') {
+                boardInfo();
+                return;
+            }
+            if (options.popup === 'audio') {
+                audioImporter();
+                return;
+            }
             togglePopup(options.popup);
             return;
         }
@@ -982,6 +990,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (options.layerOpacity3 !== undefined) {
             const settings = getCurrentBoardSettings();
             settings.layer3Opacity = options.layerOpacity3;
+        }
+        if (options.worldInfo !== undefined) {
+            worldInfo();
+        }
+        if (options.boardInfo !== undefined) {
+            boardInfo();
+        }
+        if (options.audio !== undefined) {
+            audioImporter();
         }
 
         console.log('current layer: ', currentLayer);

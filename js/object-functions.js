@@ -137,6 +137,17 @@ export function loadObjectsFromGameData(gameData) {
     return placedObjects;
 }
 
+// Splits a command line into tokens, treating "quoted strings" as a single token.
+function tokenizeCommand(str) {
+    const tokens = [];
+    const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+    let m;
+    while ((m = re.exec(str)) !== null) {
+        tokens.push(m[1] !== undefined ? m[1] : m[2] !== undefined ? m[2] : m[3]);
+    }
+    return tokens;
+}
+
 function parseScript(text) {
     let lines = text.trim().split("\n").map(line => line.trim());
     let script = [];
@@ -174,7 +185,7 @@ function parseScript(text) {
         if (inMixin) {
             // --- MIXIN: Support #commands, *status, and text blocks ---
             if (line.startsWith("#")) {
-                const [cmd, ...args] = line.slice(1).split(" ");
+                const [cmd, ...args] = tokenizeCommand(line.slice(1));
                 const blocking = BLOCKING_COMMANDS.includes(cmd.toLowerCase());
                 currentMixinCommands.push({ type: "command", name: cmd.toLowerCase(), args, blocking });
             } else if (line.startsWith("*")) {
@@ -242,7 +253,7 @@ function parseScript(text) {
 
         // Commands
         if (line.startsWith("#")) {
-            const [cmd, ...args] = line.slice(1).split(" ");
+            const [cmd, ...args] = tokenizeCommand(line.slice(1));
             const blocking = BLOCKING_COMMANDS.includes(cmd.toLowerCase());
             script.push({ type: "command", name: cmd.toLowerCase(), args, blocking });
             index++;
@@ -444,6 +455,28 @@ function retokenizeIfArgs(args) {
 }
 
 // Resolves a single token to a concrete value.
+export function resolveNumericArg(token) {
+    if (typeof token === 'number') return token;
+    if (token === undefined || token === null) return NaN;
+    const str = String(token).trim();
+    if (str === '') return NaN;
+
+    const rndMatch = str.match(/^rnd\s*\(\s*(-?\d+)\s*(?:,\s*(-?\d+)\s*)?\)$/i);
+    if (rndMatch) {
+        const a = parseInt(rndMatch[1], 10);
+        const b = rndMatch[2] !== undefined ? parseInt(rndMatch[2], 10) : null;
+        if (b === null) {
+            return Math.floor(Math.random() * (a + 1));
+        }
+        const min = Math.min(a, b);
+        const max = Math.max(a, b);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    const n = Number(str);
+    return isNaN(n) ? NaN : n;
+}
+
 // Handles: $var, p.stat, rnd(n), rnd(n,m), numeric literals, plain strings.
 function resolveSingleValue(token, player, scriptGlobals) {
     if (token === undefined || token === null) return '';

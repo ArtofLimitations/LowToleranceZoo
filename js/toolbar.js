@@ -21,6 +21,9 @@ const spriteTypes = [document.getElementById('wall'), document.getElementById('s
 const terrainButton = document.getElementById('terrainButton');
 const itemButton = document.getElementById('itemButton');
 const creatureButton = document.getElementById('creatureButton');
+const worldButton = document.getElementById('worldInfoButton');
+const boardButton = document.getElementById('boardInfoButton');
+const audioButton = document.getElementById('audioButton');
 const editMode = document.getElementById('editMode');
 const undoButton = document.getElementById('undoButton');
 const redoButton = document.getElementById('redoButton');
@@ -116,6 +119,24 @@ if (itemButton) {
 if (creatureButton) {
   creatureButton.onclick = () => {
     callbackFunction({ popup: 'extraCreatures' });
+  };
+}
+
+if (worldButton) {
+  worldButton.onclick = () => {
+    callbackFunction({ popup: 'worldInfo' });
+  };
+}
+
+if (boardButton) {
+  boardButton.onclick = () => {
+    callbackFunction({ popup: 'boardInfo' });
+  };
+}
+
+if (audioButton) {
+  audioButton.onclick = () => {
+    callbackFunction({ popup: 'audio' });
   };
 }
 

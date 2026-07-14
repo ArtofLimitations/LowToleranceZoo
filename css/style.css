@@ -177,6 +177,13 @@ h3 {
   outline: none;
 }
 
+.spriteEditorToolbar {
+  position: relative;
+  top: 115px;
+  width: 120px !important;
+  height: 520px !important;
+}
+
 .lowToleranceToolbar {
   background-color: #0e2a68;
   color: #ffc800;
@@ -199,7 +206,6 @@ h3 {
   position: absolute;
   z-index: 5;
 }
-
 
 .lowToleranceToolbar span.shades {
   font-size: 16px;
@@ -603,10 +609,17 @@ h3 {
 
 .spriteCanvas {
   display: block;
-  /* position: absolute */
+  width: 584px;
+  height: 520px;
   top: 0;
   left: 0;
-  margin: auto;
+  margin: 0;
+}
+
+.spriteEditorLayout {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .spriteContainer {
@@ -620,13 +633,63 @@ h3 {
   background-color: #222;
   border-width: 5px;
   border-color: rgba(34, 34, 34, .9);
-  padding: 64px;
+  padding: 24px;
   box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
+}
+
+.spriteEditorToolbar {
+  position: relative;
+  top: 0;
+  right: auto;
+  width: 168px;
+  height: 520px;
+  margin: 0;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.spriteEditorToolbar .fieldContainer {
+  margin: 0;
+}
+
+.spriteEditorToolbar .fieldRow {
+  margin: 8px 0;
+}
+
+.spriteEditorToolbar .spriteButtonGroup {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.spriteEditorToolbar .spriteButton {
+  flex: 1 1 0;
+  height: 32px;
+  background-color: #2e4675;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 11px;
+  font-family: "Fira Code", monospace;
+  font-weight: 600;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.spriteEditorToolbar .spriteButton:hover {
+  background-color: #5f76aa;
+}
+
+.spriteEditorToolbar .spriteButton.modeButton-active {
+  background-color: #f0f0f0;
+  color: #131313;
 }
 
 .spriteInfo {
   color: #fff;
   padding: 4px;
+  margin-bottom: 8px;
 }
 
 .spriteInfoMode {

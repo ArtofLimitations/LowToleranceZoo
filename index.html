@@ -93,9 +93,12 @@
                 <div class="fieldRow"><span class="valueBox valueText" id="spriteType"></span><span
                         class="fieldText">Current <br>Type </span></div>
                 <!-- Other types (menu) -->
-                <div class="fieldRow"><span class="fieldCategory" id="terrainButton">Terrain</span><span class="fieldCategory alternate" id="worldInfoButton">World Info</span></div>
-                <div class="fieldRow"><span class="fieldCategory" id="itemButton">Item</span><span class="fieldCategory alternate" id="boardInfoButton">Board Info</span></div>
-                <div class="fieldRow"><span class="fieldCategory" id="creatureButton">Creatures</span><span class="fieldCategory alternate" id="audioButton">Audio</span></div>
+                <div class="fieldRow"><span class="fieldCategory" id="terrainButton">Terrain</span><span
+                        class="fieldCategory alternate" id="worldInfoButton">World Info</span></div>
+                <div class="fieldRow"><span class="fieldCategory" id="itemButton">Item</span><span
+                        class="fieldCategory alternate" id="boardInfoButton">Board Info</span></div>
+                <div class="fieldRow"><span class="fieldCategory" id="creatureButton">Creatures</span><span
+                        class="fieldCategory alternate" id="audioButton">Audio</span></div>
                 <div class="fieldRow">
                     <span class="valueBox valueText" id="editMode">Draw</span>
                     <span class="fieldText">Edit<br> Mode</span>
@@ -155,8 +158,28 @@
             <div class="spriteInfo" id="spriteInfo"><strong>Sprite Editor</strong><br> F: fill | D: draw | esc: save and
                 close editor - <em><span class="spriteInfoMode">Mode:</span> <span id="spriteDrawMode">Draw</span></em>
             </div>
-            <canvas class="spriteCanvas" id="spriteCanvas" width="584" height="520"></canvas>
+            <div class="spriteEditorLayout">
+                <canvas class="spriteCanvas" id="spriteCanvas" width="584" height="520"></canvas>
+                <div class="lowToleranceToolbar spriteEditorToolbar">
+                    <div class="fieldContainer">
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="spriteButton modeButton modeButton-active" id="spriteButtonDraw" type="button">Dark</button>
+                                <button class="spriteButton modeButton" id="spriteButtonFill" type="button">Light</button>
+                            </div>
+                        </div>
+                        <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░</span></div>
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="material-symbols-outlined" id="spriteButtonCopy" type="button">content_copy</button>
+                                <button class="material-symbols-outlined" id="spriteButtonPaste" type="button">content_paste</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+
         <div class="paletteContainer" id="paletteContainer">
             <p><strong>Color Palette</strong></p>
             <div class="paletteColorContainer">
@@ -188,7 +211,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="boardInfoBox" id="boardInfoBox">
             <p><strong>Board Information</strong></p>
             <div class="boardInfoContent" id="boardInfoContent">
@@ -272,18 +295,22 @@
                     <input class="audio-input-field" type="file" id="audioFileInput" accept=".ogg,.mp3,.wav,audio/*" />
                 </div>
                 <div class="audio-import-row">
-                    <label for="audioNameInput">Save as name <span class="audio-hint">(leave blank to use filename)</span></label>
-                    <input class="audio-input-field" type="text" id="audioNameInput" placeholder="e.g. coin.ogg" autocomplete="off" />
+                    <label for="audioNameInput">Save as name <span class="audio-hint">(leave blank to use
+                            filename)</span></label>
+                    <input class="audio-input-field" type="text" id="audioNameInput" placeholder="e.g. coin.ogg"
+                        autocomplete="off" />
                 </div>
-                <button class="material-symbols-outlined audio-import-submit" id="importAudioButton" title="Import">file_upload</button>
+                <button class="material-symbols-outlined audio-import-submit" id="importAudioButton"
+                    title="Import">file_upload</button>
                 <div class="audio-import-row audio-list-section">
                     <label>Imported audio</label>
                     <ul id="audioImportList" class="audio-import-list"></ul>
                 </div>
             </div>
-            <button class="material-symbols-outlined audio-close-btn" id="audioImporterClose" title="Close (Esc)">close</button>
+            <button class="material-symbols-outlined audio-close-btn" id="audioImporterClose"
+                title="Close (Esc)">close</button>
         </div>
-        
+
         <div class="selectAmount" id="selectAmount"></div>
         <div class="boardSelect" id="boardSelect">
             <p><strong>Select Board</strong></p>

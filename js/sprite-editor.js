@@ -43,6 +43,25 @@ const buttons = [
     { x: 8, y: 450, width: 48, height: 40, label: 'CLR' }
 ]
 
+const sidebarColorButtons = {
+    dark: document.getElementById('spriteButtonDraw'),
+    light: document.getElementById('spriteButtonFill'),
+};
+
+function syncSidebarColorButtons() {
+    if (!sidebarColorButtons.dark || !sidebarColorButtons.light) return;
+
+    const isDark = currentColor === 1;
+    sidebarColorButtons.dark.classList.toggle('modeButton-active', isDark);
+    sidebarColorButtons.light.classList.toggle('modeButton-active', !isDark);
+}
+
+function setSpriteColor(color) {
+    currentColor = color;
+    syncSidebarColorButtons();
+    drawButtons();
+}
+
 function isInsideButton(bX, x, y, button) {
     //console.log(`offset: ${bX} X: ${x} Y: ${y}`);
     return (
@@ -129,10 +148,10 @@ function draw(event) {
 
                 switch (button.label) {
                     case 'Dark':
-                        currentColor = 1;
+                        setSpriteColor(1);
                         break;
                     case 'Light':
-                        currentColor = 0;
+                        setSpriteColor(0);
                         break;
                     case 'CLR':
                         if (confirm('Are you sure you want clear?')) {
@@ -285,12 +304,10 @@ function handleKeyboard(event) {
             drawGrid();
             break;
         case '1':
-            currentColor = 1;
-            drawButtons();
+            setSpriteColor(1);
             break;
         case '2':
-            currentColor = 0;
-            drawButtons();
+            setSpriteColor(0);
             break;
         case "!": // delete all back
             spriteData = spriteData.map(row => row.map(value => value === 1 ? 2 : value));
@@ -391,6 +408,14 @@ function addSpriteEvents() {
     spriteCanvas.addEventListener('mouseup', () => { mouse.down = false; });
     spriteCanvas.addEventListener('mousemove', handleMouseMove);
     spriteCanvas.addEventListener('mouseleave', () => { mouse.down = false; });
+
+    if (sidebarColorButtons.dark) {
+        sidebarColorButtons.dark.onclick = () => setSpriteColor(1);
+    }
+    if (sidebarColorButtons.light) {
+        sidebarColorButtons.light.onclick = () => setSpriteColor(0);
+    }
+
     // Event listener for keyboard
     document.addEventListener('keydown', handleKeyboard);
     document.addEventListener('keyup', () => { mouse.ctrl = false; });
@@ -428,6 +453,7 @@ export function editSprite(current, onClose = null) {
 
     // add event listeners
     addSpriteEvents();
+    syncSidebarColorButtons();
 
     // Initial draw
     drawGrid();
