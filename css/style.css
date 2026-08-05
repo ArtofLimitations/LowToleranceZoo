@@ -1,3 +1,19 @@
+:root {
+  --primary-color: #1a1a1a;
+  --secondary-color: #0e2a68;
+  --accent-color: #ffc800;
+  --text-color: #ffffff;
+  --font-family: "Fira Code", serif;
+  --font-size: 16px;
+  --font-weight: 300;
+  --font-style: normal;
+  --scrollbar-track-color: #ffffff;
+  --scrollbar-thumb-color: #0e2a68;
+  --scrollbar-size: 16px;
+  --sidebar-width: 320px;
+  --popup-top: 24px;
+}
+
 body {
   display: flex;
   justify-content: center;
@@ -157,7 +173,7 @@ h3 {
   --grid-size: 32px;
   --grid-strength: 1px;
   --grid-dash: 16px;
-  --grid-gap: 4px;
+  --grid-gap: 1px;
   --grid-color: #353a55;
   --paper-color: #131313;
 
@@ -175,13 +191,6 @@ h3 {
 .lowToleranceCanvas:active {
   /*border: 1px dashed #bdd109 !important;*/
   outline: none;
-}
-
-.spriteEditorToolbar {
-  position: relative;
-  top: 115px;
-  width: 120px !important;
-  height: 520px !important;
 }
 
 .lowToleranceToolbar {
@@ -259,7 +268,7 @@ h3 {
 .lowToleranceToolbar .modeButtonGroup {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  gap: 6px;
+  gap: 8px 0;
   margin-right: 8px;
   width: 100%;
 }
@@ -609,11 +618,16 @@ h3 {
 
 .spriteCanvas {
   display: block;
-  width: 584px;
+  width: 520px;
   height: 520px;
   top: 0;
   left: 0;
   margin: 0;
+  border: 1px solid black;
+  image-rendering: pixelated;
+  background-color: #5f5f64;
+  background-image: linear-gradient(45deg, #b1b1b1 50%, #c0c0c5 50%);
+  background-size: 16px 16px;
 }
 
 .spriteEditorLayout {
@@ -625,16 +639,18 @@ h3 {
 .spriteContainer {
   display: none;
   /* Hidden initially */
-  box-sizing: content-box;
+  box-sizing: border-box;
   position: absolute;
-  top: 0;
-  left: 219px;
-  margin: auto;
+  top: var(--popup-top);
+  left: calc(50% - var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  margin: 0;
   background-color: #222;
   border-width: 5px;
   border-color: rgba(34, 34, 34, .9);
   padding: 24px;
   box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
+  z-index: 6;
 }
 
 .spriteEditorToolbar {
@@ -658,8 +674,10 @@ h3 {
 
 .spriteEditorToolbar .spriteButtonGroup {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
+  flex-direction: row;
+  justify-content: center;
 }
 
 .spriteEditorToolbar .spriteButton {
@@ -686,6 +704,25 @@ h3 {
   color: #131313;
 }
 
+.spriteEditorToolbar .spriteButtonActions {
+  background-color: #ffffff;
+  color: #000;
+  cursor: pointer;
+  transition: all 0.2s;
+  /*box-shadow: 1px 1px 1px #2e4675, -1px -1px 1px #2e4675;*/
+}
+
+.spriteEditorToolbar .spriteButtonActions:active {
+  /* styles for click animation */
+  background-color: #b4b4b6;
+  color: #fff;
+  box-shadow: inset 1px 1px 2px #2e4675, inset -1px -1px 2px #2e4675;
+}
+
+.spriteEditorToolbar #spriteEditorCurrentSpriteImage {
+  background-color: #838383;
+}
+
 .spriteInfo {
   color: #fff;
   padding: 4px;
@@ -698,14 +735,15 @@ h3 {
 
 .boardInfoBox {
   display: none;
+  position: absolute;
   flex-direction: column;
   align-items: center;
-  box-sizing: content-box;
-  position: absolute;
-  top: 0;
-  left: 219px;
-  margin: auto;
-  width: 55%;
+  box-sizing: border-box;
+  top: var(--popup-top);
+  left: calc(50% - var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  margin: 0;
+  width: min(55%, 760px);
   max-height: 70vh;
   background-color: #222;
   padding: 48px 56px;
@@ -803,11 +841,12 @@ h3 {
   display: none;
   flex-direction: column;
   align-items: flex-start;
-  box-sizing: content-box;
+  box-sizing: border-box;
   position: absolute;
-  top: 0;
-  left: 219px;
-  width: 420px;
+  top: var(--popup-top);
+  left: calc(50% - var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 48px));
   max-height: 70vh;
   background-color: #222;
   padding: 48px 56px;
@@ -943,15 +982,17 @@ h3 {
 .paletteContainer {
   display: none;
   /* Hidden initially */
-  box-sizing: content-box;
+  box-sizing: border-box;
   position: absolute;
-  top: 0;
-  left: 419px;
-  margin: auto;
+  top: var(--popup-top);
+  left: calc(50% - var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  margin: 0;
   background-color: #222;
   padding: 64px;
   box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
   text-align: center;
+  z-index: 6;
 }
 
 .paletteContainer p {
@@ -1009,12 +1050,14 @@ h3 {
 
 .editorContainer {
   display: none;
-  box-sizing: content-box;
-  position: relative;
-  top: 0;
-  width: 55%;
+  box-sizing: border-box;
+  position: absolute;
+  top: var(--popup-top);
+  left: calc(50% - var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  width: min(55%, 760px);
   color: #fff;
-  margin: 0 auto;
+  margin: 0;
   background-color: #222;
   border-width: 5px;
   border-color: rgba(34, 34, 34, .9);
@@ -1062,12 +1105,14 @@ h3 {
 .boardSelect {
   display: none;
   /* Hidden initially */
-  box-sizing: content-box;
-  position: relative;
-  top: 0;
-  width: 55%;
+  box-sizing: border-box;
+  position: absolute;
+  top: var(--popup-top);
+  left: calc(50% - var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  width: min(55%, 760px);
   color: #fff;
-  margin: 0 auto;
+  margin: 0;
   background-color: #222;
   border-width: 5px;
   border-color: rgba(34, 34, 34, .9);
@@ -1143,12 +1188,14 @@ h3 {
   /* Hidden initially */
   flex-direction: column;
   align-items: stretch;
-  box-sizing: content-box;
-  position: relative;
-  top: 0;
-  width: 25%;
+  box-sizing: border-box;
+  position: absolute;
+  top: var(--popup-top);
+  left: calc(50% - var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  width: min(25%, 360px);
   color: #fff;
-  margin: 0 auto;
+  margin: 0;
   background-color: #222;
   padding: 64px;
   box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
@@ -1182,13 +1229,13 @@ h3 {
   flex-direction: column;
   align-content: center;
   align-items: flex-start;
-  box-sizing: content-box;
-  position: relative;
-  top: 8px;
-  left: -8px;
+  box-sizing: border-box;
+  position: absolute;
+  top: 50%;
+  left: calc(100% - 180px);
+  transform: translate(-50%, -50%);
   width: 270px;
   color: #fff;
-  float: right;
   background-color: #0e2a68;
   padding: 24px;
   box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.5);
@@ -1246,12 +1293,14 @@ h3 {
   display: none;
   /* Hidden initially */
   flex-direction: column;
-  box-sizing: content-box;
-  position: relative;
-  top: 0;
-  width: 55%;
+  box-sizing: border-box;
+  position: absolute;
+  top: var(--popup-top);
+  left: calc(50% - var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  width: min(55%, 760px);
   color: #fff;
-  margin: 0 auto;
+  margin: 0;
   background-color: #222;
   border-width: 5px;
   border-color: rgba(34, 34, 34, .9);
@@ -1292,13 +1341,4 @@ h3 {
 
 .lowToleranceCanvas {
   border-radius: 4px;
-}
-
-.spriteCanvas {
-  border: 1px solid black;
-  image-rendering: pixelated;
-  background-color: #5f5f64;
-  background-image: linear-gradient(45deg, #b1b1b1 50%, #c0c0c5 50%);
-  background-size: 16px 16px;
-
 }

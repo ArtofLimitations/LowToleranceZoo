@@ -2594,7 +2594,7 @@ document.addEventListener("keydown", (event) => {
             saveGame();
         }
 
-        if (event.key === ' ' && !gamePaused) { // Space bar to shoot
+        if (event.key === ' ' && !gamePaused && player.canShoot && bulletArray.filter(b => b.active).length < player.maxBullets) { // Space bar to shoot
             const w = getEquippedWeaponConfig();
             bulletArray.push(createBullet(
                 canvas,
@@ -2607,6 +2607,7 @@ document.addEventListener("keydown", (event) => {
                 w.size,
                 w.damage
             ));
+            console.log('Shot fired. Active bullets:', bulletArray.filter(b => b.active).length);
         }
 
         if (event.key === 'n') { // M to toggle night mode (TEMPORARY)
@@ -2620,6 +2621,7 @@ document.addEventListener("keydown", (event) => {
         console.log('Player location:', player.layer, player.x, player.y);
         console.log('Player stats:', player.stats);
         console.log('Bullets active:', bulletArray.filter(b => b.active));
+        console.log('Number of bullets active:', bulletArray.filter(b => b.active).length);
     }
 
     updateDirection(); // Update direction based on keys held

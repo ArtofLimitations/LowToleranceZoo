@@ -10,6 +10,8 @@ export let defaultPlayerStats = {
     stepSize: 0.5,
     transported: false,
     locked: false,
+    canShoot: true,
+    maxBullets: 256,
     justInteracted: false,
     flashRed: false,
     flashTimer: 0,

@@ -1,4 +1,4 @@
-import { updateSpriteImage } from './sprite.js';
+import { createDataURL, updateSpriteImage } from './sprite.js';
 import { addToSpriteSheet, getDataFromSheet } from './sprite-sheet.js';
 
 // Get the spriteCanvas element and context
@@ -6,12 +6,12 @@ const spriteCanvas = document.getElementById('spriteCanvas');
 const spriteCtx = spriteCanvas.getContext('2d');
 const container = document.getElementById('spriteContainer');
 const overlay = document.getElementById('overlay');
+const spriteNumber = document.getElementById('spriteEditorCurrentSprite');
+const spritePreview = document.getElementById('spriteEditorCurrentSpriteImage');
 
 // Set up the grid and colors
-// Grid width 520px
 const gridSize = 16;
-const sidebar = 64;
-const pixelSize = (spriteCanvas.width - sidebar) / gridSize;
+const pixelSize = Math.min(spriteCanvas.width, spriteCanvas.height) / gridSize;
 const colors = ['white', 'black'];                                                // Only two colors: white and black
 const maxSprites = 300; // Maximum number of sprites, can be changed later
 let currentColor = 1;
@@ -32,20 +32,25 @@ let spriteSheet = {};
 // Optional callback to notify caller (main.js) when editor closes or changes current sprite
 let onCloseCallback = null;
 
-const buttons = [
-    { x: 8, y: 100, width: 48, height: 40, label: 'Dark' },
-    { x: 8, y: 150, width: 48, height: 40, label: 'Light' },
-    //{ x: 8, y: 200, width: 48, height: 40, label: 'Alpha' },
-    { x: 8, y: 200, width: 48, height: 40, label: 'Copy' },
-    { x: 8, y: 250, width: 48, height: 40, label: 'Paste' },
-    { x: 8, y: 350, width: 48, height: 40, label: 'FlipY' },
-    { x: 8, y: 400, width: 48, height: 40, label: 'FlipX' },
-    { x: 8, y: 450, width: 48, height: 40, label: 'CLR' }
-]
-
 const sidebarColorButtons = {
-    dark: document.getElementById('spriteButtonDraw'),
-    light: document.getElementById('spriteButtonFill'),
+    dark: document.getElementById('spriteButtonDark'),
+    light: document.getElementById('spriteButtonLight'),
+};
+
+const sidebarActionButtons = {
+    copy: document.getElementById('spriteButtonCopy'),
+    paste: document.getElementById('spriteButtonPaste'),
+    flipY: document.getElementById('spriteButtonFlipY'),
+    flipX: document.getElementById('spriteButtonFlipX'),
+    clear: document.getElementById('spriteButtonClear'),
+    invert: document.getElementById('spriteButtonInvert'),
+    delDark: document.getElementById('spriteButtonDelDark'),
+    delLight: document.getElementById('spriteButtonDelLight'),
+    nudgeUp: document.getElementById('spriteButtonNUP'),
+    nudgeDown: document.getElementById('spriteButtonNDOWN'),
+    nudgeLeft: document.getElementById('spriteButtonNLEFT'),
+    nudgeRight: document.getElementById('spriteButtonNRIGHT'),
+
 };
 
 function syncSidebarColorButtons() {
@@ -59,65 +64,122 @@ function syncSidebarColorButtons() {
 function setSpriteColor(color) {
     currentColor = color;
     syncSidebarColorButtons();
-    drawButtons();
 }
 
-function isInsideButton(bX, x, y, button) {
-    //console.log(`offset: ${bX} X: ${x} Y: ${y}`);
-    return (
-        x > bX + button.x && x < bX + button.x + button.width &&
-        y > button.y && y < button.y + button.height
-    );
+function handleSidebarAction(action) {
+    switch (action) {
+        case 'copy':
+            clipboard = structuredClone(spriteData);
+            console.log('Sprite copied to clipboard');
+            break;
+        case 'paste':
+            if (clipboard && clipboard.length) {
+                spriteData = structuredClone(clipboard);
+                drawGrid();
+                drawSpritePreview();
+            } else {
+                console.log('Clipboard is empty. Copy data first.');
+            }
+            break;
+        case 'flipY':
+            spriteData = [...spriteData].reverse();
+            drawGrid();
+            drawSpritePreview();
+            break;
+        case 'flipX':
+            spriteData = spriteData.map(row => [...row].reverse());
+            drawGrid();
+            drawSpritePreview();
+            break;
+        case 'clear':
+            if (confirm('Are you sure you want to clear the sprite?')) {
+                spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
+                drawGrid();
+                drawSpritePreview();
+                console.log('Cleared sprite');
+            }
+            break;
+        case 'invert':
+            spriteData = invertColor();
+            drawGrid();
+            drawSpritePreview();
+            break;
+        case 'delDark':
+            spriteData = spriteData.map(row => row.map(value => value === 1 ? 2 : value));
+            drawGrid();
+            drawSpritePreview();
+            break;
+        case 'delLight':
+            spriteData = spriteData.map(row => row.map(value => value === 0 ? 2 : value));
+            drawGrid();
+            drawSpritePreview();
+            break;
+        case 'nudgeUp':
+            spriteData = nudgeSprite(spriteData, "up");
+            drawGrid();
+            drawSpritePreview();
+            break;
+        case 'nudgeDown':
+            spriteData = nudgeSprite(spriteData, "down");
+            drawGrid();
+            drawSpritePreview();
+            break;
+        case 'nudgeLeft':
+            spriteData = nudgeSprite(spriteData, "left");
+            drawGrid();
+            drawSpritePreview();
+            break;
+        case 'nudgeRight':
+            spriteData = nudgeSprite(spriteData, "right");
+            drawGrid();
+            drawSpritePreview();
+            break;
+    }
 }
 
-function drawButtons() {
-    buttons.forEach(button => {
-        //spriteCtx.fillStyle = '#9ed474';
-        if (currentColor === 1 && button.label === 'Dark') {
-            spriteCtx.fillStyle = '#576b47';
-        } else if (currentColor === 0 && button.label === 'Light') {
-            spriteCtx.fillStyle = '#576b47';
-        } else {
-            spriteCtx.fillStyle = '#fff';//'#d2ebbe';
-        }
-        spriteCtx.fillRect(spriteCanvas.width - sidebar + button.x, button.y, button.width, button.height);
-        spriteCtx.fillStyle = '#222';
-        spriteCtx.font = 'bold 14px Arial';
-        spriteCtx.fillText(button.label, spriteCanvas.width - sidebar + button.x + 8, button.y + 25);
-    });
+function drawSpritePreview() {
+    if (!spritePreview) return;
+
+    spritePreview.innerHTML = '';
+    createDataURL(spriteData, [0, 0, 0, 1], [255, 255, 255, 1])
+        .then((img) => {
+            img.style.width = '32px';
+            img.style.height = '32px';
+            //img.style.imageRendering = 'pixelated';
+            //img.style.display = 'block';
+            spritePreview.appendChild(img);
+            //spritePreview.style.backgroundImage = img;
+        })
+        .catch((error) => {
+            console.error('Error creating sprite preview:', error);
+        });
 }
 
 // Function to draw the grid and sprite data
 function drawGrid() {
-    spriteCtx.clearRect(0, 0, spriteCanvas.width, spriteCanvas.height); // clear
-    spriteCtx.beginPath();                                              // draw sidebar
-    spriteCtx.fillStyle = '#2c3d63';
-    spriteCtx.fillRect(spriteCanvas.width - sidebar, 0, spriteCanvas.width, spriteCanvas.height);
-    spriteCtx.beginPath();
-    spriteCtx.fillStyle = "#addcca";
-    spriteCtx.font = "12px Helvetica, Arial, Sans-Serif";
-    //if (mouse.mode === 'draw') spriteCtx.fillText("Draw", spriteCanvas.width - sidebar + 10, 300);
+    spriteCtx.clearRect(0, 0, spriteCanvas.width, spriteCanvas.height);
+    //beginPath();
+    //spriteCtx.fillStyle = '#1f1f1f';
+    //spriteCtx.fillRect(0, 0, spriteCanvas.width, spdrawButtons riteCanvas.height);
+    //beginPath();
+    spriteCtx.fillStyle = '#addcca';
+    spriteCtx.font = '12px Helvetica, Arial, Sans-Serif';
+
     if (mouse.mode === 'draw') document.getElementById('spriteDrawMode').textContent = 'Draw';
-    //if (mouse.mode === 'fill') spriteCtx.fillText("Fill", spriteCanvas.width - sidebar + 10, 300);
     if (mouse.mode === 'fill') document.getElementById('spriteDrawMode').textContent = 'Fill';
 
-    for (let y = 0; y < gridSize; y++) {                                                           // draw grid
+    for (let y = 0; y < gridSize; y++) {
         for (let x = 0; x < gridSize; x++) {
             if (spriteData[y][x] !== 2) {
-                spriteCtx.fillStyle = colors[spriteData[y][x]];                                    // Draw pixels to grid
+                spriteCtx.fillStyle = colors[spriteData[y][x]];
                 spriteCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-
-                spriteCtx.fillRect((spriteCanvas.width - sidebar + 10) + x * 2, 10 + y * 2, 2, 2); // Draw small preview in sidebar (same color)
-                spriteCtx.beginPath();
-                spriteCtx.fillStyle = spriteData[y][x] === 1 ? '#417329' : '#e6ce37';
-                spriteCtx.fillRect((spriteCanvas.width - sidebar + 10) + x * 2, 54 + y * 2, 2, 2); // Draw small preview in sidebar (picked color)
             }
-            spriteCtx.strokeStyle = '#888';                                                        // Grid line color
-            spriteCtx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);              // Draw grid lines
+            spriteCtx.strokeStyle = '#888';
+            spriteCtx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
             spriteCtx.beginPath();
         }
     }
-    drawButtons();
+    //drawSpritePreview();
 }
 
 function draw(event) {
@@ -130,7 +192,7 @@ function draw(event) {
     const y = Math.floor((event.clientY - rect.top) / pixelSize);
     //console.log(x * pixelSize);
 
-    if (x < gridSize && y < gridSize) {                             // draw data to spriteData array if clicked inside grid
+    if (x < gridSize && y < gridSize) {             // draw data to spriteData array if clicked inside grid
         switch (mouse.button) {
             case 0:
                 spriteData[y][x] = currentColor;    // either draw the current color (black or white)
@@ -140,56 +202,8 @@ function draw(event) {
         }
         drawGrid();
     }
-    else {                                          // deal with sidebar / button click
-        let offset = spriteCanvas.width - sidebar;
-        buttons.forEach(button => {
-            if (isInsideButton(offset, mouseX, mouseY, button)) {
-                //console.log(`${button.label} clicked!`);
-
-                switch (button.label) {
-                    case 'Dark':
-                        setSpriteColor(1);
-                        break;
-                    case 'Light':
-                        setSpriteColor(0);
-                        break;
-                    case 'CLR':
-                        if (confirm('Are you sure you want clear?')) {
-                            spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
-                            drawGrid();
-                            console.log('Cleared sprite');
-                        } else {
-                            console.log('Canceled')
-                        }
-                        mouse.down = false;
-                        break;
-                    case 'FlipY':
-                        spriteData = spriteData
-                            .reverse();
-                        drawGrid();
-                        break;
-                    case 'FlipX':
-                        for (var i = 0; i < spriteData.length; i++) {
-                            spriteData[i].reverse();
-                        }
-                        drawGrid();
-                        break;
-                    case 'Copy':
-                        clipboard = structuredClone(spriteData);
-                        break;
-                    case 'Paste':
-                        if (clipboard && clipboard.length) { // Check if clipboard contains data
-                            spriteData = structuredClone(clipboard); // Clone the clipboard content
-                            drawGrid();
-                        } else {
-                            console.log("Clipboard is empty. Copy data first.");
-                        }
-                        break;
-                }
-            }
-        });
-        drawButtons();
-    }
+   
+    drawSpritePreview();
 }
 
 function floodFill(x, y, targetColor, fillColor) {
@@ -309,19 +323,22 @@ function handleKeyboard(event) {
         case '2':
             setSpriteColor(0);
             break;
-        case "!": // delete all back
+        case "!": // delete all dark
             spriteData = spriteData.map(row => row.map(value => value === 1 ? 2 : value));
             drawGrid();
+            drawSpritePreview();
             break;
-        case "@": // delete all white
+        case "@": // delete all light
             spriteData = spriteData.map(row => row.map(value => value === 0 ? 2 : value));
             drawGrid();
+            drawSpritePreview();
             break;
         case 'I':
         case 'i':
             console.log(invertColor());
             spriteData = invertColor();
             drawGrid();
+            drawSpritePreview();
             break;
         case '+':
         case '=':
@@ -334,10 +351,12 @@ function handleKeyboard(event) {
                 } catch (e) { console.warn('Failed to save sprite before switching', e); }
                 currentSprite++;
                 updateSpriteData(currentSprite);
+                spriteNumber.innerText = currentSprite;
                 drawGrid();
                 // notify caller of change
                 if (onCloseCallback) onCloseCallback(currentSprite);
             }
+            drawSpritePreview();
             break;
         case '-':
         case '_':
@@ -349,9 +368,11 @@ function handleKeyboard(event) {
                 } catch (e) { console.warn('Failed to save sprite before switching', e); }
                 currentSprite--;
                 updateSpriteData(currentSprite);
+                spriteNumber.innerText = currentSprite;
                 drawGrid();
                 if (onCloseCallback) onCloseCallback(currentSprite);
             }
+            drawSpritePreview();
             break;
         case '%': // generate a checked pattern sprite
             for (let y = 0; y < gridSize; y++) {
@@ -360,6 +381,7 @@ function handleKeyboard(event) {
                 }
             }
             drawGrid();
+            drawSpritePreview();
             break;
         case '^': // generate a striped pattern sprite (checkered but 2 pixels down, 1 pixel right)
             for (let y = 0; y < gridSize; y++) {
@@ -368,6 +390,7 @@ function handleKeyboard(event) {
                 }
             }
             drawGrid();
+            drawSpritePreview();
             break;
         case 'Escape':
             removeSpriteEvents()
@@ -415,6 +438,42 @@ function addSpriteEvents() {
     if (sidebarColorButtons.light) {
         sidebarColorButtons.light.onclick = () => setSpriteColor(0);
     }
+    if (sidebarActionButtons.copy) {
+        sidebarActionButtons.copy.onclick = () => handleSidebarAction('copy');
+    }
+    if (sidebarActionButtons.paste) {
+        sidebarActionButtons.paste.onclick = () => handleSidebarAction('paste');
+    }
+    if (sidebarActionButtons.flipY) {
+        sidebarActionButtons.flipY.onclick = () => handleSidebarAction('flipY');
+    }
+    if (sidebarActionButtons.flipX) {
+        sidebarActionButtons.flipX.onclick = () => handleSidebarAction('flipX');
+    }
+    if (sidebarActionButtons.clear) {
+        sidebarActionButtons.clear.onclick = () => handleSidebarAction('clear');
+    }
+    if (sidebarActionButtons.invert) {
+        sidebarActionButtons.invert.onclick = () => handleSidebarAction('invert');
+    }
+    if (sidebarActionButtons.delDark) {
+        sidebarActionButtons.delDark.onclick = () => handleSidebarAction('delDark');
+    }
+    if (sidebarActionButtons.delLight) {
+        sidebarActionButtons.delLight.onclick = () => handleSidebarAction('delLight');
+    }
+    if (sidebarActionButtons.nudgeUp) {
+        sidebarActionButtons.nudgeUp.onclick = () => handleSidebarAction('nudgeUp');
+    }
+    if (sidebarActionButtons.nudgeDown) {
+        sidebarActionButtons.nudgeDown.onclick = () => handleSidebarAction('nudgeDown');
+    }
+    if (sidebarActionButtons.nudgeLeft) {
+        sidebarActionButtons.nudgeLeft.onclick = () => handleSidebarAction('nudgeLeft');
+    }
+    if (sidebarActionButtons.nudgeRight) {
+        sidebarActionButtons.nudgeRight.onclick = () => handleSidebarAction('nudgeRight');
+    }
 
     // Event listener for keyboard
     document.addEventListener('keydown', handleKeyboard);
@@ -442,6 +501,7 @@ export function updateSpriteData(current) {
         console.log('creating new sprite')
         spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
     }
+    drawGrid();
 }
 
 export function editSprite(current, onClose = null) {

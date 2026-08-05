@@ -159,22 +159,68 @@
                 close editor - <em><span class="spriteInfoMode">Mode:</span> <span id="spriteDrawMode">Draw</span></em>
             </div>
             <div class="spriteEditorLayout">
-                <canvas class="spriteCanvas" id="spriteCanvas" width="584" height="520"></canvas>
+                <canvas class="spriteCanvas" id="spriteCanvas" width="520" height="520"></canvas>
                 <div class="lowToleranceToolbar spriteEditorToolbar">
                     <div class="fieldContainer">
+
+                        <div class="fieldRow"><span class="valueBox" id="spriteEditorCurrentSprite">1</span><span
+                                class="imageBox" id="spriteEditorCurrentSpriteImage"> </span><span
+                                class="fieldText">Current<br> Sprite</span></div>
+                        </div>
                         <div class="fieldRow">
                             <div class="spriteButtonGroup">
-                                <button class="spriteButton modeButton modeButton-active" id="spriteButtonDraw" type="button">Dark</button>
-                                <button class="spriteButton modeButton" id="spriteButtonFill" type="button">Light</button>
+                                <button class="spriteButton modeButton modeButton-active" id="spriteButtonDark" type="button">Dark</button>
+                                <button class="spriteButton modeButton" id="spriteButtonLight" type="button">Light</button>
                             </div>
                         </div>
-                        <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░</span></div>
+                        <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░</span></div>
                         <div class="fieldRow">
                             <div class="spriteButtonGroup">
-                                <button class="material-symbols-outlined" id="spriteButtonCopy" type="button">content_copy</button>
-                                <button class="material-symbols-outlined" id="spriteButtonPaste" type="button">content_paste</button>
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonCopy" type="button">content_copy</button>
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonPaste" type="button">content_paste</button>
                             </div>
                         </div>
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="spriteButton spriteButtonActions" id="spriteButtonFlipX" type="button">Flip X</button>
+                                <button class="spriteButton spriteButtonActions" id="spriteButtonFlipY" type="button">Flip Y</button>
+                            </div>
+                        </div>
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="spriteButton spriteButtonActions" id="spriteButtonInvert" type="button">Invert</button>
+                            </div>
+                        </div>
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="spriteButton spriteButtonActions" id="spriteButtonDelDark" type="button">Delete Dark</button>
+                                <button class="spriteButton spriteButtonActions" id="spriteButtonDelLight" type="button">Delete Light</button>
+                            </div>
+                        </div>
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonClear" type="button">delete</button>
+                            </div>
+                        </div>
+                                                <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░</span></div>
+
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNUP" type="button">arrow_drop_up</button>
+                            </div>
+                        </div>
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNLEFT" type="button">arrow_left</button>
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNRIGHT" type="button">arrow_right</button>
+                            </div>
+                        </div>
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNDOWN" type="button">arrow_drop_down</button>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>

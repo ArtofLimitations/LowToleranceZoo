@@ -969,10 +969,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (options.history === 'undo') {
+            showStatusMessage('Undo');
             undoAction();
             return;
         }
         if (options.history === 'redo') {
+            showStatusMessage('Redo');
             redoAction();
             return;
         }
@@ -990,6 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (options.layerOpacity3 !== undefined) {
             const settings = getCurrentBoardSettings();
             settings.layer3Opacity = options.layerOpacity3;
+            showStatusMessage(`Layer 3 opacity set to ${Math.round(options.layerOpacity3 * 100)}%`);
         }
         if (options.worldInfo !== undefined) {
             worldInfo();
@@ -2116,13 +2119,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (!event.ctrlKey) saveBoard(placedSprites); // save board (not sprite sheet)
                         if (event.repeat) { return }
                         break;
-                    case 's': // save sprite sheet only
+                    case ',': // save sprite sheet only
                         saveSpriteSheet(getSpriteSheet()); // UPDATE
                         showStatusMessage('Sprite sheet saved');
                         if (event.repeat) { return }
                         break;
-                    case 'l': // load sprite sheet only
-                        loadSpriteSheet(handleLoadedSpriteSheet); // UPDATE
+                    case '/': // load sprite sheet only
+                    
+                        //loadSpriteSheet(handleLoadedSpriteSheet); // UPDATE
+                        loadSpriteSheetDialog((spriteSheet) => {
+                            replaceSpriteSheet(spriteSheet);
+                            drawBoard(); // Redraw to reflect new sprites
+                            console.log('Spritesheet loaded!');
+                        });
                         showStatusMessage('Sprite sheet loaded');
                         if (event.repeat) { return }
                         break;
