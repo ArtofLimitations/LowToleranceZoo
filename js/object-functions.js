@@ -45,7 +45,7 @@ export const defaultStatusMessageStyle = {
     font: "bold 16px 'Fira Code', monospace",
     letterSpacing: 2,
     shadow: false,
-    duration: 2000
+    duration: 4000
 };
 
 // Global mixin storage
@@ -298,7 +298,8 @@ function parseScript(text) {
                 !lines[index + 1].startsWith("*") &&
                 !lines[index + 1].startsWith("--") &&
                 !lines[index + 1].startsWith("$") &&
-                !lines[index + 1].startsWith("!")
+                !lines[index + 1].startsWith("!") &&
+                !lines[index + 1].startsWith("/")
             ) {
                 textBlock += "\n" + lines[index + 1];
                 index++;
@@ -461,10 +462,12 @@ export function resolveNumericArg(token) {
     const str = String(token).trim();
     if (str === '') return NaN;
 
-    const rndMatch = str.match(/^rnd\s*\(\s*(-?\d+)\s*(?:,\s*(-?\d+)\s*)?\)$/i);
+    const rndMatch = str.match(/^rnd\s*\(\s*(-?\d+)\s*(?:,\s*(-?\d+)\s*|to\s+(-?\d+)\s*)?\)$/i);
     if (rndMatch) {
         const a = parseInt(rndMatch[1], 10);
-        const b = rndMatch[2] !== undefined ? parseInt(rndMatch[2], 10) : null;
+        const b = rndMatch[2] !== undefined && rndMatch[2] !== undefined ? parseInt(rndMatch[2], 10)
+                : rndMatch[3] !== undefined ? parseInt(rndMatch[3], 10)
+                : null;
         if (b === null) {
             return Math.floor(Math.random() * (a + 1));
         }

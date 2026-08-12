@@ -29,6 +29,12 @@ let mouse = {
 };
 
 let spriteSheet = {};
+let undoStack = [];
+let redoStack = [];
+const historyLimit = 100;
+let isDrawingUndoGroup = false;
+let drawingHistorySnapshot = null;
+
 // Optional callback to notify caller (main.js) when editor closes or changes current sprite
 let onCloseCallback = null;
 
@@ -42,6 +48,10 @@ const sidebarActionButtons = {
     paste: document.getElementById('spriteButtonPaste'),
     flipY: document.getElementById('spriteButtonFlipY'),
     flipX: document.getElementById('spriteButtonFlipX'),
+    rotateL: document.getElementById('spriteButtonRotateL'),
+    rotateR: document.getElementById('spriteButtonRotateR'),
+    undo: document.getElementById('spriteButtonUndo'),
+    redo: document.getElementById('spriteButtonRedo'),
     clear: document.getElementById('spriteButtonClear'),
     invert: document.getElementById('spriteButtonInvert'),
     delDark: document.getElementById('spriteButtonDelDark'),
@@ -66,73 +76,199 @@ function setSpriteColor(color) {
     syncSidebarColorButtons();
 }
 
+function areSpriteDataEqual(a, b) {
+    if (a === b) return true;
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let y = 0; y < a.length; y++) {
+        const rowA = a[y];
+        const rowB = b[y];
+        if (!Array.isArray(rowA) || !Array.isArray(rowB) || rowA.length !== rowB.length) return false;
+        for (let x = 0; x < rowA.length; x++) {
+            if (rowA[x] !== rowB[x]) return false;
+        }
+    }
+    return true;
+}
+
+function resetSpriteHistory() {
+    undoStack.length = 0;
+    redoStack.length = 0;
+    isDrawingUndoGroup = false;
+    drawingHistorySnapshot = null;
+}
+
+function pushSpriteHistory(previous, next, label = '') {
+    if (areSpriteDataEqual(previous, next)) return;
+    if (undoStack.length >= historyLimit) undoStack.shift();
+    undoStack.push({ previous: structuredClone(previous), next: structuredClone(next), label });
+    redoStack.length = 0;
+}
+
+function applySpriteState(state) {
+    spriteData = structuredClone(state);
+    drawGrid();
+}
+
+function undoSpriteAction() {
+    if (!undoStack.length) return;
+    const entry = undoStack.pop();
+    redoStack.push({ previous: structuredClone(entry.previous), next: structuredClone(entry.next), label: entry.label });
+    applySpriteState(entry.previous);
+}
+
+function redoSpriteAction() {
+    if (!redoStack.length) return;
+    const entry = redoStack.pop();
+    undoStack.push({ previous: structuredClone(entry.previous), next: structuredClone(entry.next), label: entry.label });
+    applySpriteState(entry.next);
+}
+
+const onSpriteMouseUp = () => {
+    mouse.down = false;
+    commitSpriteDrawHistory();
+};
+
+const onSpriteMouseLeave = () => {
+    mouse.down = false;
+    commitSpriteDrawHistory();
+};
+
+const onSpriteKeyUp = () => {
+    mouse.ctrl = false;
+};
+
+/*function redoSpriteAction() {
+    if (!redoStack.length) return;
+    const entry = redoStack.pop();
+    undoStack.push({ previous: structuredClone(entry.previous), next: structuredClone(entry.next), label: entry.label });
+    applySpriteState(entry.next);
+}*/
+
+function beginSpriteDrawHistory() {
+    if (!isDrawingUndoGroup) {
+        drawingHistorySnapshot = structuredClone(spriteData);
+        isDrawingUndoGroup = true;
+    }
+}
+
+function commitSpriteDrawHistory() {
+    if (!isDrawingUndoGroup) return;
+    const before = drawingHistorySnapshot;
+    const after = spriteData;
+    isDrawingUndoGroup = false;
+    drawingHistorySnapshot = null;
+    pushSpriteHistory(before, after, 'draw');
+}
+
 function handleSidebarAction(action) {
     switch (action) {
         case 'copy':
             clipboard = structuredClone(spriteData);
             console.log('Sprite copied to clipboard');
             break;
-        case 'paste':
+        case 'paste': {
+            const before = structuredClone(spriteData);
             if (clipboard && clipboard.length) {
                 spriteData = structuredClone(clipboard);
                 drawGrid();
-                drawSpritePreview();
+                pushSpriteHistory(before, spriteData, 'paste');
             } else {
                 console.log('Clipboard is empty. Copy data first.');
             }
             break;
-        case 'flipY':
+        }
+        case 'flipY': {
+            const before = structuredClone(spriteData);
             spriteData = [...spriteData].reverse();
             drawGrid();
-            drawSpritePreview();
+            pushSpriteHistory(before, spriteData, 'flipY');
             break;
-        case 'flipX':
+        }
+        case 'flipX': {
+            const before = structuredClone(spriteData);
             spriteData = spriteData.map(row => [...row].reverse());
             drawGrid();
-            drawSpritePreview();
+            pushSpriteHistory(before, spriteData, 'flipX');
             break;
-        case 'clear':
+        }
+        case 'clear': {
             if (confirm('Are you sure you want to clear the sprite?')) {
+                const before = structuredClone(spriteData);
                 spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
                 drawGrid();
-                drawSpritePreview();
+                pushSpriteHistory(before, spriteData, 'clear');
                 console.log('Cleared sprite');
             }
             break;
-        case 'invert':
+        }
+        case 'rotateL': {
+            const before = structuredClone(spriteData);
+            spriteData = spriteData[0].map((val, index) => spriteData.map(row => row[row.length - 1 - index]));
+            drawGrid();
+            pushSpriteHistory(before, spriteData, 'rotateL');
+            break;
+        }
+        case 'rotateR': {
+            const before = structuredClone(spriteData);
+            spriteData = spriteData[0].map((val, index) => spriteData.map(row => row[index]).reverse());
+            drawGrid();
+            pushSpriteHistory(before, spriteData, 'rotateR');
+            break;
+        }
+        case 'invert': {
+            const before = structuredClone(spriteData);
             spriteData = invertColor();
             drawGrid();
-            drawSpritePreview();
+            pushSpriteHistory(before, spriteData, 'invert');
             break;
-        case 'delDark':
+        }
+        case 'delDark': {
+            const before = structuredClone(spriteData);
             spriteData = spriteData.map(row => row.map(value => value === 1 ? 2 : value));
             drawGrid();
-            drawSpritePreview();
+            pushSpriteHistory(before, spriteData, 'delDark');
             break;
-        case 'delLight':
+        }
+        case 'delLight': {
+            const before = structuredClone(spriteData);
             spriteData = spriteData.map(row => row.map(value => value === 0 ? 2 : value));
             drawGrid();
-            drawSpritePreview();
+            pushSpriteHistory(before, spriteData, 'delLight');
             break;
-        case 'nudgeUp':
-            spriteData = nudgeSprite(spriteData, "up");
+        }
+        case 'nudgeUp': {
+            const before = structuredClone(spriteData);
+            spriteData = nudgeSprite(spriteData, 'up');
             drawGrid();
-            drawSpritePreview();
+            pushSpriteHistory(before, spriteData, 'nudgeUp');
             break;
-        case 'nudgeDown':
-            spriteData = nudgeSprite(spriteData, "down");
+        }
+        case 'nudgeDown': {
+            const before = structuredClone(spriteData);
+            spriteData = nudgeSprite(spriteData, 'down');
             drawGrid();
-            drawSpritePreview();
+            pushSpriteHistory(before, spriteData, 'nudgeDown');
             break;
-        case 'nudgeLeft':
-            spriteData = nudgeSprite(spriteData, "left");
+        }
+        case 'nudgeLeft': {
+            const before = structuredClone(spriteData);
+            spriteData = nudgeSprite(spriteData, 'left');
             drawGrid();
-            drawSpritePreview();
+            pushSpriteHistory(before, spriteData, 'nudgeLeft');
             break;
-        case 'nudgeRight':
-            spriteData = nudgeSprite(spriteData, "right");
+        }
+        case 'nudgeRight': {
+            const before = structuredClone(spriteData);
+            spriteData = nudgeSprite(spriteData, 'right');
             drawGrid();
-            drawSpritePreview();
+            pushSpriteHistory(before, spriteData, 'nudgeRight');
+            break;
+        }
+        case 'undo':
+            undoSpriteAction();
+            break;
+        case 'redo':
+            redoSpriteAction();
             break;
     }
 }
@@ -179,7 +315,7 @@ function drawGrid() {
             spriteCtx.beginPath();
         }
     }
-    //drawSpritePreview();
+    drawSpritePreview();
 }
 
 function draw(event) {
@@ -192,18 +328,18 @@ function draw(event) {
     const y = Math.floor((event.clientY - rect.top) / pixelSize);
     //console.log(x * pixelSize);
 
-    if (x < gridSize && y < gridSize) {             // draw data to spriteData array if clicked inside grid
+    if (x < gridSize && y < gridSize) {
+        beginSpriteDrawHistory();
         switch (mouse.button) {
             case 0:
-                spriteData[y][x] = currentColor;    // either draw the current color (black or white)
+                spriteData[y][x] = currentColor;
                 break;
             case 2:
-                spriteData[y][x] = 2;               // or draw transparent black
+                spriteData[y][x] = 2;
+                break;
         }
         drawGrid();
     }
-   
-    drawSpritePreview();
 }
 
 function floodFill(x, y, targetColor, fillColor) {
@@ -233,10 +369,15 @@ function handlespriteCanvasClick(event) {
         const targetColor = spriteData[y][x];
         console.log(`target: ${spriteData[y][x]} current: ${currentColor}`);
 
-        if (targetColor !== currentColor) floodFill(x, y, targetColor, currentColor);
+        if (targetColor !== currentColor) {
+            const before = structuredClone(spriteData);
+            floodFill(x, y, targetColor, currentColor);
+            drawGrid();
+            pushSpriteHistory(before, spriteData, 'fill');
+        }
         mouse.down = false;
         mouse.mode = 'draw';
-        drawGrid();
+        return;
     }
     draw(event);
 }
@@ -322,6 +463,20 @@ function handleKeyboard(event) {
             break;
         case '2':
             setSpriteColor(0);
+            break;
+        case 'z':
+        case 'Z':
+            if (event.ctrlKey || event.metaKey) {
+                undoSpriteAction();
+                return;
+            }
+            break;
+        case 'y':
+        case 'Y':
+            if (event.ctrlKey || event.metaKey) {
+                redoSpriteAction();
+                return;
+            }
             break;
         case "!": // delete all dark
             spriteData = spriteData.map(row => row.map(value => value === 1 ? 2 : value));
@@ -428,9 +583,9 @@ function addSpriteEvents() {
     // Add events for sprite editor
     // Event listeners for mouse click
     spriteCanvas.addEventListener('mousedown', handlespriteCanvasClick);
-    spriteCanvas.addEventListener('mouseup', () => { mouse.down = false; });
+    spriteCanvas.addEventListener('mouseup', onSpriteMouseUp);
     spriteCanvas.addEventListener('mousemove', handleMouseMove);
-    spriteCanvas.addEventListener('mouseleave', () => { mouse.down = false; });
+    spriteCanvas.addEventListener('mouseleave', onSpriteMouseLeave);
 
     if (sidebarColorButtons.dark) {
         sidebarColorButtons.dark.onclick = () => setSpriteColor(1);
@@ -449,6 +604,12 @@ function addSpriteEvents() {
     }
     if (sidebarActionButtons.flipX) {
         sidebarActionButtons.flipX.onclick = () => handleSidebarAction('flipX');
+    }
+    if (sidebarActionButtons.rotateL) {
+        sidebarActionButtons.rotateL.onclick = () => handleSidebarAction('rotateL');
+    }
+    if (sidebarActionButtons.rotateR) {
+        sidebarActionButtons.rotateR.onclick = () => handleSidebarAction('rotateR');
     }
     if (sidebarActionButtons.clear) {
         sidebarActionButtons.clear.onclick = () => handleSidebarAction('clear');
@@ -474,22 +635,28 @@ function addSpriteEvents() {
     if (sidebarActionButtons.nudgeRight) {
         sidebarActionButtons.nudgeRight.onclick = () => handleSidebarAction('nudgeRight');
     }
+    if (sidebarActionButtons.undo) {
+        sidebarActionButtons.undo.onclick = () => handleSidebarAction('undo');
+    }
+    if (sidebarActionButtons.redo) {
+        sidebarActionButtons.redo.onclick = () => handleSidebarAction('redo');
+    }
 
     // Event listener for keyboard
     document.addEventListener('keydown', handleKeyboard);
-    document.addEventListener('keyup', () => { mouse.ctrl = false; });
+    document.addEventListener('keyup', onSpriteKeyUp);
 }
 
 function removeSpriteEvents() {
     // Add events for sprite editor
     // Event listeners for mouse click
     spriteCanvas.removeEventListener('mousedown', handlespriteCanvasClick);
-    spriteCanvas.removeEventListener('mouseup', () => { });
-    spriteCanvas.removeEventListener("mousemove", handleMouseMove);
-    spriteCanvas.removeEventListener('mouseleave', () => { });
+    spriteCanvas.removeEventListener('mouseup', onSpriteMouseUp);
+    spriteCanvas.removeEventListener('mousemove', handleMouseMove);
+    spriteCanvas.removeEventListener('mouseleave', onSpriteMouseLeave);
     // Event listener for keyboard
     document.removeEventListener('keydown', handleKeyboard);
-    document.removeEventListener('keyup', handleKeyboard);
+    document.removeEventListener('keyup', onSpriteKeyUp);
 }
 
 export function updateSpriteData(current) {
@@ -501,6 +668,7 @@ export function updateSpriteData(current) {
         console.log('creating new sprite')
         spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2));
     }
+    resetSpriteHistory();
     drawGrid();
 }
 

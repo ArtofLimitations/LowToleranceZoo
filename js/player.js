@@ -6,11 +6,13 @@ import { defaultPlayerStats } from './player-stats.js';
 import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, resolveNumericArg, RESERVED_FLAG_WORDS } from './object-functions.js';
 import { getAudioStore } from './ltz.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
+import * as Howler from './modules/howler.js';
 
 // Audio
-const _audioCtx = new AudioContext();
-const _audioBufferCache = {};
-let _currentMusicSource = null;
+let audioCtx = null; // Legacy AudioContext fallback if needed
+const audioBufferCache = {};
+let currentMusicSource = null;
+let howlInstances = {};
 
 // Canvas Configurations
 const displayWidth = 1154;
@@ -676,6 +678,23 @@ function executeObjectCommand(obj, command) {
                     console.log(`Moved object to (${targetX}, ${targetY})${force ? ' with force' : ''}`);
                     break;
                 }
+                case 'movePlayer': {
+
+
+
+
+
+
+
+
+                    const moveParams = resolveMoveParams(obj, command.args);
+                    if (!moveParams) {
+                        console.warn(`Invalid direction "${command.args.join(' ')}" provided for #movePlayer`);
+                        break;
+                    }
+                    movePlayer(moveParams.direction, moveParams.step);
+                    break;
+                }
                 case "change": {
                     const spriteNumber = resolveNumericArg(command.args[0]);
                     if (isNaN(spriteNumber)) {
@@ -823,6 +842,7 @@ function executeObjectCommand(obj, command) {
                         ? command.args.slice(eqIndex + 1).join(" ").replace(/^"|"$/g, '')
                         : command.args.slice(1).join(" ").replace(/^"|"$/g, '');
                     scriptGlobals[varName] = value;
+                    console.log(`Global variables:`, scriptGlobals);
                     break;
                 }
                 case "set": {
@@ -1203,7 +1223,7 @@ function executeObjectCommand(obj, command) {
                     break;
                 }
                 case 'stop':
-                    
+
                 case "debug":
                     console.log("DEBUG: Object script:", obj.script);
                     console.log("DEBUG: Object labels:", obj.labels);
@@ -1403,12 +1423,43 @@ canvas.addEventListener('click', function (event) {
     }
 });
 
-function substituteGlobals(args) {
-    return args.map(arg =>
-        arg.startsWith('$') && scriptGlobals[arg] !== undefined
-            ? scriptGlobals[arg]
-            : arg
-    );
+function substituteGlobals(value) {
+    if (typeof value === 'string') {
+        return value.replace(/\$[a-zA-Z_][a-zA-Z0-9_]*/g, (placeholder) => {
+            if (!Object.prototype.hasOwnProperty.call(scriptGlobals, placeholder)) return placeholder;
+            const stored = scriptGlobals[placeholder];
+            if (typeof stored === 'string') {
+                const resolvedNumber = resolveNumericArg(stored);
+                return isNaN(resolvedNumber) ? stored : String(resolvedNumber);
+            }
+            return String(stored);
+        });
+    }
+
+    if (Array.isArray(value)) {
+        return value.map(arg =>
+            arg.startsWith('$') && scriptGlobals[arg] !== undefined
+                ? scriptGlobals[arg]
+                : arg
+        );
+    }
+
+    return value;
+}
+
+function jumpToLabel(obj, label) {
+    // label should include the colon, e.g., ':click'
+    if (!obj.labels || !obj.labels[label]) {
+        console.warn(`Label ${label} not found in object script.`);
+        return;
+    }
+    const index = resolveLabel(obj, label);
+    if (index !== null) {
+        obj.scriptIndex = index;
+        obj.waitTime = 0;
+        obj.waiting = false;
+        obj.resting = false;
+    }
 }
 
 async function playAudio(trackName, { loop = false, stopCurrent = true } = {}) {
@@ -1416,25 +1467,34 @@ async function playAudio(trackName, { loop = false, stopCurrent = true } = {}) {
     const store = getAudioStore();
     // Search by exact key first, then fall back to name-only match
     let key = Object.keys(store).find(k => k === trackName) ||
-               Object.keys(store).find(k => k.endsWith('/' + trackName));
+        Object.keys(store).find(k => k.endsWith('/' + trackName));
     if (!key) {
         console.warn(`#play: Track "${trackName}" not found in audio store.`);
         return;
     }
-    if (stopCurrent && _currentMusicSource) {
-        try { _currentMusicSource.stop(); } catch (_) {}
-        _currentMusicSource = null;
+
+    // TODO: migrate this to Howler playback.
+    // The current implementation uses the Web Audio API directly.
+    // Later it should create/reuse a Howl instance from the stored bytes
+    // and play it with Howl.play() / Howl.loop(loop) / Howl.stop().
+
+    if (stopCurrent && currentMusicSource) {
+        try { currentMusicSource.stop(); } catch (_) { }
+        currentMusicSource = null;
     }
-    if (_audioCtx.state === 'suspended') await _audioCtx.resume();
-    if (!_audioBufferCache[key]) {
-        _audioBufferCache[key] = await _audioCtx.decodeAudioData(store[key].buffer.slice(0));
+    if (!audioCtx) {
+        audioCtx = new AudioContext();
     }
-    const source = _audioCtx.createBufferSource();
-    source.buffer = _audioBufferCache[key];
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    if (!audioBufferCache[key]) {
+        audioBufferCache[key] = await audioCtx.decodeAudioData(store[key].buffer.slice(0));
+    }
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBufferCache[key];
     source.loop = loop;
-    source.connect(_audioCtx.destination);
+    source.connect(audioCtx.destination);
     source.start(0);
-    if (loop) _currentMusicSource = source;
+    if (loop) currentMusicSource = source;
     return source;
 }
 
@@ -1552,6 +1612,16 @@ function showStatusMessage(message, duration = defaultStatusMessageStyle.duratio
         container.appendChild(el);
     }
 
+    // 3. Trigger keyframe animation directly in JS
+    el.animate([
+        { opacity: 0, transform: 'translateX(-50%) translateY(10px)' }, // Start state
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)' }      // End state
+    ], {
+        duration: 300, // Duration in ms
+        easing: 'ease-out',
+        fill: 'forwards' // Retain end state
+    });
+
     // Merge provided style with defaults
     const s = { ...defaultStatusMessageStyle, ...(style || {}) };
 
@@ -1568,7 +1638,7 @@ function showStatusMessage(message, duration = defaultStatusMessageStyle.duratio
     parts.push('padding:8px 24px');
     parts.push('border-radius:6px');
     parts.push('pointer-events:none');
-    parts.push('z-index:10000');
+    parts.push('z-index:99');
     parts.push('display:block');
     parts.push('text-align:center');
     parts.push('max-width:80%');
@@ -1588,8 +1658,10 @@ function showStatusMessage(message, duration = defaultStatusMessageStyle.duratio
     // Apply all styles at once
     el.style.cssText = parts.join(';') + ';';
 
+    const resolved = substituteGlobals(message);
+
     // Set message text (use textContent to avoid HTML injection)
-    el.textContent = message;
+    el.textContent = resolved;
 
     // Clear previous timeout and set hide timer
     clearTimeout(el._timeout);
@@ -1653,21 +1725,6 @@ function getObjectAtTile(tileX, tileY, layer = 1) {
     // Default to layer 1 if not specified
     const key = `${layer},${tileX},${tileY}`;
     return placedObjects[key] || null;
-}
-
-function jumpToLabel(obj, label) {
-    // label should include the colon, e.g., ':click'
-    if (!obj.labels || !obj.labels[label]) {
-        console.warn(`Label ${label} not found in object script.`);
-        return;
-    }
-    const index = resolveLabel(obj, label);
-    if (index !== null) {
-        obj.scriptIndex = index;
-        obj.waitTime = 0;
-        obj.waiting = false;
-        obj.resting = false;
-    }
 }
 
 function checkTiles(x, y, direction = 'down') {
@@ -2303,7 +2360,7 @@ function handleLoadedBoard(spriteSheetData, boardData) {
         playerPaused = false;
     }
     player.locked = false;
- 
+
     //stats = player.stats;
     console.log('Loaded Stats', playerStats);
     console.log(player);
@@ -2348,14 +2405,13 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
             return null;
         })();
 
-        // Merge: saved settings win, then world-derived fallbacks
+        const savedNightMode = saved?.nightMode ?? saved?.nightmode ?? saved?.dark ?? false;
         boardData[board] = {
             ...(saved || {}),
             boardName: (saved && saved.boardName) || getBoardName(board),
             playerStart: (saved && saved.playerStart) || fallbackPlayerStart,
-            // Keep any light/night flags from world data if present, otherwise from saved, otherwise defaults
             light: world[board].light !== undefined ? world[board].light : (saved?.light ?? true),
-            nightMode: world[board].nightMode !== undefined ? world[board].nightMode : (saved?.nightMode ?? saved?.nightmode ?? false)
+            nightMode: world[board].nightMode !== undefined ? world[board].nightMode : savedNightMode
         };
     }
 
@@ -2377,7 +2433,8 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
     player = findPlayerSprite();
     playerStats = structuredClone(defaultPlayerStats); // Reset player stats
     player = { ...playerStats, ...player };
-    nightMode = false;
+    //nightMode = false;
+    nightMode = boardData[currentBoard]?.nightMode || false;
     gamePaused = false;
     if (playerPaused) {
         hidePauseMessage();
@@ -2389,6 +2446,7 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
     // Hide dialog and game over boxes
     document.getElementById('dialog-box').style.display = 'none';
     document.getElementById('game-over-box').style.display = 'none';
+    document.title = `LTZ - 'Untitled'`; // Placeholder title
     canvas.focus(); // Ensure canvas is focused for input
 
     console.log('Loaded World');
@@ -2469,6 +2527,9 @@ async function switchBoard(board, colorKey = null, edgePlacement = null) {
         }
     }
 
+    //nightmode
+    nightMode = boardData[board]?.nightMode || false;
+
     player.locked = false; // Unlock player movement
 
     currentBoard = board;
@@ -2506,7 +2567,7 @@ function findPlayerSprite() {
 }
 
 // Key mapping (now using key names instead of key codes)
-let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10",  F12: "F12" };
+let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "esc", PageUp: "rePag", PageDown: "avPag", End: "end", Home: "home", ArrowLeft: "left", ArrowUp: "up", ArrowRight: "right", ArrowDown: "down", F1: "F1", F2: "F2", F3: "F3", F4: "F4", F6: "F6", F7: "F7", F8: "F8", F9: "F9", F10: "F10", F12: "F12" };
 
 document.addEventListener("keydown", (event) => {
     canvas.style.cursor = 'none'; // Hide the default cursor when using keyboard controls
@@ -2518,15 +2579,15 @@ document.addEventListener("keydown", (event) => {
         event.preventDefault();
 
         // Stop movement when entering aim mode
-        keys['ArrowUp']    = false;
-        keys['ArrowDown']  = false;
-        keys['ArrowLeft']  = false;
+        keys['ArrowUp'] = false;
+        keys['ArrowDown'] = false;
+        keys['ArrowLeft'] = false;
         keys['ArrowRight'] = false;
         return;
     }
 
     if (shiftAiming && (
-        event.key === 'ArrowUp'   ||
+        event.key === 'ArrowUp' ||
         event.key === 'ArrowDown' ||
         event.key === 'ArrowLeft' ||
         event.key === 'ArrowRight')) {
@@ -2607,7 +2668,7 @@ document.addEventListener("keydown", (event) => {
                 w.size,
                 w.damage
             ));
-            console.log('Shot fired. Active bullets:', bulletArray.filter(b => b.active).length);
+            //console.log('Shot fired. Active bullets:', bulletArray.filter(b => b.active).length);
         }
 
         if (event.key === 'n') { // M to toggle night mode (TEMPORARY)
@@ -2637,7 +2698,7 @@ document.addEventListener('keyup', (event) => {
 
     updateDirection(); // Update direction when key is released
     if (
-        event.key === 'ArrowUp'   ||
+        event.key === 'ArrowUp' ||
         event.key === 'ArrowDown' ||
         event.key === 'ArrowLeft' ||
         event.key === 'ArrowRight'

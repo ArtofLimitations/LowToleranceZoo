@@ -44,6 +44,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentAmount = 1;               // current value for item amount (ammo, coins, health, etc)
     let tileData = { script: '' };       // extra data for tile (script, amount, etc)
     let popup = { active: false, type: null };
+    let popupOutsideClickHandler = null;
+    let popupKeydownHandler = null;
+    let popupCloseCallback = null;
     let colorIntensity = 10;             // lighten/darken intensity (1-50)
     let intensityTooltip = { visible: false, timeout: null }; // tooltip for intensity changes
     let boardList = [[1, 'Title Screen'], [2, 'Default']];
@@ -84,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
             reenterWhenHurt: options.reenterWhenHurt !== undefined ? options.reenterWhenHurt : false,
             linkedBoards: options.linkedBoards || { east: null, west: null, north: null, south: null },
             dark: options.dark || false,
-            nightmode: options.nightmode || false,
+            nightMode: options.nightMode !== undefined ? options.nightMode : options.nightmode || false,
             layer1Opacity: options.layer1Opacity !== undefined ? options.layer1Opacity : 1.0,
             layer2Opacity: options.layer2Opacity !== undefined ? options.layer2Opacity : 1.0,
             layer3Opacity: options.layer3Opacity !== undefined ? options.layer3Opacity : 1.0,
@@ -97,24 +100,55 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function normalizeBoardSettings(settings) {
+        if (!settings || typeof settings !== 'object') return settings;
+        if (settings.nightmode !== undefined && settings.nightMode === undefined) {
+            settings.nightMode = settings.nightmode;
+            delete settings.nightmode;
+        }
+        return settings;
+    }
+
     // Initialize board settings for a specific board
     function initializeBoardSettings(boardId, options = {}) {
         const defaults = createDefaultBoardSettings(boardId, options);
-        const existing = worldSaveData.boardSettings[boardId];
+        let existing = normalizeBoardSettings(worldSaveData.boardSettings[boardId]);
 
         if (!existing) {
-            worldSaveData.boardSettings[boardId] = defaults;
-        } else {
-            worldSaveData.boardSettings[boardId] = {
-                ...defaults,
-                ...existing
-            };
+            worldSaveData.boardSettings[boardId] = JSON.parse(JSON.stringify(defaults));
+            console.log('initializeBoardSettings: created defaults for board', boardId);
+            return worldSaveData.boardSettings[boardId];
+        }
 
-            if (options.boardName) {
-                worldSaveData.boardSettings[boardId].boardName = options.boardName;
+        // Detect accidental shared references between boards and fix them.
+        for (const otherId in worldSaveData.boardSettings) {
+            if (Number(otherId) === Number(boardId)) continue;
+            if (worldSaveData.boardSettings[otherId] === existing) {
+                console.warn('initializeBoardSettings: duplicated settings reference detected for board', boardId, 'and board', otherId);
+                existing = JSON.parse(JSON.stringify(existing));
+                worldSaveData.boardSettings[boardId] = existing;
+                break;
             }
         }
 
+        // If no options provided, return existing settings directly to avoid
+        // re-merging and re-cloning on hot paths (draw loops, getters, etc.).
+        if (!options || Object.keys(options).length === 0) {
+            return existing;
+        }
+
+        // Merge options into a cloned settings object when explicit options are given
+        worldSaveData.boardSettings[boardId] = JSON.parse(JSON.stringify({
+            ...defaults,
+            ...existing,
+            ...options
+        }));
+
+        if (options.boardName) {
+            worldSaveData.boardSettings[boardId].boardName = options.boardName;
+        }
+
+        console.log('initializeBoardSettings: merged settings for board', boardId);
         return worldSaveData.boardSettings[boardId];
     }
 
@@ -931,12 +965,23 @@ document.addEventListener('DOMContentLoaded', () => {
         world = worldData || world; // Load the world data
 
         worldSaveData.worldSettings = Object.keys(worldSettingsData).length ? worldSettingsData : worldSaveData.worldSettings;
-        worldSaveData.boardSettings = boardSettingsData || {};
+        worldSaveData.boardSettings = JSON.parse(JSON.stringify(boardSettingsData || {}));
 
         // Ensure every board has settings (fills in new defaults without overwriting existing values)
         boardList.forEach(([boardId, boardName]) => {
             initializeBoardSettings(boardId, { boardName: boardName });
         });
+
+        // Sanity check for shared settings objects after load
+        const seen = new Map();
+        for (const boardId in worldSaveData.boardSettings) {
+            const settingsObj = worldSaveData.boardSettings[boardId];
+            if (seen.has(settingsObj)) {
+                console.warn('handleLoadedWorld: shared board settings object detected for boards', seen.get(settingsObj), boardId);
+            } else {
+                seen.set(settingsObj, boardId);
+            }
+        }
 
         replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
 
@@ -1047,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!list) return;
             list.innerHTML = '';
             const store = getAudioStore();
-            const keys  = Object.keys(store);
+            const keys = Object.keys(store);
             if (keys.length === 0) {
                 const empty = document.createElement('li');
                 empty.className = 'audio-import-empty';
@@ -1058,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', () => {
             keys.forEach(key => {
                 // key = 'audio/sfx/coin.ogg'
                 const parts = key.split('/');
-                const cat  = parts[1];               // 'sfx' or 'music'
+                const cat = parts[1];               // 'sfx' or 'music'
                 const name = parts.slice(2).join('/');
                 const li = document.createElement('li');
                 li.className = 'audio-import-item';
@@ -1091,9 +1136,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAudioList();
 
         // Wire up the import button
-        const importBtn  = document.getElementById('importAudioButton');
-        const fileInput  = document.getElementById('audioFileInput');
-        const nameInput  = document.getElementById('audioNameInput');
+        const importBtn = document.getElementById('importAudioButton');
+        const fileInput = document.getElementById('audioFileInput');
+        const nameInput = document.getElementById('audioNameInput');
         const categorySelect = document.getElementById('audioCategorySelect');
 
         // Remove old listeners by replacing the button
@@ -1105,14 +1150,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const file = fileInput.files[0];
             if (!file) { alert('Please select an audio file first.'); return; }
             const category = categorySelect ? categorySelect.value : 'sfx';
-            const rawName  = nameInput.value.trim() || file.name;
+            const rawName = nameInput.value.trim() || file.name;
             // Normalise: keep only the filename, strip path
             const safeName = rawName.replace(/[\\/:*?"<>|]/g, '_');
 
             file.arrayBuffer().then(buffer => {
                 addAudioToStore(category, safeName, new Uint8Array(buffer));
-                fileInput.value  = '';
-                nameInput.value  = '';
+                fileInput.value = '';
+                nameInput.value = '';
                 renderAudioList();
                 showStatusMessage(`Audio imported: ${safeName}`);
             });
@@ -1121,23 +1166,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Close on Escape
         const handleClose = (event) => {
             if (!popup.active || popup.type !== 'audioImporterBox') {
-                document.removeEventListener('keydown', handleClose);
+                removePopupKeydownHandler();
                 return;
             }
             if (event.key === 'Escape') {
                 event.preventDefault();
                 closePopup();
-                document.removeEventListener('keydown', handleClose);
             }
         };
-        document.addEventListener('keydown', handleClose);
+        addPopupKeydownHandler(handleClose);
 
         // Wire close button
         const closeBtn = document.getElementById('audioImporterClose');
         if (closeBtn) closeBtn.onclick = () => closePopup();
 
         popup.active = true;
-        popup.type   = 'audioImporterBox';
+        popup.type = 'audioImporterBox';
         overlay.style.display = 'block';
         container.style.display = 'flex';
     }
@@ -1157,7 +1201,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const boardId = currentBoard;
         const currentBoardData = boardList.find(board => board[0] === boardId);
         const boardName = currentBoardData ? currentBoardData[1] : `Board ${boardId}`;
-        const settings = initializeBoardSettings(boardId, { boardName: boardName });
+
+        // Load the stored settings for this board but operate on a local clone
+        // inside the popup UI to avoid accidental mutations that could affect
+        // other boards if references were shared. We'll write back a cloned
+        // object when the popup closes or on explicit sync.
+        const storedSettings = initializeBoardSettings(boardId, { boardName: boardName });
+
+        // Diagnostic: warn if the stored settings object is the same reference
+        // as any other board's settings (shouldn't happen). This helps track
+        // down cases where multiple boards point to one object.
+        for (const otherId in worldSaveData.boardSettings) {
+            if (Number(otherId) === Number(boardId)) continue;
+            if (worldSaveData.boardSettings[otherId] === storedSettings) {
+                console.warn('Shared settings reference detected between boards', boardId, otherId);
+            }
+        }
+
+        const settings = JSON.parse(JSON.stringify(storedSettings));
+        if (settings.nightmode !== undefined && settings.nightMode === undefined) {
+            settings.nightMode = settings.nightmode;
+            delete settings.nightmode;
+        }
 
         // Build the UI inside the popup dynamically so it matches current data
 
@@ -1211,7 +1276,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startLayerInput.value = settings.playerStart?.layer ?? 2;
         reenterInput.checked = !!settings.reenterWhenHurt;
         darkInput.checked = !!settings.dark;
-        nightInput.checked = !!settings.nightmode;
+        nightInput.checked = !!settings.nightMode;
         lockedInput.checked = !!settings.playerLocked;
         canAttackInput.checked = !!settings.playerCanAttack;
         scriptInput.value = settings.boardScript || '';
@@ -1248,7 +1313,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         nightInput.onchange = () => {
-            settings.nightmode = nightInput.checked;
+            settings.nightMode = nightInput.checked;
         };
 
         lockedInput.onchange = () => {
@@ -1277,30 +1342,58 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         [northInput, eastInput, southInput, westInput].forEach((input) => {
             if (!input) return;
-            input.oninput = updateLinkedBoards;
+            input.onchange = updateLinkedBoards;
         });
 
         scriptInput.oninput = () => {
             settings.boardScript = scriptInput.value;
         };
 
+        const syncBoardInfoSettings = () => {
+            settings.boardName = nameInput.value.trim() || `Board ${boardId}`;
+            settings.bulletLimit = Number.isFinite(parseInt(bulletLimitInput.value, 10)) ? parseInt(bulletLimitInput.value, 10) : 0;
+            settings.playerStart = {
+                x: Number.isFinite(parseInt(startXInput.value, 10)) ? parseInt(startXInput.value, 10) : 0,
+                y: Number.isFinite(parseInt(startYInput.value, 10)) ? parseInt(startYInput.value, 10) : 0,
+                layer: Number.isFinite(parseInt(startLayerInput.value, 10)) ? parseInt(startLayerInput.value, 10) : 2,
+            };
+            settings.reenterWhenHurt = reenterInput.checked;
+            settings.dark = darkInput.checked;
+            settings.nightMode = nightInput.checked;
+            settings.playerLocked = lockedInput.checked;
+            settings.playerCanAttack = canAttackInput.checked;
+            updateLinkedBoards();
+            settings.boardScript = scriptInput.value;
+            worldSaveData.boardSettings[boardId] = JSON.parse(JSON.stringify(settings));
+        };
+
+        [nameInput, bulletLimitInput, startXInput, startYInput, startLayerInput, reenterInput, darkInput, nightInput, lockedInput, canAttackInput, northInput, eastInput, southInput, westInput, scriptInput].forEach((input) => {
+            if (!input) return;
+            input.onchange = syncBoardInfoSettings;
+        });
+
         const handleClose = (event) => {
             if (!popup.active || popup.type !== 'boardInfoBox') {
-                document.removeEventListener('keydown', handleClose);
+                removePopupKeydownHandler();
                 return;
             }
-            if (event.key === 'Enter' || event.key === 'Escape') {
+            if (event.key === 'Escape') {
                 event.preventDefault();
                 closePopup();
-                document.removeEventListener('keydown', handleClose);
             }
         };
-        document.addEventListener('keydown', handleClose);
+        addPopupKeydownHandler(handleClose);
+        popupCloseCallback = () => {
+            syncBoardInfoSettings();
+            worldSaveData.boardSettings[boardId] = JSON.parse(JSON.stringify(settings));
+            console.log('Saved board settings for board', boardId, worldSaveData.boardSettings[boardId]);
+        };
 
         popup.active = true;
         popup.type = 'boardInfoBox';
         overlay.style.display = 'block';
         boardInfoContainer.style.display = 'flex';
+        addPopupOutsideClickHandler();
     }
 
 
@@ -1335,14 +1428,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update the text content of the element
         spriteSheetLength.textContent = `(${getSpriteSheet().length}/300)`;
 
-        document.addEventListener('keydown', (event) => {
-            if (popup.active && popup.type === 'spriteSelect' && event.key === 'Enter' || event.key === 'Escape') {
-                popup.active = false; // Close the popup
-                overlay.style.display = 'none'; // Hide the overlay
-                spriteContainer.style.display = 'none'; // Hide the popup container
-                canvas.focus(); // Focus back on the canvas
+        const handleSpriteSelectClose = (event) => {
+            if (!popup.active || popup.type !== 'spriteSelect') {
+                removePopupKeydownHandler();
+                return;
             }
-        });
+            if (event.key === 'Enter' || event.key === 'Escape') {
+                closePopup();
+                spriteContainer.style.display = 'none';
+            }
+        };
+        addPopupKeydownHandler(handleSpriteSelectClose);
     }
 
     function createSpriteGallery(spriteSheet, onSpriteClick) {
@@ -1654,8 +1750,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initializeQuickMenuInteractions();
 
+    function removePopupOutsideClickHandler() {
+        if (!popupOutsideClickHandler) return;
+        document.removeEventListener('mousedown', popupOutsideClickHandler);
+        popupOutsideClickHandler = null;
+    }
+
+    function addPopupOutsideClickHandler() {
+        removePopupOutsideClickHandler();
+        popupOutsideClickHandler = (event) => {
+            if (!popup.active || !popup.type) return;
+            const activePopup = document.getElementById(popup.type);
+            if (!activePopup || activePopup.contains(event.target)) return;
+            closePopup();
+        };
+        document.addEventListener('mousedown', popupOutsideClickHandler);
+    }
+
+    function removePopupKeydownHandler() {
+        if (!popupKeydownHandler) return;
+        document.removeEventListener('keydown', popupKeydownHandler);
+        popupKeydownHandler = null;
+    }
+
+    function addPopupKeydownHandler(handler) {
+        removePopupKeydownHandler();
+        popupKeydownHandler = handler;
+        document.addEventListener('keydown', popupKeydownHandler);
+    }
+
     function closePopup() {
         if (!popup.type) return; // If no popup type is active, do nothing
+
+        if (typeof popupCloseCallback === 'function') {
+            try {
+                popupCloseCallback();
+            } catch (err) {
+                console.error('Popup close callback error:', err);
+            }
+            popupCloseCallback = null;
+        }
 
         // Hide the currently active popup
         const activePopup = document.getElementById(popup.type);
@@ -1669,6 +1803,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Hide the overlay
         overlay.style.display = 'none';
+        removePopupOutsideClickHandler();
+        removePopupKeydownHandler();
 
         // Refocus the canvas
         canvas.focus();
@@ -2094,6 +2230,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.ctrlKey || event.metaKey) {
                 // Handle key combinations for both Windows/Linux (Ctrl) and Mac (Cmd)
                 key.ctrl = true;
+
+                // Ctrl/Cmd + Enter: grab color only (similar to Ctrl + right-click)
+                if (event.key === 'Enter') {
+                    grabSprite(tileKey);
+                    if (event.repeat) { return }
+                    event.preventDefault();
+                    return;
+                }
+
                 switch (event.key.toLowerCase()) { // Check the key
                     case 'z':
                         if (event.shiftKey) {
@@ -2125,7 +2270,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (event.repeat) { return }
                         break;
                     case '/': // load sprite sheet only
-                    
+
                         //loadSpriteSheet(handleLoadedSpriteSheet); // UPDATE
                         loadSpriteSheetDialog((spriteSheet) => {
                             replaceSpriteSheet(spriteSheet);
@@ -2266,6 +2411,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (popup.active) {
             // Optionally check if event.target === overlay to only close when clicking the background
             closePopup();
+        }
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+        // 1. Check your state (e.g., whether the user has unsaved changes)
+        const hasUnsavedChanges = true;
+
+        if (hasUnsavedChanges) {
+            // 2. Prevent the default browser action
+            event.preventDefault();
+
+            // 3. Included for legacy browser support (Chrome/Firefox/Safari require event.returnValue)
+            event.returnValue = '';
         }
     });
 

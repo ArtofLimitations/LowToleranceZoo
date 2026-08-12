@@ -7,6 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta name="description" content="Low Tolerance Zoo - A ZZT-style game and editor for the modern web.">
     <title>LTZ Editor</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="js/modules/vanilla-picker.csp.css">
@@ -14,6 +15,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap" rel="stylesheet">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
 </head>
 
 <body>
@@ -21,7 +26,7 @@
 
     <div class="fieldContainer">
         <div class="fieldRow" style="color: #fff">
-            Ctrl + Scroll: zoom in/out | Ctrl + 0: reset zoom
+            Ctrl + Scroll: zoom in/out | Ctrl + 0: reset zoom | F1: Save | F3: Load | Go to Player: <a href="player.html" target="_blank">Here</a>
         </div>
     </div>
 
@@ -188,6 +193,12 @@
                         </div>
                         <div class="fieldRow">
                             <div class="spriteButtonGroup">
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonRotateL" type="button">rotate_left</button>
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonRotateR" type="button">rotate_right</button>
+                            </div>
+                        </div>
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
                                 <button class="spriteButton spriteButtonActions" id="spriteButtonInvert" type="button">Invert</button>
                             </div>
                         </div>
@@ -195,6 +206,12 @@
                             <div class="spriteButtonGroup">
                                 <button class="spriteButton spriteButtonActions" id="spriteButtonDelDark" type="button">Delete Dark</button>
                                 <button class="spriteButton spriteButtonActions" id="spriteButtonDelLight" type="button">Delete Light</button>
+                            </div>
+                        </div>
+                        <div class="fieldRow">
+                            <div class="spriteButtonGroup">
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonUndo" type="button">undo</button>
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonRedo" type="button">redo</button>
                             </div>
                         </div>
                         <div class="fieldRow">
@@ -411,7 +428,7 @@
 
     <canvas id="exportedSpriteCanvas" width="32" height="32" style="margin-top: 20px;"></canvas>
 
-    <div class="info"><span id="versionInfo">LTZ v0.9.3</span></div>
+    <div class="info"><span id="versionInfo">LTZ Alpha Version</span><br>ZZT Style Editor for the modern web.<br>2026 Art Of Limitations - <a href="https://github.com/ArtofLimitations/LowToleranceZoo" target="_blank">GitHub</a></div>
     <script type="module" src="js/main.js"></script>
 </body>
 <!--  http-server ./ -c-1 -->
