@@ -1053,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('hidden layers: ', hiddenLayers);
         console.log('sprite type: ', type);
 
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
         drawBoard();
     };
 
@@ -1710,7 +1710,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!handler) return;
         const tileKey = `${currentLayer},${cursorX},${cursorY}`;
         handler(tileKey);
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
     }
 
     function attachPopupClickHandlers(popupId) {
@@ -2042,7 +2042,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             // callback from sprite editor when it changes or closes
                             currentSprite = newIndex;
                             updateSpriteData(currentSprite);
-                            toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+                            toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
                             drawBoard();
                             canvas.focus();
                         });
@@ -2057,7 +2057,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Swap light and dark colors
                         colors = toolbarSwapColor();
                         updateColor(colors);
-                        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+                        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
                         drawBoard();
                         if (event.repeat) { return }
                         break;
@@ -2127,7 +2127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateLayers(currentLayer);
                         if (event.repeat) { return }
                         drawBoard();
-                        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+                        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
                         return;
                     case 's': // Save board & sprite sheet
                         saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
@@ -2316,7 +2316,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     placedSprites = data;
                                     world[currentBoard] = placedSprites;
                                     drawBoard();
-                                    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+                                    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
                                     clearHistory();
                                     console.log('Board pasted from clipboard');
                                 }
@@ -2361,7 +2361,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         DrawSingleTile(cursorX, cursorY); // Draw the tile at the cursor position
         [mouse.oldX, mouse.oldY] = [cursorX, cursorY];
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
     }
 
     // ######################################
@@ -2385,7 +2385,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 enterPressed = false; // Unlock when Enter is released
             }
         });
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type); // Initialize toolbar with current sprite and colors
+        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY); // Initialize toolbar with current sprite and colors
         colors = currentColors;
         drawBoard(); // Draw function for entire board
         canvas.focus();
@@ -2433,7 +2433,7 @@ document.addEventListener('DOMContentLoaded', () => {
     createPlayer();
     addBoardToWorld(); // Add the current board to the world object
     world[currentBoard] = placedSprites; // Initialize the current board in the world object
-    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
     drawBoard();
     clearHistory();
 });

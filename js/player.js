@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets, weaponDefinitions } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, resolveNumericArg, RESERVED_FLAG_WORDS } from './object-functions.js';
+import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, resolveNumericArg, RESERVED_FLAG_WORDS, defaultDialogStyle, validTypes } from './object-functions.js';
 import { getAudioStore } from './ltz.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 import * as Howler from './modules/howler.js';
@@ -12,6 +12,7 @@ import * as Howler from './modules/howler.js';
 let audioCtx = null; // Legacy AudioContext fallback if needed
 const audioBufferCache = {};
 let currentMusicSource = null;
+let currentMusicKey = null;
 let howlInstances = {};
 
 // Canvas Configurations
@@ -91,28 +92,6 @@ function getEquippedWeaponConfig() {
 // File info
 export let filename = ''; // ############ File to load ###############
 
-const defaultDialogStyle = [
-    'display:none',
-    'flex-direction:column',
-    'justify-content:center',
-    'align-items:center',
-    'position:relative',
-    'overflow:hidden',
-    'top:500px',
-    'margin:0 auto',
-    'width:60%',
-    'max-height:30%',
-    'min-height:10%',
-    'background-color:rgba(0,0,0,0.8)',
-    'border-radius:32px',
-    'color:#fff',
-    "font-family:'Fira Code', monospace",
-    'font-size:24px',
-    'text-shadow:0px 1px 20px #444, 0px 1px 10px rgba(255,255,255,0.8)',
-    'padding:20px 60px',
-    'animation:fade_in_show 0.5s',
-    'z-index:99'
-].join(';');
 let currentDialogStyle = defaultDialogStyle;
 
 function mergeCssStrings(baseCss, extraCss) {
@@ -240,7 +219,11 @@ function updateTile(layer, x, y) {
     const spriteKey = `${layer},${x},${y}`;
     if (placedSprites[spriteKey]) {
         const sprite = placedSprites[spriteKey];
-        drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
+        // Never bake the player sprite into the layer canvases; player is drawn separately.
+        if (sprite.type !== 'player') {
+            drawSpriteToCanvas(ctx, x, y, tileSizeX, tileSizeY, sprite.sprite, sprite.color);
+        }
+        return;
     }
 }
 
@@ -299,24 +282,27 @@ function renderLayersToMainCanvas() {
 
 function drawPlayerAndBulletsToCanvas() {
     ctx.save();
-    ctx.shadowColor = "white";
-    ctx.shadowBlur = 10;
-    ctx.drawImage(getCachedSprite(player.sprite, player.color), player.x * tileSizeX, player.y * tileSizeY);
+    if (!player.hidden) {
+        ctx.shadowColor = "white";
+        ctx.shadowBlur = 10;
+        // Draw the player sprite
+        ctx.drawImage(getCachedSprite(player.sprite, player.color), player.x * tileSizeX, player.y * tileSizeY);
 
-    // Draw red tint if flashing
-    if (player.flashRed) {
-        offscreenCtx.clearRect(0, 0, tileSizeX, tileSizeY);
-        offscreenCtx.drawImage(getSprite(player.sprite, player.color), 0, 0);
+        // Draw red tint if flashing
+        if (player.flashRed) {
+            offscreenCtx.clearRect(0, 0, tileSizeX, tileSizeY);
+            offscreenCtx.drawImage(getSprite(player.sprite, player.color), 0, 0);
 
-        offscreenCtx.globalCompositeOperation = "source-in";
-        let alpha = Math.max(0, player.flashTimer / 200);
-        offscreenCtx.globalAlpha = 0.5 * alpha;
-        offscreenCtx.fillStyle = "red";
-        offscreenCtx.fillRect(0, 0, tileSizeX, tileSizeY);
-        offscreenCtx.globalAlpha = 1.0;
-        offscreenCtx.globalCompositeOperation = "source-over";
+            offscreenCtx.globalCompositeOperation = "source-in";
+            let alpha = Math.max(0, player.flashTimer / 200);
+            offscreenCtx.globalAlpha = 0.5 * alpha;
+            offscreenCtx.fillStyle = "red";
+            offscreenCtx.fillRect(0, 0, tileSizeX, tileSizeY);
+            offscreenCtx.globalAlpha = 1.0;
+            offscreenCtx.globalCompositeOperation = "source-over";
 
-        ctx.drawImage(offscreenTile, player.x * tileSizeX, player.y * tileSizeY);
+            ctx.drawImage(offscreenTile, player.x * tileSizeX, player.y * tileSizeY);
+        }
     }
 
     bulletArray.forEach(bullet => {
@@ -678,21 +664,65 @@ function executeObjectCommand(obj, command) {
                     console.log(`Moved object to (${targetX}, ${targetY})${force ? ' with force' : ''}`);
                     break;
                 }
-                case 'movePlayer': {
-
-
-
-
-
-
-
-
+                case "movePlayer": {
+                    // Support #movePlay n, #movePlayer right, #movePlayer south force, etc.
                     const moveParams = resolveMoveParams(obj, command.args);
                     if (!moveParams) {
                         console.warn(`Invalid direction "${command.args.join(' ')}" provided for #movePlayer`);
                         break;
                     }
-                    movePlayer(moveParams.direction, moveParams.step);
+                    movePlayerByDirection(moveParams.direction, moveParams.step);
+                    break;
+                }
+                case "teleport": {
+                    // Send player to another board <boardnumber> at an x, y location. Example: #teleport 3 5,10 or #teleport 3 5 10
+                    const targetBoard = resolveNumericArg(command.args[0]);
+                    if (isNaN(targetBoard)) {
+                        console.warn(`#teleport: Invalid board number "${command.args[0]}"`);
+                        break;
+                    }
+                    let targetX, targetY;
+                    if (command.args[1] && command.args[1].includes(',')) {
+                        [targetX, targetY] = command.args[1].split(',').map(s => resolveNumericArg(s.trim()));
+                    } else if (command.args[1] && command.args[2]) {
+                        targetX = resolveNumericArg(command.args[1]);
+                        targetY = resolveNumericArg(command.args[2]);
+                    } else {
+                        console.warn(`#teleport: Missing coordinates for board ${targetBoard}`);
+                        break;
+                    }
+
+                    if (
+                        isNaN(targetX) || isNaN(targetY) ||
+                        targetX < 0 || targetY < 0 || targetX >= tilesX || targetY >= tilesY
+                    ) {
+                        console.warn(`#teleport: Invalid coordinates (${targetX}, ${targetY}) for board ${targetBoard}`);
+                        break;
+                    }
+
+                    // Perform the teleportation
+                    if (targetBoard !== currentBoard) {
+                        // Use switchBoard to centralize loading, rendering, and sanitization.
+                        // Provide an edgePlacement-like object so switchBoard places the player at the requested coords.
+                        switchBoard(targetBoard, null, { targetBoard: targetBoard, targetLayer: player.layer || 2, targetX: targetX, targetY: targetY });
+                    } else {
+                        // If teleporting within the same board, just move the player
+                        movePlayerTo(targetX, targetY);
+                    }
+                    break;
+                }
+                case "hideplayer":
+                case "hidePlayer": {
+                    player.hidden = true;
+                    updateTile(player.layer, player.x, player.y);
+                    renderLayersToMainCanvas();
+                    break;
+                }
+                case "showplayer":
+                case "showPlayer": {
+                    player.hidden = false;
+                    updateTile(player.layer, player.x, player.y);
+                    renderLayersToMainCanvas();
                     break;
                 }
                 case "change": {
@@ -775,6 +805,27 @@ function executeObjectCommand(obj, command) {
                     renderLayersToMainCanvas();
                     break;
                 }
+                case 'become': {
+                    const newType = command.args[0];
+                    if (!newType) {
+                        console.warn("#become: No type provided");
+                        break;
+                    }
+                    if (!validTypes.has(newType)) {
+                        console.warn(`#become: Invalid type "${newType}"`);
+                        break;
+                    }
+                    let spriteKey = `${obj.layer},${obj.x},${obj.y}`;
+                    if (placedSprites[spriteKey]) {
+                        placedSprites[spriteKey].type = newType;
+                    }
+                    if (placedObjects[spriteKey]) {
+                        placedObjects[spriteKey].type = newType;
+                    }
+                    updateTile(obj.layer, obj.x, obj.y);
+                    renderLayersToMainCanvas();
+                    break;
+                }
                 case "give": {
                     let item = command.args[0];
                     let amount = resolveNumericArg(command.args[1]);
@@ -829,6 +880,14 @@ function executeObjectCommand(obj, command) {
                 case "unlock":
                     obj.locked = false;
                     break;
+                case "playerlock":
+                case "playerLock":
+                    player.locked = true;
+                    break;
+                case "playerunlock":
+                case "playerUnlock":
+                    player.locked = false;
+                    break;
                 case "let": {
                     // Usage: #let $var = value
                     let varName = command.args[0];
@@ -845,7 +904,7 @@ function executeObjectCommand(obj, command) {
                     console.log(`Global variables:`, scriptGlobals);
                     break;
                 }
-                case "set": {
+                case "set": { // #set flagName
                     if (!command.args[0]) {
                         console.warn("#set: No flag provided.");
                         break;
@@ -1208,10 +1267,12 @@ function executeObjectCommand(obj, command) {
                     executeObjectCommand(obj, maybeCommand);
                     break;
                 }
-                case 'nightmode':
+                case "nightmode":
                     nightMode = !nightMode;
+                    //set current board setting to nightmode
+                    boardData[currentBoard].settings.nightMode = nightMode;
                     break;
-                case 'play': {
+                case "play": {
                     // args[0] is already unquoted thanks to tokenizeCommand in the parser
                     const trackName = command.args[0];
                     if (!trackName) {
@@ -1473,15 +1534,23 @@ async function playAudio(trackName, { loop = false, stopCurrent = true } = {}) {
         return;
     }
 
-    // TODO: migrate this to Howler playback.
-    // The current implementation uses the Web Audio API directly.
-    // Later it should create/reuse a Howl instance from the stored bytes
-    // and play it with Howl.play() / Howl.loop(loop) / Howl.stop().
+    // Determine category: music vs sfx
+    const isMusic = /(^|\/)music\//.test(key);
 
-    if (stopCurrent && currentMusicSource) {
+    // If requested track is music and already playing, ignore
+    if (isMusic && currentMusicKey === key && currentMusicSource) {
+        console.log(`#play: Music "${trackName}" already playing; ignoring.`);
+        return currentMusicSource;
+    }
+
+    // Stop existing music if a new music track is requested (or stopCurrent requested)
+    if (isMusic && (stopCurrent || currentMusicKey !== null) && currentMusicSource) {
         try { currentMusicSource.stop(); } catch (_) { }
         currentMusicSource = null;
+        currentMusicKey = null;
     }
+
+    // TODO: migrate this to Howler playback. For now use Web Audio API.
     if (!audioCtx) {
         audioCtx = new AudioContext();
     }
@@ -1489,12 +1558,26 @@ async function playAudio(trackName, { loop = false, stopCurrent = true } = {}) {
     if (!audioBufferCache[key]) {
         audioBufferCache[key] = await audioCtx.decodeAudioData(store[key].buffer.slice(0));
     }
+
     const source = audioCtx.createBufferSource();
     source.buffer = audioBufferCache[key];
-    source.loop = loop;
+    source.loop = !!(loop && isMusic); // only loop music when requested
     source.connect(audioCtx.destination);
     source.start(0);
-    if (loop) currentMusicSource = source;
+
+    if (isMusic) {
+        currentMusicSource = source;
+        currentMusicKey = key;
+        if (!source.loop) {
+            source.onended = () => {
+                if (currentMusicSource === source) {
+                    currentMusicSource = null;
+                    currentMusicKey = null;
+                }
+            };
+        }
+    }
+
     return source;
 }
 
@@ -1844,6 +1927,10 @@ function canMoveTo(x, y, object = player) {
     // Check for collision with all placedSprites (except the player itself)
     for (const key in placedSprites) {
         const sprite = placedSprites[key];
+        if (!sprite) {
+            console.warn('placedSprites contains empty/undefined entry at key', key, 'currentBoard:', currentBoard);
+            continue;
+        }
         //if (sprite.type === 'player') continue; // Skip player sprite
 
         const [layer, objX, objY] = key.split(',').map(Number);
@@ -1851,12 +1938,27 @@ function canMoveTo(x, y, object = player) {
         // Only check collision if on the same layer
         if (layer !== object.layer) continue;
 
-        if (sprite.id && object.id && sprite.id === object.id) continue; // Skip collision with itself
+        if (object.id && sprite.id === object.id) continue; // Skip collision with itself
 
-        const objLeft = objX * tileSizeX;
-        const objTop = objY * tileSizeY;
-        const objWidth = sprite.width || tileSizeX; // Use sprite width or default tile size
-        const objHeight = sprite.height || tileSizeY;
+
+        // TESTING: Log sprite and object info for debugging
+        let objLeft, objTop, objWidth, objHeight;
+        try {
+            objLeft = objX * tileSizeX;
+            objTop = objY * tileSizeY;
+            objWidth = sprite.width || tileSizeX; // Use sprite width or default tile size
+            objHeight = sprite.height || tileSizeY;
+        } catch (e) {
+            console.error('Error calculating sprite dimensions for collision:', e);
+            console.error('Sprite data:', sprite);
+            console.log('Object data:', object);
+            console.log('Key:', key);
+            console.log('Current board:', currentBoard);
+            console.log('World:', world[currentBoard]);
+            continue;
+        }
+        // END TESTING
+
 
         if (isBoundingBoxOverlap(
             playerLeft, playerTop, playerWidth, playerHeight,
@@ -2245,6 +2347,10 @@ function updatePlayer(deltaTime) {
     if (accumulatedTime < moveSpeed) return; // Wait for the next frame
     accumulatedTime = 0;
 
+    // Normalize legacy `player.lock` to `player.locked` and respect lock state
+    if (player.lock !== undefined) { player.locked = player.lock; delete player.lock; }
+    if (player.locked) return;
+
     //let oldTiles = getOverlappingTiles(player.x * 32, player.y * 32);
     let newX = player.x;
     let newY = player.y;
@@ -2312,8 +2418,65 @@ function updatePlayer(deltaTime) {
     }
 }
 
+// Move player by a direction and step (step in tiles: 1 or 0.5)
+function movePlayerByDirection(direction, step = 1) {
+    const dir = convertDirections(direction);
+    if (dir === -1) {
+        console.warn(`Invalid direction provided for movePlayer: ${direction}`);
+        return false;
+    }
+
+    const offsets = { up: [0, -step], down: [0, step], left: [-step, 0], right: [step, 0] };
+    if (!offsets[dir]) {
+        console.warn(`movePlayerByDirection: unknown direction ${direction}`);
+        return false;
+    }
+
+    const [dx, dy] = offsets[dir];
+    const targetX = player.x + dx;
+    const targetY = player.y + dy;
+
+    // Set player direction for push logic
+    player.direction = dir;
+
+    // Handle board-edge transitions
+    const edge = canMoveAcrossEdge(targetX, targetY, player.layer);
+    if (edge.allowed) {
+        switchBoard(edge.targetBoard, null, edge);
+        return true;
+    }
+
+    // Try normal movement
+    if (!canMoveTo(targetX, targetY, player)) {
+        // Attempt to push if possible
+        const pushed = tryPushPlayer(player.x, player.y, dir, player.layer);
+        if (pushed) return true;
+        return false;
+    }
+
+    // Perform the move
+    const oldKey = `${player.layer},${player.x},${player.y}`;
+    const newKey = `${player.layer},${targetX},${targetY}`;
+
+    if (!player.transported) {
+        player.x = targetX;
+        player.y = targetY;
+        placedSprites[newKey] = placedSprites[oldKey];
+        delete placedSprites[oldKey];
+    } else {
+        player.x = targetX;
+        player.y = targetY;
+    }
+
+    player.transported = false;
+    player.justInteracted = false;
+    renderLayersToMainCanvas();
+    return true;
+}
+
 function movePlayer(newLayer, newX, newY, shouldRender = true) {
     // Remove player from old position (always from the current board data)
+    player.locked = true; // lock player movement before attempting to move
     const oldBoardSprites = world[currentBoard] || placedSprites;
     const oldKey = `${player.layer},${player.x},${player.y}`;
     if (oldBoardSprites && oldBoardSprites[oldKey]) {
@@ -2331,6 +2494,23 @@ function movePlayer(newLayer, newX, newY, shouldRender = true) {
     placedSprites[newKey] = { ...player, type: 'player' };
 
     if (shouldRender) renderLayersToMainCanvas();
+    player.locked = false; // Ensure player is unlocked after moving
+}
+
+// Remove invalid or undefined entries from placedSprites to avoid runtime errors
+function sanitizePlacedSprites() {
+    for (const key in placedSprites) {
+        const val = placedSprites[key];
+        if (!val || typeof val !== 'object') {
+            delete placedSprites[key];
+            continue;
+        }
+        // Ensure basic expected properties exist
+        if (val.type === undefined) {
+            delete placedSprites[key];
+            continue;
+        }
+    }
 }
 
 // #############################################
@@ -2345,6 +2525,8 @@ function handleLoadedBoard(spriteSheetData, boardData) {
 
     placedObjects = loadObjectsFromGameData(placedSprites);
     console.log('Loaded Board', placedSprites);
+
+    sanitizePlacedSprites();
 
     loaded = true;
     player = findPlayerSprite();
@@ -2423,34 +2605,36 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
     console.log('Loaded board settings:', savedBoardSettings);
 
     currentBoard = 2;
-    placedSprites = world[currentBoard]; // Get the current board from the world object
-    placedObjects = worldObjects[currentBoard]; // Get objects for the current board
+    placedSprites = world[currentBoard];                // Get the current board from the world object
+    placedObjects = worldObjects[currentBoard];         // Get objects for the current board
     placedPassages = worldPassages[currentBoard] || {}; // Load passages for the current board
+    sanitizePlacedSprites();
     Object.keys(spriteCache).forEach(key => delete spriteCache[key]); // Safe clear sprite cache
-    hiddenLayers.clear(); // Clear hidden layers
+    hiddenLayers.clear();                                             // Clear hidden layers
 
-    loaded = true;
-    player = findPlayerSprite();
-    playerStats = structuredClone(defaultPlayerStats); // Reset player stats
-    player = { ...playerStats, ...player };
-    //nightMode = false;
-    nightMode = boardData[currentBoard]?.nightMode || false;
-    gamePaused = false;
-    if (playerPaused) {
+    loaded = true;                                           // Mark the game as loaded
+    player = findPlayerSprite();                             // Find the player sprite on the current board
+    playerStats = structuredClone(defaultPlayerStats);       // Reset player stats
+    player = { ...playerStats, ...player };                  // Merge default stats with player sprite data
+    nightMode = boardData[currentBoard]?.nightMode || false; // Set night mode based on current board settings
+    gamePaused = false;      // Unpause the game
+    if (playerPaused) {      // If the player was paused, hide the pause message
         hidePauseMessage();
         playerPaused = false;
     }
-    player.locked = false;
+    player.locked = false;   // Unlock player movement
     player.gameOver = false; // Reset game over state
+    player.flags = {};       // Reset player flags
+    player.vars = {};        // Reset player variables
 
     // Hide dialog and game over boxes
-    document.getElementById('dialog-box').style.display = 'none';
-    document.getElementById('game-over-box').style.display = 'none';
-    document.title = `LTZ - 'Untitled'`; // Placeholder title
-    canvas.focus(); // Ensure canvas is focused for input
+    document.getElementById('dialog-box').style.display = 'none';    // Hide any open dialog box
+    document.getElementById('game-over-box').style.display = 'none'; // Hide the game over box
+    document.title = `LTZ - 'Untitled'`;                             // Placeholder title
+    canvas.focus();                                                  // Ensure canvas is focused for input
 
     console.log('Loaded World');
-    drawBoard();
+    drawBoard();                // Generate all layers for the current board
     renderLayersToMainCanvas(); // Draw them onto the main canvas
     requestAnimationFrame(animateGame);
 }
@@ -2472,6 +2656,17 @@ function loadPassagesFromGameData(gameData, board) {
     return worldPassages[board]; // Return the passages for the current board
 }
 
+function loadBoard(boardNum, x, y) {
+    if (world[boardNum]) {
+        // Delegate to switchBoard to ensure consistent sanitization and rendering
+        switchBoard(boardNum, null, { targetBoard: boardNum, targetLayer: player.layer || 2, targetX: x, targetY: y }).catch(err => {
+            console.error('loadBoard -> switchBoard failed:', err);
+        });
+    } else {
+        console.warn(`Board ${boardNum} does not exist in the world data.`);
+    }
+}
+
 async function switchBoard(board, colorKey = null, edgePlacement = null) {
     const wasPaused = gamePaused;
     gamePaused = true;
@@ -2483,6 +2678,7 @@ async function switchBoard(board, colorKey = null, edgePlacement = null) {
     placedSprites = world[board]; // Get the current board from the world object
     placedObjects = worldObjects[board]; // Use preloaded objects
     placedPassages = worldPassages[board] || {}; // Load passages for the current board
+    sanitizePlacedSprites();
 
     let placed = false;
 
@@ -2558,6 +2754,7 @@ function saveGame() { // Save current world state to localStorage
 function findPlayerSprite() {
     for (const key in placedSprites) {
         const sprite = placedSprites[key];
+        if (!sprite) continue;
         if (sprite.type === 'player') {
             const [layer, x, y] = key.split(',').map(Number); // Extract layer, x, y from the key
             return { layer, x, y, ...sprite }; // Return sprite with position data
@@ -2571,48 +2768,16 @@ let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "es
 
 document.addEventListener("keydown", (event) => {
     canvas.style.cursor = 'none'; // Hide the default cursor when using keyboard controls
+    // Set key state, but clear movement keys immediately if player is locked
     keys[event.key] = true;
 
-    // Shift-first aim/shoot: hold Shift, press arrow to shoot without moving
-    if (event.key === 'Shift') {
-        shiftAiming = true;
-        event.preventDefault();
-
-        // Stop movement when entering aim mode
+    if (player.locked) {
+        // Prevent arrow movement while locked
         keys['ArrowUp'] = false;
         keys['ArrowDown'] = false;
         keys['ArrowLeft'] = false;
         keys['ArrowRight'] = false;
-        return;
-    }
-
-    if (shiftAiming && (
-        event.key === 'ArrowUp' ||
-        event.key === 'ArrowDown' ||
-        event.key === 'ArrowLeft' ||
-        event.key === 'ArrowRight')) {
-        // Prevent movement while aiming
-        event.preventDefault();
-        keys[event.key] = false;
-
-        // Update direction based on the arrow pressed
-        if (event.key === 'ArrowUp') player.direction = 'up';
-        else if (event.key === 'ArrowDown') player.direction = 'down';
-        else if (event.key === 'ArrowLeft') player.direction = 'left';
-        else if (event.key === 'ArrowRight') player.direction = 'right';
-        const w = getEquippedWeaponConfig();
-        bulletArray.push(createBullet(
-            canvas,
-            player.x + 0.5,
-            player.y + 0.5,
-            player.direction,
-            w.speed,
-            w.color,
-            'player',
-            w.size,
-            w.damage
-        ));
-        return;
+        return; // still allow other global keys (F3 etc.) handled above
     }
 
     var key = event.code; // Use event.code
@@ -2624,10 +2789,59 @@ document.addEventListener("keydown", (event) => {
         loadLtz(handleLoadedGame);
     }
 
+    if (event.key === 'f') { // show player location
+        console.log('Placed sprites:', placedSprites);
+        console.log('Player location:', player.layer, player.x, player.y);
+        console.log('Player stats:', player.stats);
+        console.log('Bullets active:', bulletArray.filter(b => b.active));
+        console.log('Number of bullets active:', bulletArray.filter(b => b.active).length);
+    }
+
     // Block all other keys if not loaded
     if (!loaded) return;
 
     if (!player.locked) { // Prevent input if player is locked
+        // Shift-first aim/shoot: hold Shift, press arrow to shoot without moving
+        if (event.key === 'Shift') {
+            shiftAiming = true;
+            event.preventDefault();
+
+            // Stop movement when entering aim mode
+            keys['ArrowUp'] = false;
+            keys['ArrowDown'] = false;
+            keys['ArrowLeft'] = false;
+            keys['ArrowRight'] = false;
+            return;
+        }
+
+        if (shiftAiming && (
+            event.key === 'ArrowUp' ||
+            event.key === 'ArrowDown' ||
+            event.key === 'ArrowLeft' ||
+            event.key === 'ArrowRight')) {
+            // Prevent movement while aiming
+            event.preventDefault();
+            keys[event.key] = false;
+
+            // Update direction based on the arrow pressed
+            if (event.key === 'ArrowUp') player.direction = 'up';
+            else if (event.key === 'ArrowDown') player.direction = 'down';
+            else if (event.key === 'ArrowLeft') player.direction = 'left';
+            else if (event.key === 'ArrowRight') player.direction = 'right';
+            const w = getEquippedWeaponConfig();
+            bulletArray.push(createBullet(
+                canvas,
+                player.x + 0.5,
+                player.y + 0.5,
+                player.direction,
+                w.speed,
+                w.color,
+                'player',
+                w.size,
+                w.damage
+            ));
+            return;
+        }
 
         if (event.key === 'l' && !gamePaused) { // load game
             loadCombinedData(handleLoadedBoard);
@@ -2673,19 +2887,16 @@ document.addEventListener("keydown", (event) => {
 
         if (event.key === 'n') { // M to toggle night mode (TEMPORARY)
             nightMode = !nightMode;
+            boardData[currentBoard].nightMode = nightMode; // Update boardData for current board
             renderLayersToMainCanvas(); // Redraw layers to apply night mode
         }
+
+        if (event.key === 'K') { // kill switch for testing. Stop animation frame and stop program
+            cancelAnimationFrame(animateGame);
+        }
+        updateDirection(); // Update direction based on keys held
     }
 
-    if (event.key === 'f') { // show player location
-        console.log('Placed sprites:', placedSprites);
-        console.log('Player location:', player.layer, player.x, player.y);
-        console.log('Player stats:', player.stats);
-        console.log('Bullets active:', bulletArray.filter(b => b.active));
-        console.log('Number of bullets active:', bulletArray.filter(b => b.active).length);
-    }
-
-    updateDirection(); // Update direction based on keys held
 });
 
 document.addEventListener('keyup', (event) => {

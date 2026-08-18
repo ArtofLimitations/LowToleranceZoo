@@ -8,6 +8,7 @@ export let defaultPlayerStats = {
     oldY: 10,
     layer: 2,
     stepSize: 0.5,
+    hidden: false,
     transported: false,
     locked: false,
     canShoot: true,

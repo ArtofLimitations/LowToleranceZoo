@@ -48,6 +48,29 @@ export const defaultStatusMessageStyle = {
     duration: 4000
 };
 
+export const defaultDialogStyle = [
+    'display:none',
+    'flex-direction:column',
+    'justify-content:center',
+    'align-items:center',
+    'position:relative',
+    'overflow:hidden',
+    'top:500px',
+    'margin:0 auto',
+    'width:60%',
+    'max-height:30%',
+    'min-height:10%',
+    'background-color:rgba(0,0,0,0.8)',
+    'border-radius:32px',
+    'color:#fff',
+    "font-family:'Fira Code', monospace",
+    'font-size:24px',
+    'text-shadow:0px 1px 20px #444, 0px 1px 10px rgba(255,255,255,0.8)',
+    'padding:20px 60px',
+    'animation:fade_in_show 0.5s',
+    'z-index:99'
+].join(';');
+
 // Global mixin storage
 export const scriptMixins = {}; // <-- Added for mixin support
 
@@ -425,6 +448,8 @@ export const messageStylePresets = {
     subtle: { color: "#888", bgColor: "#222", duration: 1800, font: "16px monospace" },
     big: { color: "#fff", bgColor: "#000", duration: 4000, font: "bold 32px monospace" }
 };
+
+export const validTypes = new Set(['object', 'bullet', 'player', 'wall', 'break', 'step', 'push', 'ammo', 'coin', 'key', 'door', 'invisible', 'empty']);
 
 // =============================================
 // ############ #if Condition Engine ###########

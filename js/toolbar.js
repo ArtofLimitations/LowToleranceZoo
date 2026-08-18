@@ -34,6 +34,8 @@ const modeButtons = {
   lighten: document.getElementById('modeButtonLighten'),
   darken: document.getElementById('modeButtonDarken'),
 };
+const cursorX = document.getElementById('cursorX');
+const cursorY = document.getElementById('cursorY');
 
 //const toolBarSize = 320; // Right side toolbar sized in tiles
 let colors = [[0, 0, 0, 1], [255, 255, 255, 1]];
@@ -159,7 +161,7 @@ Object.entries(modeButtons).forEach(([mode, button]) => {
   };
 });
 
-export function toolbar(current, currentColors, layer, mouse, hiddenLayers, callback, currentType) { // Main toolbar function
+export function toolbar(current, currentColors, layer, mouse, hiddenLayers, callback, currentType, x, y) { // Main toolbar function
   //console.log('Function called from toolbar.js');
   //const leftSide = canvas.width - toolBarSize;
   colors = currentColors || [[0, 0, 0, 1], [255, 255, 255, 1]];
@@ -231,6 +233,9 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
       button.classList.remove('modeButton-active');
     }
   });
+
+  cursorX.innerText = x !== undefined ? x : '';
+  cursorY.innerText = y !== undefined ? y : '';
 }
 
 export function updateType (type) { // Update sprite type in toolbar
