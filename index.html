@@ -7,8 +7,28 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta name="description" content="Low Tolerance Zoo - A ZZT-style game and editor for the modern web.">
     <title>LTZ Editor</title>
+    
+    <meta name="description" content="Low Tolerance Zoo - A ZZT-style game and editor for the modern web.">
+    <!-- Schema JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Low Tolerance Zoo",
+      "alternateName": "LTZ",
+      "url": "https://lowtolerance.app/",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "All",
+      "description": "An in-browser 2D retro tilemap editor, sprite designer, and board scripting editor for web games.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="js/modules/vanilla-picker.csp.css">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
@@ -22,7 +42,7 @@
 </head>
 
 <body>
-    <h1>☺</h1>
+    <h1>Low Tolerance Zoo - Editor</h1>
 
     <div class="fieldContainer">
         <div class="fieldRow" style="color: #fff">
@@ -163,7 +183,9 @@
             </div>
         </div>
         <!----------------->
+        
         <div class="spriteContainer" id="spriteContainer" oncontextmenu="event.preventDefault();">
+            <button class="material-symbols-outlined popup-close-btn" id="spriteContainerClose" title="Close (Esc)">close</button>
             <div class="spriteInfo" id="spriteInfo"><strong>Sprite Editor</strong><br> F: fill | D: draw | esc: save and
                 close editor - <em><span class="spriteInfoMode">Mode:</span> <span id="spriteDrawMode">Draw</span></em>
             </div>
@@ -248,6 +270,7 @@
         </div>
 
         <div class="paletteContainer" id="paletteContainer">
+            <button class="material-symbols-outlined popup-close-btn" id="paletteContainerClose" title="Close (Esc)">close</button>
             <p><strong>Color Palette</strong></p>
             <div class="paletteColorContainer">
                 <div class="paletteColorBox" id="colorDark"><span class="paletteLabel">Dark</span>
@@ -268,8 +291,12 @@
                 <div class="paletteRecent" id="color4"></div>
                 <div class="paletteRecent" id="color5"></div>
             </div>
+            <p>Common Colors</p>
+            <div class="commonColorsContainer" id="commonColorsContainer" oncontextmenu="event.preventDefault();"></div>
         </div>
+
         <div class="editorContainer" id="editorContainer">
+            <button class="material-symbols-outlined popup-close-btn" id="editorContainerClose" title="Close (Esc)">close</button>
             <p><strong>Script Editor</strong></p>
             <div class="editorTextContainer" id="editorTextContainer">
                 <!--<div class="fieldContainer"><input type="text" id="objectName" placeholder="Enter name"></div>-->
@@ -345,6 +372,7 @@
                     <textarea class="inputField" id="boardInfoScript" rows="5"></textarea>
                 </div>
             </div>
+            <button class="material-symbols-outlined popup-close-btn" id="boardInfoClose" title="Close (Esc)">close</button>
         </div>
 
         <div class="audioImporterBox" id="audioImporterBox">
@@ -374,11 +402,17 @@
                     <ul id="audioImportList" class="audio-import-list"></ul>
                 </div>
             </div>
-            <button class="material-symbols-outlined audio-close-btn" id="audioImporterClose"
+            <button class="material-symbols-outlined popup-close-btn" id="audioImporterClose"
                 title="Close (Esc)">close</button>
         </div>
 
-        <div class="selectAmount" id="selectAmount"></div>
+        <div class="selectAmount" id="selectAmount">
+            <button class="material-symbols-outlined popup-close-btn" id="selectAmountClose" title="Close (Esc)">close</button>
+        </div>
+        <div class="pushType" id="pushType">
+            <button class="material-symbols-outlined popup-close-btn" id="pushTypeClose" title="Close (Esc)">close</button>
+        </div>
+
         <div class="boardSelect" id="boardSelect">
             <p><strong>Select Board</strong></p>
             <div class="boardList" id="boardList">
@@ -388,10 +422,12 @@
                 </ol>
             </div>
             <button class="material-symbols-outlined" id="addBoardButton" title="Add New Board">add</button>
+            <button class="material-symbols-outlined popup-close-btn" id="boardSelectClose" title="Close (Esc)">close</button>
         </div>
         <div class="selectSprite" id="selectSpriteBox">
             <p><strong>Select Sprite</strong></p>
             <div id="spriteGallery" class="sprite-gallery"></div>
+            <button class="material-symbols-outlined popup-close-btn" id="selectSpriteClose" title="Close (Esc)">close</button>
         </div>
         <div class="extraTiles" id="extraTerrain">
             <p><span class="char">■</span><strong>Terrain</strong></p>

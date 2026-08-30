@@ -12,20 +12,6 @@ export function getObjectData(key) {
     return objectText;
 }
 
-function handleKeyboard(event) {
-    switch (event.key) {
-
-        case 'Escape':
-            let result = sanitizeInput(text.value);
-            objectText = result;
-            //if (!textOnly) result = parseScriptFromTextarea(result);
-            removeObjectEvents();
-            addMainEvents();
-            container.style.display = 'none';
-            callbackFunction(result, tileKey);
-    }
-}
-
 function sanitizeInput(input) {
     return input.replace(/<(?!\/?(b|i|br|em|strong|center|page)\b)[^>]*>/gi, "");
 }
@@ -41,8 +27,8 @@ function parseScriptFromTextarea(text) {
             collectingText = true;
             textBlock = "";
             continue;
-        } 
-        
+        }
+
         if (collectingText) {
             if (line === "#end") {
                 script.push(`#text ${textBlock.trim()}`); // Store full text block as one entry
@@ -62,15 +48,35 @@ function parseScriptFromTextarea(text) {
     return script;
 }
 
+function closeEditor() {
+    let result = sanitizeInput(text.value);
+    objectText = result;
+    //if (!textOnly) result = parseScriptFromTextarea(result);
+    removeObjectEvents();
+    addMainEvents();
+    container.style.display = 'none';
+    callbackFunction(result, tileKey);
+}
+
+function handleKeyboard(event) {
+    switch (event.key) {
+
+        case 'Escape':
+            closeEditor();
+    }
+}
+
 function addObjectEvents() {
     document.addEventListener('keydown', handleKeyboard);
+    document.getElementById('editorContainerClose').addEventListener('click', closeEditor);
 }
 
 function removeObjectEvents() {
     document.removeEventListener('keydown', handleKeyboard);
+    document.getElementById('editorContainerClose').removeEventListener('click', closeEditor);
 }
 
-export function editObject (type, script, key, callback) {
+export function editObject(type, script, key, callback) {
     if (type === 'text') {
         textOnly = true;
         title.innerText = 'Edit Sign Text';

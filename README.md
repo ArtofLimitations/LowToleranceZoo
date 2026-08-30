@@ -62,27 +62,30 @@ npm run start-player
 
 ## Editor Overview
 
-| Key | Action |
-|-----|--------|
-| `E` | Open Sprite Editor |
-| `C` | Open Color Palette |
-| Arrow keys | Move cursor |
-| Left click | Place tile |
-| Right click | Grab tile |
-| `Ctrl-Right` Click | Grab Tile Color |
-| `Ctrl+Z` | Undo |
-| `Ctrl+R` | Redo
-| `Ctrl+S` | Save Board with Spritesheet |
-| `F1` | Save World |
-| `F3` | Load World |
-| `D` | Draw Mode |
-| `F` | Fill Mode |
-| `Tab` | Paint Mode |
-| `/` | Lighten Mode |
-| `*` | Darken Mode |
-| `O` | Place Object |
+| Key | Action | Key | Action |
+|-----|--------|-----|--------|
+| `E` | Open Sprite Editor | `PageUp` | Switch to next board |
+| `C` | Open Color Palette | `PageDown` | Switch to previous board |
+| Arrow keys | Move cursor | `Ctrl-Enter`| Grab color only |
+| Left click | Place tile | `Z` | Move player |
+| Right click | Grab tile | `V`| Sprite gallery |
+| `Ctrl-Right` Click | Grab Tile Color | `X` | Swap colors |
+| `Ctrl+Z` | Undo | `+` | Next sprite |
+| `Ctrl+R` | Redo | `-` | Previous sprite |
+| `Ctrl+S` | Save Board with Spritesheet | `B` | Board selector |
+| `F1` | Save World | `I` | Open board info |
+| `F3` | Load World | | |
+| `D` | Draw Mode | `Space` | Plot |
+| `F` | Fill Mode | `M` | Audio import| 
+| `Tab` | Paint Mode | | |
+| `/` | Lighten Mode | `F9` | Terrain types |
+| `*` | Darken Mode | `F10` | Item types |
+| `O` | Place Object | `.` | Place Sign | 
+| `1` | Switch to layer 1 | `Delete` | Delete all sprites on current layer |
+| `2` | Switch to layer 2 | `H` | Hide current layer |
+| `3` | Switch to layer 3 |  `R` | Reset board |
 
-Tile types that can be placed: `wall`, `object`, `sign`, `passage`, `coin`, `ammo`, `invisible` Wall, `break`able, `empty`, `push`, `step`, more to come
+Tile types that can be placed: `wall`, `object`, `sign`, `passage`, `coin`, `ammo`, `invisible` wall, `break`able, `empty`, `push`, `step`, more to come
 
 Layers: **1** = Floor, **2** = Default, **3** = Ceiling
 

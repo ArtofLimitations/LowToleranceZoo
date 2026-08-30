@@ -14,6 +14,8 @@ const audioBufferCache = {};
 let currentMusicSource = null;
 let currentMusicKey = null;
 let howlInstances = {};
+let currentMusicGain = null;
+let masterGain = null;
 
 // Canvas Configurations
 const displayWidth = 1154;
@@ -1272,7 +1274,8 @@ function executeObjectCommand(obj, command) {
                     //set current board setting to nightmode
                     boardData[currentBoard].settings.nightMode = nightMode;
                     break;
-                case "play": {
+                case "play": 
+                case "music": {
                     // args[0] is already unquoted thanks to tokenizeCommand in the parser
                     const trackName = command.args[0];
                     if (!trackName) {
@@ -1280,11 +1283,79 @@ function executeObjectCommand(obj, command) {
                         break;
                     }
                     const loopFlag = command.args.includes('loop');
-                    playAudio(trackName, { loop: loopFlag });
+                    // parse optional fade-in: '#play track fade 500'
+                    let fadeMs = 0;
+                    const fidx = command.args.findIndex(a => a === 'fade' || a === 'fadein');
+                    if (fidx !== -1 && command.args[fidx + 1]) {
+                        const n = parseInt(command.args[fidx + 1], 10);
+                        if (!isNaN(n) && n >= 0) fadeMs = n;
+                    }
+                    playAudio(trackName, { loop: loopFlag, fadeIn: fadeMs });
                     break;
                 }
-                case 'stop':
-
+                case 'sfx':
+                case 'sound': {
+                    // args[0] is already unquoted thanks to tokenizeCommand in the parser
+                    const sfxName = command.args[0];
+                    if (!sfxName) {
+                        console.warn('#sfx: No sound name provided.');
+                        break;
+                    }
+                    // parse optional volume: '#sfx name volume 80'
+                    let vol = 100;
+                    const vidx = command.args.findIndex(a => a === 'volume' || a === 'vol');
+                    if (vidx !== -1 && command.args[vidx + 1]) {
+                        const n = parseInt(command.args[vidx + 1], 10);
+                        if (!isNaN(n) && n >= 0 && n <= 100) vol = n;
+                    }
+                    // parse optional fade-in
+                    let sfade = 0;
+                    const sfidx = command.args.findIndex(a => a === 'fade' || a === 'fadein');
+                    if (sfidx !== -1 && command.args[sfidx + 1]) {
+                        const n = parseInt(command.args[sfidx + 1], 10);
+                        if (!isNaN(n) && n >= 0) sfade = n;
+                    }
+                    // Play sfx over any music; do not stop current music
+                    playAudio(sfxName, { loop: false, stopCurrent: false, fadeIn: sfade, volume: vol / 100 });
+                    break;
+                }
+                case "pause": {
+                    // TODO: pause is not supported for WebAudio buffer source fallback.
+                    // If Howler is available and used later, implement pause/resume there.
+                    if (currentMusicSource && typeof currentMusicSource.stop !== 'undefined') {
+                        // no-op: cannot pause BufferSource; stop instead
+                        try { currentMusicSource.stop(); } catch (_) {}
+                        currentMusicSource = null;
+                        currentMusicKey = null;
+                        currentMusicGain = null;
+                    }
+                    break;
+                }
+                case "stop": {
+                    // support: #stop [fade <ms>]
+                    let fadeMs = 0;
+                    const idx = command.args.findIndex(a => a === 'fade' || a === 'fadeout');
+                    if (idx !== -1 && command.args[idx + 1]) {
+                        const n = parseInt(command.args[idx + 1], 10);
+                        if (!isNaN(n) && n >= 0) fadeMs = n;
+                    }
+                    stopAudio(null, { fadeOut: fadeMs });
+                    break;
+                }
+                case "volume": {
+                    const level = command.args[0];
+                    if (!level || level < 0 || level > 100) {
+                        console.warn('#volume: Expected number between 0 and 100')
+                        break;
+                    }
+                    // Set Howler global volume (for future Howler migration)
+                    try { Howler.Howler && Howler.Howler.volume(level / 100); } catch (_) { }
+                    // Also set master gain for WebAudio fallback
+                    if (audioCtx && masterGain) {
+                        masterGain.gain.setValueAtTime(level / 100, audioCtx.currentTime);
+                    }
+                    break;
+                }
                 case "debug":
                     console.log("DEBUG: Object script:", obj.script);
                     console.log("DEBUG: Object labels:", obj.labels);
@@ -1523,7 +1594,7 @@ function jumpToLabel(obj, label) {
     }
 }
 
-async function playAudio(trackName, { loop = false, stopCurrent = true } = {}) {
+async function playAudio(trackName, { loop = false, stopCurrent = true, fadeIn = 0, volume = 1 } = {}) {
     // Keys in the store are 'audio/sfx/name' or 'audio/music/name'
     const store = getAudioStore();
     // Search by exact key first, then fall back to name-only match
@@ -1550,9 +1621,12 @@ async function playAudio(trackName, { loop = false, stopCurrent = true } = {}) {
         currentMusicKey = null;
     }
 
-    // TODO: migrate this to Howler playback. For now use Web Audio API.
+    // TODO: migrate this to Howler playback. For now use Web Audio API with master gain and fades.
     if (!audioCtx) {
         audioCtx = new AudioContext();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 1;
+        masterGain.connect(audioCtx.destination);
     }
     if (audioCtx.state === 'suspended') await audioCtx.resume();
     if (!audioBufferCache[key]) {
@@ -1562,23 +1636,80 @@ async function playAudio(trackName, { loop = false, stopCurrent = true } = {}) {
     const source = audioCtx.createBufferSource();
     source.buffer = audioBufferCache[key];
     source.loop = !!(loop && isMusic); // only loop music when requested
-    source.connect(audioCtx.destination);
+
+    // create a gain node for this source so we can fade it independently
+    const gainNode = audioCtx.createGain();
+    // volume is a 0..1 multiplier applied before masterGain
+    gainNode.gain.value = fadeIn > 0 ? 0 : (typeof volume === 'number' ? volume : 1);
+    source.connect(gainNode);
+    gainNode.connect(masterGain);
+
+    const now = audioCtx.currentTime;
+    if (fadeIn > 0) {
+        const target = (typeof volume === 'number' ? volume : 1);
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(target, now + fadeIn / 1000);
+    }
+
     source.start(0);
 
     if (isMusic) {
         currentMusicSource = source;
         currentMusicKey = key;
+        currentMusicGain = gainNode;
         if (!source.loop) {
             source.onended = () => {
                 if (currentMusicSource === source) {
                     currentMusicSource = null;
                     currentMusicKey = null;
+                    currentMusicGain = null;
                 }
             };
         }
     }
 
     return source;
+}
+
+// Stop current music (or specific track) with optional fade-out in ms
+function stopAudio(trackName = null, { fadeOut = 0 } = {}) {
+    if (!currentMusicSource) return;
+    if (trackName) {
+        // resolve trackName to key format similar to playAudio
+        const store = getAudioStore();
+        const key = Object.keys(store).find(k => k === trackName) || Object.keys(store).find(k => k.endsWith('/' + trackName));
+        if (!key) return;
+        if (key !== currentMusicKey) return; // not the currently playing track
+    }
+
+    if (!audioCtx || !currentMusicGain) {
+        try { currentMusicSource.stop(); } catch (_) { }
+        currentMusicSource = null;
+        currentMusicKey = null;
+        currentMusicGain = null;
+        return;
+    }
+
+    const now = audioCtx.currentTime;
+    if (fadeOut > 0) {
+        currentMusicGain.gain.cancelScheduledValues(now);
+        currentMusicGain.gain.setValueAtTime(currentMusicGain.gain.value, now);
+        currentMusicGain.gain.linearRampToValueAtTime(0, now + fadeOut / 1000);
+        // stop after fade completes
+        setTimeout(() => {
+            try { currentMusicSource.stop(); } catch (_) { }
+            if (currentMusicSource) {
+                currentMusicSource = null;
+                currentMusicKey = null;
+                currentMusicGain = null;
+            }
+        }, fadeOut + 50);
+    } else {
+        try { currentMusicSource.stop(); } catch (_) { }
+        currentMusicSource = null;
+        currentMusicKey = null;
+        currentMusicGain = null;
+    }
 }
 
 // ##############################################

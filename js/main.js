@@ -725,7 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function refreshEditorAfterHistory() {
         drawBoard();
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+        updateToolbar();
     }
 
     function undoAction() {
@@ -795,6 +795,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setTile(tileKey, tilePayload, logHistory);
+    }
+
+    function updateToolbar () {
+            toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
     }
 
     // ######################################
@@ -881,7 +885,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         drawBoard();
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type);
+        updateToolbar();
     }
 
     // Handles mouse clicks
@@ -927,7 +931,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const now = Date.now(); // Current time in milliseconds
 
                 //handleTileClick(event);
-                if (mouse.mode === 'draw' && // if mouse mode is draw and click is within drawing area and click delay is long enough
+                if (mouse.mode === 'draw' || mouse.mode === 'darken' || mouse.mode === 'lighten' && // if mouse mode is draw and click is within drawing area and click delay is long enough
                     mouse.x >= 0 &&
                     mouse.y >= 0 &&
                     mouse.x < tilesX &&
@@ -1053,7 +1057,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('hidden layers: ', hiddenLayers);
         console.log('sprite type: ', type);
 
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
+        updateToolbar();
         drawBoard();
     };
 
@@ -1393,13 +1397,15 @@ document.addEventListener('DOMContentLoaded', () => {
         popup.type = 'boardInfoBox';
         overlay.style.display = 'block';
         boardInfoContainer.style.display = 'flex';
+        const boardCloseBtn = document.getElementById('boardInfoClose');
+        if (boardCloseBtn) boardCloseBtn.onclick = () => closePopup();
         addPopupOutsideClickHandler();
     }
 
 
     function spriteSelect() { // Select from a list of sprites
         popup.active = true;
-        popup.type = 'spriteSelect';
+        popup.type = 'selectSpriteBox';
 
         overlay.style.display = 'block';
 
@@ -1429,7 +1435,7 @@ document.addEventListener('DOMContentLoaded', () => {
         spriteSheetLength.textContent = `(${getSpriteSheet().length}/300)`;
 
         const handleSpriteSelectClose = (event) => {
-            if (!popup.active || popup.type !== 'spriteSelect') {
+            if (!popup.active || popup.type !== 'selectSpriteBox') {
                 removePopupKeydownHandler();
                 return;
             }
@@ -1439,6 +1445,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         addPopupKeydownHandler(handleSpriteSelectClose);
+        const spriteCloseBtn = document.getElementById('selectSpriteClose');
+        if (spriteCloseBtn) spriteCloseBtn.onclick = () => closePopup();
     }
 
     function createSpriteGallery(spriteSheet, onSpriteClick) {
@@ -1534,6 +1542,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         selectContainer.style.display = 'block';
+        const boardSelectCloseBtn = document.getElementById('boardSelectClose');
+        if (boardSelectCloseBtn) boardSelectCloseBtn.onclick = () => closePopup();
     }
 
     function selectAmount(string, current = 0, tileKey) { // popup to select a number for an item tile and return it
@@ -1550,6 +1560,22 @@ document.addEventListener('DOMContentLoaded', () => {
         selectContainer.innerHTML = `<strong>${string}</strong>`; // Set the title of the popup
         selectContainer.appendChild(inputField); // Append the input field to the popup
         selectContainer.appendChild(confirmButton); // Append the button to the popup
+        // add or wire close button for this popup
+        let selectCloseBtn = document.getElementById('selectAmountClose');
+        if (!selectCloseBtn) {
+            selectCloseBtn = document.createElement('button');
+            selectCloseBtn.className = 'material-symbols-outlined popup-close-btn';
+            selectCloseBtn.id = 'selectAmountClose';
+            selectCloseBtn.title = 'Close (Esc)';
+            selectCloseBtn.textContent = 'close';
+            selectContainer.appendChild(selectCloseBtn);
+        }
+        selectCloseBtn.onclick = () => {
+            popup.active = false;
+            overlay.style.display = 'none';
+            selectContainer.style.display = 'none';
+            canvas.focus();
+        };
         selectContainer.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' || event.key === 'Escape') { // If Enter key is pressed
                 const amount = parseInt(inputField.value, 10); // Get the value from the input field
@@ -1592,7 +1618,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         overlay.style.display = 'block';
 
-        const selectContainer = document.getElementById('selectAmount');
+        const selectContainer = document.getElementById('pushType');
         selectContainer.style.display = 'flex';
         selectContainer.innerHTML = `<strong>Select Push Tile Type:</strong>`;
 
@@ -1624,6 +1650,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         selectContainer.tabIndex = 0;
         selectContainer.focus();
+        // add or wire close button for select/push popup (shares selectAmount container)
+        let selectCloseBtn = document.getElementById('pushTypeClose');
+        if (!selectCloseBtn) {
+            selectCloseBtn = document.createElement('button');
+            selectCloseBtn.className = 'material-symbols-outlined popup-close-btn';
+            selectCloseBtn.id = 'pushTypeClose';
+            selectCloseBtn.title = 'Close (Esc)';
+            selectCloseBtn.textContent = 'close';
+            selectContainer.appendChild(selectCloseBtn);
+        }
+        selectCloseBtn.onclick = () => {
+            popup.active = false;
+            overlay.style.display = 'none';
+            selectContainer.style.display = 'none';
+            canvas.focus();
+        };
     }
 
     const quickMenuPopups = new Set(['extraTerrain', 'extraItems', 'extraCreatures']);
@@ -1710,7 +1752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!handler) return;
         const tileKey = `${currentLayer},${cursorX},${cursorY}`;
         handler(tileKey);
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
+        updateToolbar();
     }
 
     function attachPopupClickHandlers(popupId) {
@@ -2042,7 +2084,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             // callback from sprite editor when it changes or closes
                             currentSprite = newIndex;
                             updateSpriteData(currentSprite);
-                            toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
+                            updateToolbar();
                             drawBoard();
                             canvas.focus();
                         });
@@ -2057,7 +2099,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Swap light and dark colors
                         colors = toolbarSwapColor();
                         updateColor(colors);
-                        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
+                        updateToolbar();
                         drawBoard();
                         if (event.repeat) { return }
                         break;
@@ -2127,7 +2169,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateLayers(currentLayer);
                         if (event.repeat) { return }
                         drawBoard();
-                        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
+                        updateToolbar();
                         return;
                     case 's': // Save board & sprite sheet
                         saveCombinedData(getSpriteSheet(), placedSprites); // save board and sprite sheet from file.js and sprite-sheet.js
@@ -2316,7 +2358,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     placedSprites = data;
                                     world[currentBoard] = placedSprites;
                                     drawBoard();
-                                    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
+                                    updateToolbar();
                                     clearHistory();
                                     console.log('Board pasted from clipboard');
                                 }
@@ -2361,7 +2403,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         DrawSingleTile(cursorX, cursorY); // Draw the tile at the cursor position
         [mouse.oldX, mouse.oldY] = [cursorX, cursorY];
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
+        updateToolbar();
     }
 
     // ######################################
@@ -2385,8 +2427,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 enterPressed = false; // Unlock when Enter is released
             }
         });
-        toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY); // Initialize toolbar with current sprite and colors
         colors = currentColors;
+        updateToolbar();
         drawBoard(); // Draw function for entire board
         canvas.focus();
     }
@@ -2433,7 +2475,7 @@ document.addEventListener('DOMContentLoaded', () => {
     createPlayer();
     addBoardToWorld(); // Add the current board to the world object
     world[currentBoard] = placedSprites; // Initialize the current board in the world object
-    toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
+    updateToolbar();
     drawBoard();
     clearHistory();
 });

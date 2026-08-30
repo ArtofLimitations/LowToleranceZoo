@@ -8,6 +8,7 @@ const container = document.getElementById('spriteContainer');
 const overlay = document.getElementById('overlay');
 const spriteNumber = document.getElementById('spriteEditorCurrentSprite');
 const spritePreview = document.getElementById('spriteEditorCurrentSpriteImage');
+const spriteEditorCloseBtn = document.getElementById('spriteContainerClose');
 
 // Set up the grid and colors
 const gridSize = 16;
@@ -548,16 +549,7 @@ function handleKeyboard(event) {
             drawSpritePreview();
             break;
         case 'Escape':
-            removeSpriteEvents()
-            container.style.display = 'none';
-            const imageData = updateSpriteImage(spriteData);         // in sprite.js
-            addToSpriteSheet(currentSprite, spriteData, imageData);  // in sprite-sheet.js
-            overlay.style.display = 'none';
-            addMainEvents();
-            if (onCloseCallback) {
-                try { onCloseCallback(currentSprite); } catch (e) { console.warn('onCloseCallback failed', e); }
-                onCloseCallback = null;
-            }
+            closeEditor();
     }
 
     switch (event.code) { // Handles numpad keys
@@ -579,6 +571,19 @@ function handleKeyboard(event) {
     }
 }
 
+function closeEditor() {
+    removeSpriteEvents()
+    container.style.display = 'none';
+    const imageData = updateSpriteImage(spriteData);         // in sprite.js
+    addToSpriteSheet(currentSprite, spriteData, imageData);  // in sprite-sheet.js
+    overlay.style.display = 'none';
+    addMainEvents();
+    if (onCloseCallback) {
+        try { onCloseCallback(currentSprite); } catch (e) { console.warn('onCloseCallback failed', e); }
+        onCloseCallback = null;
+    }
+}
+
 function addSpriteEvents() {
     // Add events for sprite editor
     // Event listeners for mouse click
@@ -586,6 +591,10 @@ function addSpriteEvents() {
     spriteCanvas.addEventListener('mouseup', onSpriteMouseUp);
     spriteCanvas.addEventListener('mousemove', handleMouseMove);
     spriteCanvas.addEventListener('mouseleave', onSpriteMouseLeave);
+
+    if (spriteEditorCloseBtn) {
+        spriteEditorCloseBtn.onclick = () => closeEditor();
+    }
 
     if (sidebarColorButtons.dark) {
         sidebarColorButtons.dark.onclick = () => setSpriteColor(1);

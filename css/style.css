@@ -74,6 +74,7 @@ a {
 
 h1 {
   color: #ffffff;
+  font-size: 24px;
   text-align: center;
 }
 
@@ -281,7 +282,7 @@ h3 {
 }
 
 .lowToleranceToolbar .undoRedoRow {
-  /*gap: 8px;*/
+  gap: 0px;
 }
 
 .lowToleranceToolbar .toolbarActionButton {
@@ -823,7 +824,7 @@ h3 {
   
   padding: 8px;
   font-family: 'Fira Code', monospace;
-
+  background-color: #fff;
   color: #222;
   font-size: 16px;
   font-weight: 600;
@@ -970,20 +971,6 @@ h3 {
   color: #ff8888;
 }
 
-.audio-close-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: transparent;
-  border: none;
-  color: #aaa;
-  cursor: pointer;
-  font-size: 20px;
-}
-
-.audio-close-btn:hover {
-  color: #fff;
-}
 /* ── End Audio Importer ─────────────────────────────────── */
 
 .paletteContainer {
@@ -1044,6 +1031,7 @@ h3 {
 .paletteRecentContainer {
   display: flex;
   border: 2px solid #fff;
+  margin-bottom: 16px;
 }
 
 .paletteRecent {
@@ -1053,6 +1041,23 @@ h3 {
   align-items: center;
   min-width: 32px;
   min-height: 32px;
+}
+
+.commonColorsContainer {
+  max-width: 248px;
+  max-height: 248px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(auto-fill, 24px);
+  overflow: auto;
+}
+
+.commonColorsContainer .commonColor {
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  border: #222 2px solid;
+  border-radius: 4px;
 }
 
 .editorContainer {
@@ -1190,6 +1195,7 @@ h3 {
   height: 32px;
 }
 
+.pushType,
 .selectAmount {
   display: none;
   /* Hidden initially */
@@ -1209,6 +1215,7 @@ h3 {
   z-index: 6;
 }
 
+.pushType .inputField,
 .selectAmount .inputField {
   color: #222;
   font-size: 16px;
@@ -1217,12 +1224,14 @@ h3 {
   height: 32px;
 }
 
+.pushType button,
 .selectAmount button {
   background-color: #f0f0f0;
   margin-top: 8px;
   height: 32px;
 }
 
+.pushType button:hover,
 .selectAmount button:hover {
   background-color: #ffc800;
   color: #222;
@@ -1348,4 +1357,21 @@ h3 {
 
 .lowToleranceCanvas {
   border-radius: 4px;
+}
+
+.popup-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #222 !important;
+  border: none;
+  color: #aaa;
+  font-size: 20px;
+  
+}
+
+.popup-close-btn:hover {
+    color: #fff !important;
+    border: none !important;
+    box-shadow: none !important;
 }
