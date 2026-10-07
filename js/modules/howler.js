@@ -3246,3 +3246,29 @@
     }
   };
 })();
+
+
+/*!
+ *  ES module interop
+ *  ---------------------------------------------------------------
+ *  The UMD wrappers above only publish `Howler` / `Howl` to `exports`
+ *  (CommonJS) or to `window` (browser globals). When this file is loaded
+ *  as an ES module — which is how js/audio.js consumes it — the
+ *  `typeof exports !== 'undefined'` branch is skipped and there is no
+ *  `exports` object, so `import { Howl } from './howler.js'` would throw
+ *  a SyntaxError.
+ *
+ *  Both IIFEs have already run by the time we get here (module bodies
+ *  evaluate top to bottom), so the globals they installed are available.
+ *
+ *  Note the deliberately indirect form: the spatial plugin above reads the
+ *  file-scope `Howl` by name, so declaring `const Howl = ...` here would
+ *  shadow it and raise a TDZ error during module evaluation. Aliasing to
+ *  fresh local names and re-exporting those adds export entries only,
+ *  never new local bindings.
+ */
+
+const __ltzHowler = globalThis.Howler;
+const __ltzHowl = globalThis.Howl;
+
+export { __ltzHowler as Howler, __ltzHowl as Howl };

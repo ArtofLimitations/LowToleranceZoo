@@ -626,16 +626,42 @@ h3 {
 
 .spriteCanvas {
   display: block;
-  width: 520px;
-  height: 520px;
+  /* 1. Resize to fit 32px units cleanly (16 pixels x 32px = 512px) */
+  width: 512px;
+  height: 512px;
   top: 0;
   left: 0;
   margin: 0;
   border: 1px solid black;
   image-rendering: pixelated;
-  background-color: #5f5f64;
-  background-image: linear-gradient(45deg, #b1b1b1 50%, #c0c0c5 50%);
-  background-size: 16px 16px;
+  
+  background-color: #ffffff;
+  background-image: 
+    /* LAYER 1 & 2: Top Layer - 32x32 Grid Lines */
+    linear-gradient(to right, rgba(100, 100, 100, 0.4) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(100, 100, 100, 0.4) 1px, transparent 1px),
+    
+    /* LAYER 3 & 4: Alpha Checkerboard (32x32 pixel alignment) */
+    linear-gradient(45deg, #d8d8d8 25%, transparent 25%, transparent 75%, #d8d8d8 75%),
+    linear-gradient(45deg, #d8d8d8 25%, #cacaca 25%, #cacaca 75%, #d8d8d8 75%);
+
+  background-size: 
+    /* 32x32 Pixel Grid Lines */
+    32px 32px,
+    32px 32px,
+    
+    /* Alpha Checkerboard (16x16 total size, creating 8x8 alternating blocks) */
+    16px 16px,
+    16px 16px;
+
+  background-position: 
+    /* Grid Line Offsets */
+    0 0,
+    0 0,
+    
+    /* Checker Offsets (Half the pattern size: 8px) */
+    0 0,
+    8px 8px;
 }
 
 .spriteEditorLayout {

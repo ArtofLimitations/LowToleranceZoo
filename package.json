@@ -5,7 +5,8 @@
   "main": "/js/main.js",
   "scripts": {
     "start": "http-server ./ -c-1",
-    "start-player": "http-server ./ -c-1 -o player.html"
+    "start-player": "http-server ./ -c-1 -o player.html",
+    "test": "node js/imports.test.mjs && node js/audio.test.mjs && node js/howler-interop.test.mjs"
   },
   "author": "Dustin Davidson",
   "license": "ISC",

@@ -36,7 +36,7 @@ A ZZT or MegaZeux-inspired, tile-based game maker and player built with vanilla 
 ### Requirements
 
 - [Node.js](https://nodejs.org/)
-- `http-server` (installed globally or via npm)
+- [http-server](https://www.npmjs.com/package/http-server) (installed globally or via npm)
 
 ### Install dependencies
 
@@ -255,6 +255,49 @@ Direction values and modifiers (`seek`, `flow`, `opp`) work the same as movement
 
 ---
 
+#### Audio
+
+Playback is handled by [Howler.js](https://howlerjs.com/) (vendored at
+`js/modules/howler.js`, wrapped by `js/audio.js`). Audio files are imported
+in the editor (`M`), stored in the project, and streamed from memory in the
+player — nothing is fetched at runtime.
+
+| Command | Description |
+|---------|-------------|
+| `#music name` | Play a track from the **music** category. Starts a new track and stops the current one. |
+| `#play name` | Alias for `#music` |
+| `#sfx name` | Play a sound effect. Plays *over* music without interrupting it. |
+| `#sound name` | Alias for `#sfx` |
+| `#pause` | Pause the current music track (resumes where it left off) |
+| `#resume` | Resume paused music. `#unpause` is an alias |
+| `#musicpause` | Toggle pause / resume |
+| `#stop [fade ms]` | Stop the current music, optionally fading out first |
+| `#volume n` | Set global output level, `0`–`100` |
+| `#mute` / `#unmute` | Silence or restore all output (independent of `#volume`) |
+| `#audiostatus` | Log the current audio state to the console |
+
+**Optional arguments** on `#music` / `#play` / `#sfx`:
+
+| Modifier | Example | Description |
+|----------|---------|-------------|
+| `loop` | `#music theme loop` | Loop the track (music only) |
+| `fade n` / `fadein n` | `#music theme fade 500` | Fade in over `n` ms |
+| `fadeout n` | `#music theme fadeout 800` | Fade out the *outgoing* track over `n` ms |
+| `volume n` / `vol n` | `#sfx coin volume 80` | Track volume, `0`–`100` |
+
+A track may be named by bare filename (`theme.ogg`) or full store key
+(`audio/music/theme.ogg`); both work.
+
+Only one music track plays at a time — starting a new one stops the previous.
+SFX overlap freely (up to 12 at once). The editor accepts `.ogg`, `.oga`,
+`.opus`, `.mp3`, `.wav`, `.flac`, `.m4a`, `.aac` and `.webm`.
+
+Browsers block audio until the user interacts with the page, so the player
+wakes the audio context on the first keypress or click. A track started before
+that point is skipped rather than silently failing later.
+
+---
+
 #### Messaging & Dialog
 
 | Command | Description |
@@ -341,7 +384,39 @@ Configured through the Object Editor or programmatically in world save data.
 
 ## File Format
 
-Worlds are saved as `.json` files containing the sprite sheet data, board layouts, board settings, and world settings. Use **Save** / **Load** in the editor toolbar.
+Worlds are saved as `.ltz` files: a **ZIP archive with a renamed extension**.
+
+```
+project.ltz
+├── manifest.json          version, project name, file index, audio manifest
+├── world.json             sprite sheet, boards, world data, world + board settings
+└── audio/
+    ├── music/*.ogg|.mp3|.wav|...
+    └── sfx/*.ogg|.mp3|.wav|...
+```
+
+Plain `.json` world files from earlier versions are still accepted on load
+(the dialog offers both) and are detected by extension.
+
+Use **F1** to save and **F3** to load in the editor. In the player, **F3** loads
+a `.ltz` and **`L`** loads a legacy single-board `.json`.
+
+See `js/ltz.js` for the read/write implementation — it is the smallest,
+best-documented module in the project. `ltzSelfTest()` is runnable from the
+browser console as a round-trip smoke test.
+
+---
+
+## Tests
+
+```bash
+npm test
+```
+
+Covers the audio subsystem: the ES-module interop on the vendored Howler
+build, codec-table agreement with the format map, track lookup, format
+sniffing and volume clamping. Playback itself needs a real browser audio
+backend and is not covered — those tests assert the pure logic around it.
 
 ---
 
@@ -349,7 +424,8 @@ Worlds are saved as `.json` files containing the sprite sheet data, board layout
 
 > This section is a placeholder for roadmap items.
 
-- [ ] Sound / music support
+- [x] Sound / music support
+- [ ] Audio preview in the editor's audio importer
 - [ ] More built-in weapon types
 - [ ] Additional board transition effects
 - [ ] Expanded scripting commands

@@ -53,7 +53,7 @@
     <div class="block" id="block">
         <!-- Main Canvas -->
         <canvas class="lowToleranceCanvas dashed-grid-paper" id="lowToleranceCanvas" tabindex='1'
-            oncontextmenu="event.preventDefault();"></canvas>
+            oncontextmenu="event.preventDefault();" width="1152" height="800"></canvas>
 
         <div class="lowToleranceToolbar" id="lowToleranceToolbar">
             <div class="overlay" id="overlay"></div>
@@ -85,7 +85,7 @@
                     </div>
                     <span class="colorBox" id="colorBoxLight">L </span>
                 </div>
-                <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
+                <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
                 <div class="fieldRow"><button class="material-symbols-outlined" id="layer3Button"
                         title="Layer 3">visibility</button><span class="layerBox" id="layer3">Layer 3</span> <label
                         class="slider"><input type="range" class="level" id="3-opacity" name="Layer 3 opacity" min="0"
@@ -96,7 +96,8 @@
 
                 <div class="fieldRow"><button class="material-symbols-outlined" id="layer1Button"
                         title="Layer 1">visibility</button><span class="layerBox" id="layer1">Layer 1</span> </div>
-                <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
+                
+                <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
                 <div class="fieldRow">
                     <div class="container">
                         <div class="tabs">
@@ -195,8 +196,10 @@
                     <div class="fieldContainer">
 
                         <div class="fieldRow"><span class="valueBox" id="spriteEditorCurrentSprite">1</span><span
-                                class="imageBox" id="spriteEditorCurrentSpriteImage"> </span><span
-                                class="fieldText">Current<br> Sprite</span></div>
+                                class="imageBox" id="spriteEditorCurrentSpriteImage"> 
+                                    <canvas class="spriteEditorPreviewCanvas" id="spritePreviewCanvas" width="32" height="32"></canvas>
+                                </span>
+                                <span class="fieldText">Current<br> Sprite</span></div>
                         </div>
                         <div class="fieldRow">
                             <div class="spriteButtonGroup">
@@ -386,8 +389,9 @@
                     </select>
                 </div>
                 <div class="audio-import-row">
-                    <label for="audioFileInput">Audio file (.ogg, .mp3, .wav)</label>
-                    <input class="audio-input-field" type="file" id="audioFileInput" accept=".ogg,.mp3,.wav,audio/*" />
+                    <label for="audioFileInput">Audio file (.ogg, .mp3, .wav, .flac, .m4a)</label>
+                    <input class="audio-input-field" type="file" id="audioFileInput"
+                        accept=".ogg,.oga,.opus,.mp3,.wav,.flac,.m4a,.aac,.webm,audio/*" />
                 </div>
                 <div class="audio-import-row">
                     <label for="audioNameInput">Save as name <span class="audio-hint">(leave blank to use

@@ -1,4 +1,5 @@
-const path = require('path');
+// This is a placeholder. it does not function yet.
+const path = require('path'); 
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 

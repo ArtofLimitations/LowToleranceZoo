@@ -3,7 +3,7 @@ import { drawSprite, createDataURL, adjustColor } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor, toolbarSwapColor } from './palette.js';
-import { saveCombinedData, loadCombinedData, saveWorld, loadWorld, saveLtz, loadLtz, loadSpriteSheetDialog } from './file.js';
+import { saveCombinedData, loadCombinedData, saveLtz, loadLtz, loadSpriteSheetDialog } from './file.js';
 import { addAudioToStore, removeAudioFromStore, getAudioStore } from './ltz.js';
 import { editObject, getObjectData } from './object-editor.js';
 
@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Low Tolerance Zoo');
 
     // Canvas Configurations
-    var displayWidth = 1474;
+    var displayWidth = 1152;
     var displayHeight = 800;
     const canvas = document.getElementById('lowToleranceCanvas');
     var scale = 1;
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let [cursorX, cursorY] = [9, 4];     // Keyboard cursor
     let currentSprite = 1;               // Sprite to draw. Default = 1
     let currentLayer = 2;                // Layer to draw sprite on. 1 = floor 2 = default 3 = ceiling
-    let tileSetLength = 300;             // Size of tileset
+    let tileSetLength = 999;             // Size of tileset
     let colors = currentColors;          // colors selected from palette
     let type = 'wall';                   // type of sprite to place. wall, object, sign, passage, item, coin, ammo, invisible
     let currentAmount = 1;               // current value for item amount (ammo, coins, health, etc)
@@ -99,8 +99,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // ...future board settings can be added here
         };
     }
-
-    function normalizeBoardSettings(settings) {
+    
+    // Normalize board settings to ensure consistent property names, especially for night mode
+    function normalizeBoardSettings(settings) { 
         if (!settings || typeof settings !== 'object') return settings;
         if (settings.nightmode !== undefined && settings.nightMode === undefined) {
             settings.nightMode = settings.nightmode;
@@ -1432,7 +1433,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Update the text content of the element
-        spriteSheetLength.textContent = `(${getSpriteSheet().length}/300)`;
+        spriteSheetLength.textContent = `(${getSpriteSheet().length}/${tileSetLength})`;
 
         const handleSpriteSelectClose = (event) => {
             if (!popup.active || popup.type !== 'selectSpriteBox') {
@@ -2297,17 +2298,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         showStatusMessage('Redo');
                         if (event.repeat) { return }
                         return;
-                    case 'b': // Handle 'Ctrl + B' to load board (no sprite sheet)
-                        loadBoard(handleLoadedBoard); // from file.js
-                        showStatusMessage('Board loaded');
-                        if (event.repeat) { return }
-                        return;
-                    case 'n':
-                        if (!event.ctrlKey) saveBoard(placedSprites); // save board (not sprite sheet)
-                        if (event.repeat) { return }
-                        break;
+                    case 'b': // Load Board (planned)
+                        
+                    case 'n': // Save Board (planned)
+                        
                     case ',': // save sprite sheet only
-                        saveSpriteSheet(getSpriteSheet()); // UPDATE
+                        //saveSpriteSheet(getSpriteSheet()); // UPDATE (not added yet)
                         showStatusMessage('Sprite sheet saved');
                         if (event.repeat) { return }
                         break;

@@ -7,19 +7,19 @@ const spriteCtx = spriteCanvas.getContext('2d');
 const container = document.getElementById('spriteContainer');
 const overlay = document.getElementById('overlay');
 const spriteNumber = document.getElementById('spriteEditorCurrentSprite');
-const spritePreview = document.getElementById('spriteEditorCurrentSpriteImage');
+const spritePreview = document.getElementById('spritePreviewCanvas');
 const spriteEditorCloseBtn = document.getElementById('spriteContainerClose');
 
 // Set up the grid and colors
 const gridSize = 16;
 const pixelSize = Math.min(spriteCanvas.width, spriteCanvas.height) / gridSize;
 const colors = ['white', 'black'];                                                // Only two colors: white and black
-const maxSprites = 300; // Maximum number of sprites, can be changed later
+const maxSprites = 999; // Maximum number of sprites, can be changed later
 let currentColor = 1;
 let currentSprite = 1;
 let clipboard = [];
 export let spriteData = Array(gridSize).fill().map(() => Array(gridSize).fill(2)); // 16x16 grid, initially all alpha (2)
-let [cursorX, cursorY] = [9, 4];
+let [cursorX, cursorY] = [9, 4]; // ToDo: Initialize cursor position within the grid for keyboard navigation
 let mouse = {
     x: 0,
     y: 0,
@@ -29,7 +29,6 @@ let mouse = {
     ctrl: false,
 };
 
-let spriteSheet = {};
 let undoStack = [];
 let redoStack = [];
 const historyLimit = 100;
@@ -274,7 +273,7 @@ function handleSidebarAction(action) {
     }
 }
 
-function drawSpritePreview() {
+function drawSpritePreviewOLD() {
     if (!spritePreview) return;
 
     spritePreview.innerHTML = '';
@@ -292,6 +291,24 @@ function drawSpritePreview() {
         });
 }
 
+function drawSpritePreview() { // create a sprite preview by drawing to a small 32x32 canvas
+    if (!spritePreview) return;
+
+    const previewCtx = spritePreview.getContext('2d');
+    previewCtx.clearRect(0, 0, spritePreview.width, spritePreview.height);
+
+    const scale = spritePreview.width / gridSize;
+
+    for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+            if (spriteData[y][x] !== 2) {
+                previewCtx.fillStyle = colors[spriteData[y][x]];
+                previewCtx.fillRect(x * scale, y * scale, scale, scale);
+            }
+        }
+    }
+}
+
 // Function to draw the grid and sprite data
 function drawGrid() {
     spriteCtx.clearRect(0, 0, spriteCanvas.width, spriteCanvas.height);
@@ -299,8 +316,8 @@ function drawGrid() {
     //spriteCtx.fillStyle = '#1f1f1f';
     //spriteCtx.fillRect(0, 0, spriteCanvas.width, spdrawButtons riteCanvas.height);
     //beginPath();
-    spriteCtx.fillStyle = '#addcca';
-    spriteCtx.font = '12px Helvetica, Arial, Sans-Serif';
+    //spriteCtx.fillStyle = '#d3d3d3';
+    //spriteCtx.font = '12px Helvetica, Arial, Sans-Serif';
 
     if (mouse.mode === 'draw') document.getElementById('spriteDrawMode').textContent = 'Draw';
     if (mouse.mode === 'fill') document.getElementById('spriteDrawMode').textContent = 'Fill';
@@ -311,9 +328,9 @@ function drawGrid() {
                 spriteCtx.fillStyle = colors[spriteData[y][x]];
                 spriteCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
             }
-            spriteCtx.strokeStyle = '#888';
-            spriteCtx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-            spriteCtx.beginPath();
+            //spriteCtx.strokeStyle = '#acacac';
+            //spriteCtx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+            //spriteCtx.beginPath();
         }
     }
     drawSpritePreview();

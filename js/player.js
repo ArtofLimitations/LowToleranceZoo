@@ -4,18 +4,23 @@ import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './spri
 import { createBullet, deactivateAllBullets, weaponDefinitions } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
 import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, resolveNumericArg, RESERVED_FLAG_WORDS, defaultDialogStyle, validTypes } from './object-functions.js';
-import { getAudioStore } from './ltz.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
-import * as Howler from './modules/howler.js';
-
-// Audio
-let audioCtx = null; // Legacy AudioContext fallback if needed
-const audioBufferCache = {};
-let currentMusicSource = null;
-let currentMusicKey = null;
-let howlInstances = {};
-let currentMusicGain = null;
-let masterGain = null;
+import {
+    playAudio,
+    stopAudio,
+    stopAllAudio,
+    pauseAudio,
+    resumeAudio,
+    togglePauseAudio,
+    setMasterVolume,
+    getMasterVolume,
+    setMuted,
+    unlockAudio,
+    isAudioUnlocked,
+    isMusicPlaying,
+    getCurrentMusicKey,
+    unloadAllAudio,
+} from './audio.js';
 
 // Canvas Configurations
 const displayWidth = 1154;
@@ -1279,18 +1284,37 @@ function executeObjectCommand(obj, command) {
                     // args[0] is already unquoted thanks to tokenizeCommand in the parser
                     const trackName = command.args[0];
                     if (!trackName) {
-                        console.warn('#play: No track name provided.');
+                        console.warn('#music: No track name provided.');
                         break;
                     }
                     const loopFlag = command.args.includes('loop');
-                    // parse optional fade-in: '#play track fade 500'
+                    // parse optional fade-in: '#music track fade 500'
                     let fadeMs = 0;
                     const fidx = command.args.findIndex(a => a === 'fade' || a === 'fadein');
                     if (fidx !== -1 && command.args[fidx + 1]) {
                         const n = parseInt(command.args[fidx + 1], 10);
                         if (!isNaN(n) && n >= 0) fadeMs = n;
                     }
-                    playAudio(trackName, { loop: loopFlag, fadeIn: fadeMs });
+                    // parse optional fade-out applied to the outgoing track
+                    let fadeOutMs = 0;
+                    const oidx = command.args.findIndex(a => a === 'fadeout');
+                    if (oidx !== -1 && command.args[oidx + 1]) {
+                        const n = parseInt(command.args[oidx + 1], 10);
+                        if (!isNaN(n) && n >= 0) fadeOutMs = n;
+                    }
+                    // parse optional track volume: '#music track volume 80'
+                    let vol = 100;
+                    const vidx = command.args.findIndex(a => a === 'volume' || a === 'vol');
+                    if (vidx !== -1 && command.args[vidx + 1]) {
+                        const n = parseInt(command.args[vidx + 1], 10);
+                        if (!isNaN(n) && n >= 0 && n <= 100) vol = n;
+                    }
+                    playAudio(trackName, {
+                        loop: loopFlag,
+                        fadeIn: fadeMs,
+                        fadeOut: fadeOutMs,
+                        volume: vol / 100,
+                    });
                     break;
                 }
                 case 'sfx':
@@ -1320,15 +1344,18 @@ function executeObjectCommand(obj, command) {
                     break;
                 }
                 case "pause": {
-                    // TODO: pause is not supported for WebAudio buffer source fallback.
-                    // If Howler is available and used later, implement pause/resume there.
-                    if (currentMusicSource && typeof currentMusicSource.stop !== 'undefined') {
-                        // no-op: cannot pause BufferSource; stop instead
-                        try { currentMusicSource.stop(); } catch (_) {}
-                        currentMusicSource = null;
-                        currentMusicKey = null;
-                        currentMusicGain = null;
-                    }
+                    // Howler supports real pause/resume, so #pause suspends the
+                    // music where it is and #resume picks it back up.
+                    pauseAudio();
+                    break;
+                }
+                case "resume":
+                case "unpause": {
+                    resumeAudio();
+                    break;
+                }
+                case "musicpause": {
+                    togglePauseAudio();
                     break;
                 }
                 case "stop": {
@@ -1342,18 +1369,26 @@ function executeObjectCommand(obj, command) {
                     stopAudio(null, { fadeOut: fadeMs });
                     break;
                 }
+                case "mute":
+                case "unmute": {
+                    setMuted(command.name === "mute");
+                    break;
+                }
                 case "volume": {
-                    const level = command.args[0];
-                    if (!level || level < 0 || level > 100) {
-                        console.warn('#volume: Expected number between 0 and 100')
+                    // args arrive as strings, so compare numerically.
+                    const n = parseFloat(command.args[0]);
+                    if (!Number.isFinite(n) || n < 0 || n > 100) {
+                        console.warn('#volume: Expected a number between 0 and 100');
                         break;
                     }
-                    // Set Howler global volume (for future Howler migration)
-                    try { Howler.Howler && Howler.Howler.volume(level / 100); } catch (_) { }
-                    // Also set master gain for WebAudio fallback
-                    if (audioCtx && masterGain) {
-                        masterGain.gain.setValueAtTime(level / 100, audioCtx.currentTime);
-                    }
+                    setMasterVolume(n);
+                    break;
+                }
+                case "audiostatus": {
+                    console.log('AUDIO: unlocked =', isAudioUnlocked(),
+                        '| master volume =', Math.round(getMasterVolume() * 100) + '%',
+                        '| music =', getCurrentMusicKey() ?? 'none',
+                        '| playing =', isMusicPlaying());
                     break;
                 }
                 case "debug":
@@ -1594,123 +1629,9 @@ function jumpToLabel(obj, label) {
     }
 }
 
-async function playAudio(trackName, { loop = false, stopCurrent = true, fadeIn = 0, volume = 1 } = {}) {
-    // Keys in the store are 'audio/sfx/name' or 'audio/music/name'
-    const store = getAudioStore();
-    // Search by exact key first, then fall back to name-only match
-    let key = Object.keys(store).find(k => k === trackName) ||
-        Object.keys(store).find(k => k.endsWith('/' + trackName));
-    if (!key) {
-        console.warn(`#play: Track "${trackName}" not found in audio store.`);
-        return;
-    }
-
-    // Determine category: music vs sfx
-    const isMusic = /(^|\/)music\//.test(key);
-
-    // If requested track is music and already playing, ignore
-    if (isMusic && currentMusicKey === key && currentMusicSource) {
-        console.log(`#play: Music "${trackName}" already playing; ignoring.`);
-        return currentMusicSource;
-    }
-
-    // Stop existing music if a new music track is requested (or stopCurrent requested)
-    if (isMusic && (stopCurrent || currentMusicKey !== null) && currentMusicSource) {
-        try { currentMusicSource.stop(); } catch (_) { }
-        currentMusicSource = null;
-        currentMusicKey = null;
-    }
-
-    // TODO: migrate this to Howler playback. For now use Web Audio API with master gain and fades.
-    if (!audioCtx) {
-        audioCtx = new AudioContext();
-        masterGain = audioCtx.createGain();
-        masterGain.gain.value = 1;
-        masterGain.connect(audioCtx.destination);
-    }
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-    if (!audioBufferCache[key]) {
-        audioBufferCache[key] = await audioCtx.decodeAudioData(store[key].buffer.slice(0));
-    }
-
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioBufferCache[key];
-    source.loop = !!(loop && isMusic); // only loop music when requested
-
-    // create a gain node for this source so we can fade it independently
-    const gainNode = audioCtx.createGain();
-    // volume is a 0..1 multiplier applied before masterGain
-    gainNode.gain.value = fadeIn > 0 ? 0 : (typeof volume === 'number' ? volume : 1);
-    source.connect(gainNode);
-    gainNode.connect(masterGain);
-
-    const now = audioCtx.currentTime;
-    if (fadeIn > 0) {
-        const target = (typeof volume === 'number' ? volume : 1);
-        gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(target, now + fadeIn / 1000);
-    }
-
-    source.start(0);
-
-    if (isMusic) {
-        currentMusicSource = source;
-        currentMusicKey = key;
-        currentMusicGain = gainNode;
-        if (!source.loop) {
-            source.onended = () => {
-                if (currentMusicSource === source) {
-                    currentMusicSource = null;
-                    currentMusicKey = null;
-                    currentMusicGain = null;
-                }
-            };
-        }
-    }
-
-    return source;
-}
-
-// Stop current music (or specific track) with optional fade-out in ms
-function stopAudio(trackName = null, { fadeOut = 0 } = {}) {
-    if (!currentMusicSource) return;
-    if (trackName) {
-        // resolve trackName to key format similar to playAudio
-        const store = getAudioStore();
-        const key = Object.keys(store).find(k => k === trackName) || Object.keys(store).find(k => k.endsWith('/' + trackName));
-        if (!key) return;
-        if (key !== currentMusicKey) return; // not the currently playing track
-    }
-
-    if (!audioCtx || !currentMusicGain) {
-        try { currentMusicSource.stop(); } catch (_) { }
-        currentMusicSource = null;
-        currentMusicKey = null;
-        currentMusicGain = null;
-        return;
-    }
-
-    const now = audioCtx.currentTime;
-    if (fadeOut > 0) {
-        currentMusicGain.gain.cancelScheduledValues(now);
-        currentMusicGain.gain.setValueAtTime(currentMusicGain.gain.value, now);
-        currentMusicGain.gain.linearRampToValueAtTime(0, now + fadeOut / 1000);
-        // stop after fade completes
-        setTimeout(() => {
-            try { currentMusicSource.stop(); } catch (_) { }
-            if (currentMusicSource) {
-                currentMusicSource = null;
-                currentMusicKey = null;
-                currentMusicGain = null;
-            }
-        }, fadeOut + 50);
-    } else {
-        try { currentMusicSource.stop(); } catch (_) { }
-        currentMusicSource = null;
-        currentMusicKey = null;
-        currentMusicGain = null;
-    }
-}
+// Audio playback lives in js/audio.js (Howler-backed).
+// Script commands #play / #music / #sfx / #pause / #stop / #volume call into
+// that module, which owns the audio store, Howl cache and blob: URL lifetime.
 
 // ##############################################
 // ############ Dialog box functions ############
@@ -2651,6 +2572,7 @@ function sanitizePlacedSprites() {
 // Load board and replace sprite sheet
 function handleLoadedBoard(spriteSheetData, boardData) {
     deactivateAllBullets(bulletArray); // Deactivate all bullets
+    unloadAllAudio(); // Drop the previous project's Howls and blob: URLs
     placedSprites = boardData;
     replaceSpriteSheet(spriteSheetData);
 
@@ -2684,6 +2606,7 @@ function handleLoadedBoard(spriteSheetData, boardData) {
 
 function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsData = {}, boardSettingsData = {}) {
     deactivateAllBullets(bulletArray); // Deactivate all bullets  
+    unloadAllAudio(); // Drop the previous project's Howls and blob: URLs
 
     boards = boardList; // Load the board list
     world = worldData; // Load the world data
@@ -2718,7 +2641,10 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
             return null;
         })();
 
-        const savedNightMode = saved?.nightMode ?? saved?.nightmode ?? saved?.dark ?? false;
+        
+        // Normalizing night mode setting for the board, allowing the legacy "nightmode" key as well ( ?? saved?.dark )
+        const savedNightMode = saved?.nightMode ?? saved?.nightmode ?? false;
+
         boardData[board] = {
             ...(saved || {}),
             boardName: (saved && saved.boardName) || getBoardName(board),
@@ -2899,6 +2825,10 @@ let util = { Tab: "tab", Enter: "enter", Shift: "shift", Alt: "alt", Escape: "es
 
 document.addEventListener("keydown", (event) => {
     canvas.style.cursor = 'none'; // Hide the default cursor when using keyboard controls
+    // Browsers keep the AudioContext suspended until a real user gesture, which
+    // would silently drop any track a script starts on board load. Every
+    // keydown is a valid gesture, so wake the context on the first one.
+    if (!isAudioUnlocked()) unlockAudio();
     // Set key state, but clear movement keys immediately if player is locked
     keys[event.key] = true;
 
@@ -2988,8 +2918,10 @@ document.addEventListener("keydown", (event) => {
                 playerPaused = !playerPaused;
                 if (!playerPaused) {
                     hidePauseMessage();
+                    resumeAudio();
                     requestAnimationFrame(animateGame);
                 } else {
+                    pauseAudio();
                     showPauseMessage();
                 }
                 // Optionally show/hide your pause UI here
@@ -3064,6 +2996,12 @@ function updateDirection() {
 
 document.addEventListener('mousemove', (event) => {
     canvas.style.cursor = 'default'; // Show default cursor when mouse is moved (indicating interactivity)
+});
+
+// Clicking the canvas is also a user gesture — use it to unlock audio for
+// players who never touch the keyboard.
+canvas.addEventListener('mousedown', () => {
+    if (!isAudioUnlocked()) unlockAudio();
 });
 
 // Start the animation
