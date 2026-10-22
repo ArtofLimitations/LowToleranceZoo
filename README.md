@@ -7,7 +7,7 @@ A ZZT or MegaZeux-inspired, tile-based game maker and player built with vanilla 
 ## Screenshot
 
 > 📸 
-![low tolerance editor](https://github.com/ArtofLimitations/LowToleranceZoo/blob/new-main/Screenshot%202026-08-04%20222125.png)
+![low tolerance editor](https://github.com/ArtofLimitations/LowToleranceZoo/blob/new-main/Screenshot%202026-10-08%20231651.png)
 ---
 
 [Try Editor Demo](https://lowtolerance.app/) -
