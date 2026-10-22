@@ -1,57 +1,59 @@
-const container = document.getElementById('editorContainer');
+﻿const container = document.getElementById('editorContainer');
 const title = container.querySelector('strong');
 const text = document.getElementById('textEditor');
-let textOnly = false;
 let tileKey = null;
 let objectText = '';
 let callbackFunction = () => { };
 
 export function getObjectData(key) {
-    //if (objectData[key] === undefined) return null;
     console.log('objectData: ', objectText);
     return objectText;
 }
 
-function sanitizeInput(input) {
-    return input.replace(/<(?!\/?(b|i|br|em|strong|center|page)\b)[^>]*>/gi, "");
-}
+const allowedInlineTags = new Set(['B', 'I', 'EM', 'STRONG', 'CENTER', 'PAGE', 'SPAN']);
 
-function parseScriptFromTextarea(text) {
-    let lines = text.trim().split("\n").map(line => line.trim());
-    let script = [];
-    let collectingText = false;
-    let textBlock = "";
+// Keep safe inline markup (including future syntax-highlighting spans) and
+// turn contenteditable's block structure into explicit, stable line breaks.
+function getEditorContent(element) {
+    const output = document.createElement('div');
 
-    for (let line of lines) {
-        if (line === "#text") {
-            collectingText = true;
-            textBlock = "";
-            continue;
-        }
-
-        if (collectingText) {
-            if (line === "#end") {
-                script.push(`#text ${textBlock.trim()}`); // Store full text block as one entry
-                collectingText = false;
-            } else {
-                textBlock += line + "\n"; // Keep collecting multi-line text
+    function copyChildren(source, destination) {
+        for (const node of source.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                destination.appendChild(document.createTextNode(node.nodeValue));
+                continue;
             }
-            continue;
-        }
+            if (node.nodeType !== Node.ELEMENT_NODE) continue;
 
-        // Store regular commands or section headers
-        if (line !== "") {
-            script.push(line);
+            const tag = node.tagName;
+            if (tag === 'BR') {
+                destination.appendChild(document.createElement('br'));
+            } else if (tag === 'DIV' || tag === 'P') {
+                copyChildren(node, destination);
+                destination.appendChild(document.createElement('br'));
+            } else if (allowedInlineTags.has(tag)) {
+                const cleanElement = document.createElement(tag.toLowerCase());
+                if (tag === 'SPAN' && node.classList.length) {
+                    cleanElement.className = Array.from(node.classList)
+                        .filter(name => /^[a-z0-9_-]+$/i.test(name))
+                        .join(' ');
+                }
+                copyChildren(node, cleanElement);
+                destination.appendChild(cleanElement);
+            } else {
+                // Ignore unsupported elements/attributes but keep their text.
+                copyChildren(node, destination);
+            }
         }
     }
 
-    return script;
+    copyChildren(element, output);
+    return output.innerHTML.replace(/(?:<br>){2,}$/i, '<br>');
 }
 
 function closeEditor() {
-    let result = sanitizeInput(text.value);
+    const result = getEditorContent(text);
     objectText = result;
-    //if (!textOnly) result = parseScriptFromTextarea(result);
     removeObjectEvents();
     addMainEvents();
     container.style.display = 'none';
@@ -59,11 +61,7 @@ function closeEditor() {
 }
 
 function handleKeyboard(event) {
-    switch (event.key) {
-
-        case 'Escape':
-            closeEditor();
-    }
+    if (event.key === 'Escape') closeEditor();
 }
 
 function addObjectEvents() {
@@ -77,18 +75,11 @@ function removeObjectEvents() {
 }
 
 export function editObject(type, script, key, callback) {
-    if (type === 'text') {
-        textOnly = true;
-        title.innerText = 'Edit Sign Text';
-    } else {
-        textOnly = false;
-        title.innerText = 'Edit Object Script';
-    }
+    title.innerText = type === 'text' ? 'Edit Sign Text' : 'Edit Object Script';
     tileKey = key;
     callbackFunction = callback;
-    text.value = script;
+    text.innerHTML = script || '';
     container.style.display = 'block';
     addObjectEvents();
     text.focus();
-    text.setSelectionRange(text.value.length, text.value.length); // Move cursor to end of text
 }

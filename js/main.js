@@ -2138,6 +2138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (event.repeat) { return }
                         break;
                     case 'o':
+                        event.preventDefault();
                         placeSprite(tileKey, currentSprite, 'object'); // Place sprite
                         if (placedSprites[tileKey]) {
                             editObject('object', '', tileKey, handleObjectScript); // open object script editor from object-editor.js
