@@ -4,6 +4,8 @@
   "description": "a zzt like sprite based game maker and player",
   "main": "/js/main.js",
   "scripts": {
+    "prestart": "node js/generate-preset-index.mjs",
+    "prestart-player": "node js/generate-preset-index.mjs",
     "start": "http-server ./ -c-1",
     "start-player": "http-server ./ -c-1 -o player.html",
     "test": "node js/imports.test.mjs && node js/audio.test.mjs && node js/howler-interop.test.mjs"

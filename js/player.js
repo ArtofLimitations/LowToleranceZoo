@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets, weaponDefinitions } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { extractRGB, namedColors, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, resolveNumericArg, RESERVED_FLAG_WORDS, defaultDialogStyle, validTypes } from './object-functions.js';
+import { parseHexColor, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, resolveNumericArg, RESERVED_FLAG_WORDS, defaultDialogStyle, validTypes } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 import {
     playAudio,
@@ -54,8 +54,6 @@ let bulletArray = [];
 let shiftAiming = false;             // When true, arrows aim+shoot without moving
 const scriptGlobals = {};            // Global variables for scripts
 const spriteCache = {};              // Cache for sprites to avoid redundant redrawing
-//const namedColors = namedColorList;// Named colors for easy reference
-
 // Timing
 let fps = 60;
 let lastTime = 0;                    // Timing variables
@@ -739,37 +737,27 @@ function executeObjectCommand(obj, command) {
                         break;
                     }
 
-                    // Check for enough arguments for colors
-                    if (!command.args[1]) {
-                        console.warn(`#change: Missing color arguments.`);
+                    if (!command.args[1] || !command.args[2]) {
+                        console.warn(`#change: Expected a sprite number and two hex colors. Usage: #change <sprite> <dark hex> <light hex>.`);
                         break;
                     }
 
-                    let dark, light;
-                    if (command.args[1].startsWith("(")) {
-                        // RGB format: must have at least 6 color values (3 for dark, 3 for light)
-                        if (command.args.length < 7) {
-                            console.warn(`#change: Not enough RGB values. Expected 6, got ${command.args.length - 1}.`);
-                            break;
-                        }
-                        dark = extractRGB(command.args.slice(1, 4).join(" "));
-                        light = extractRGB(command.args.slice(4, 7).join(" "));
-                    } else {
-                        // Named colors: must have at least 2 color names
-                        if (!command.args[2]) {
-                            console.warn(`#change: Missing second color name.`);
-                            break;
-                        }
-                        dark = namedColors[command.args[1]] || [0, 0, 0]; // Default to black if not found
-                        light = namedColors[command.args[2]] || [255, 255, 255]; // Default to white if not found
+                    const dark = parseHexColor(command.args[1]);
+                    const light = parseHexColor(command.args[2]);
+                    if (!dark || !light) {
+                        console.warn(`#change: Colors must be valid #RGB or #RRGGBB hex values.`);
+                        break;
                     }
 
                     // Apply sprite change
                     obj.sprite = spriteNumber;
                     obj.color = [dark, light];
 
-                    placedSprites[`${obj.layer},${obj.x},${obj.y}`].sprite = spriteNumber;
-                    placedSprites[`${obj.layer},${obj.x},${obj.y}`].color = [dark, light];
+                    const spriteKey = `${obj.layer},${obj.x},${obj.y}`;
+                    if (placedSprites[spriteKey]) {
+                        placedSprites[spriteKey].sprite = spriteNumber;
+                        placedSprites[spriteKey].color = [dark, light];
+                    }
                     updateTile(obj.layer, obj.x, obj.y); // Update tile with new sprite
                     renderLayersToMainCanvas(); // Ensure visual update
                     break;
@@ -778,16 +766,23 @@ function executeObjectCommand(obj, command) {
                 case "changeColor":
                 case "color": {
                     if (!command.args[0]) {
-                        console.warn("#changecolor: No color provided");
+                        console.warn(`#${command.name}: Expected one or two hex colors. Usage: #color <hex> [hex].`);
                         break;
                     }
-                    let color = extractRGB(command.args[0]);
+
+                    const dark = parseHexColor(command.args[0]);
+                    const light = command.args[1] ? parseHexColor(command.args[1]) : dark;
+                    if (!dark || !light) {
+                        console.warn(`#${command.name}: Colors must be valid #RGB or #RRGGBB hex values.`);
+                        break;
+                    }
+
                     let spriteKey = `${obj.layer},${obj.x},${obj.y}`;
                     if (placedSprites[spriteKey]) {
-                        placedSprites[spriteKey].color = color;
+                        placedSprites[spriteKey].color = [dark, light];
                     }
                     if (placedObjects[spriteKey]) {
-                        placedObjects[spriteKey].color = color;
+                        placedObjects[spriteKey].color = [dark, light];
                     }
                     updateTile(obj.layer, obj.x, obj.y);
                     renderLayersToMainCanvas();

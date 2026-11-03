@@ -58,6 +58,10 @@ Then open `http://localhost:8080` in your browser.
 npm run start-player
 ```
 
+### Palette image presets
+
+Add image files (`.avif`, `.bmp`, `.gif`, `.jpg`, `.jpeg`, `.png`, `.svg`, or `.webp`) to `assets/presets/`. Starting the editor or player regenerates the preset list automatically. Before publishing a static copy, run `node js/generate-preset-index.mjs` so the list includes the current files. In the palette, choose an image, then left-click for the dark color or right-click for the light color and sample anywhere on screen. The browser's EyeDropper API requires a supported browser and a secure context (localhost is supported).
+
 ---
 
 ## Editor Overview
@@ -235,9 +239,9 @@ These labels are triggered automatically by the engine:
 
 | Command | Description |
 |---------|-------------|
-| `#change n dark light` | Change sprite and both colors (named or RGB) |
+| `#change n dark light` | Change sprite and both colors using `#RGB` or `#RRGGBB` hex values |
 | `#changesprite n` / `#sprite n` | Change the sprite number only |
-| `#changecolor color` / `#color color` | Change the object's color |
+| `#changecolor hex [hex]` / `#color hex [hex]` | Change the object's colors; one hex applies to both, two set dark and light |
 | `#hidelayer n` | Hide canvas layer 1, 2, or 3 |
 | `#showlayer n` | Show canvas layer 1, 2, or 3 |
 | `#nightmode` | Toggle night mode on/off |

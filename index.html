@@ -296,17 +296,23 @@
             </div>
             <p>Common Colors</p>
             <div class="commonColorsContainer" id="commonColorsContainer" oncontextmenu="event.preventDefault();"></div>
+            <p id="presetPaletteHeading">Preset Images</p>
+            <select id="presetPaletteSelect" aria-label="Choose a preset image">
+                <option value="">Loading preset images...</option>
+            </select>
+            <img id="presetPaletteImage" alt="" hidden draggable="false">
+            <p id="presetPaletteStatus" role="status" aria-live="polite">
+                Left-click for dark or right-click for light, then choose a color on screen.
+            </p>
         </div>
 
         <div class="editorContainer" id="editorContainer">
             <button class="material-symbols-outlined popup-close-btn" id="editorContainerClose" title="Close (Esc)">close</button>
             <p><strong>Script Editor</strong></p>
             <div class="editorTextContainer" id="editorTextContainer">
-                <!--<div class="textEditorContainer"><textarea id="textEditor" placeholder="Code here..." autocomplete="off"
-                        autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
-                </div>-->
-                <div class="editorTextContent" id="textEditor" contenteditable="true" data-placeholder="Type your text here..."></div>
+                <div id="codeEditor"></div>
             </div>
+            <div>Option 1</div><div>Option 2</div>
         </div>
 
         <div class="boardInfoBox" id="boardInfoBox">

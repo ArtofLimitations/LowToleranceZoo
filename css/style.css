@@ -8,7 +8,7 @@
   --font-weight: 300;
   --font-style: normal;
   --scrollbar-track-color: #ffffff;
-  --scrollbar-thumb-color: #0e2a68;
+  --scrollbar-thumb-color: #969aa3;
   --scrollbar-size: 16px;
   --sidebar-width: 320px;
   --popup-top: 24px;
@@ -50,14 +50,14 @@ textarea::-webkit-scrollbar-track {
 
 div::-webkit-scrollbar-thumb,
 textarea::-webkit-scrollbar-thumb {
-  background: var(--sb-thumb-color);
+  background: var(--scrollbar-thumb-color);
   border-radius: 1px;
 
 }
 
 @supports not selector(::-webkit-scrollbar) {
   div {
-    scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
+    scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
   }
 }
 
@@ -217,7 +217,7 @@ h3 {
   background-color: #0e2a68;
   width: 100vw;
   height: 100vh;
-  opacity: 70%;
+  opacity: 45%;
   position: fixed;
   top: 0;
   left: 0;
@@ -798,6 +798,9 @@ h3 {
   overflow-y: auto;
   padding-right: 8px;
   width: 100%;
+
+  background-color: #2b2b2b;
+  padding: 0px 8px;
 }
 
 /*
@@ -856,6 +859,8 @@ h3 {
   font-weight: 600;
   margin: 8px 0;
   box-sizing: border-box;
+
+  border: 1px solid #232323;
 }
 
 .boardInfoBox select {
@@ -1086,6 +1091,39 @@ h3 {
   border-radius: 4px;
 }
 
+#presetPaletteSelect,
+#presetPaletteImage {
+  display: block;
+  width: min(248px, 100%);
+  box-sizing: border-box;
+  margin: 1 auto 0;
+}
+
+select#presetPaletteSelect {
+  padding: 8px;
+  font-family: 'Fira Code', monospace;
+  background-color: #fff;
+  color: #222;
+  font-size: 16px;
+  border: 1px solid #232323;
+}
+
+#presetPaletteImage {
+  max-height: 248px;
+  object-fit: contain;
+  cursor: crosshair;
+}
+
+#presetPaletteImage[hidden] {
+  display: none;
+}
+
+#presetPaletteStatus {
+  max-width: 248px;
+  margin: 8px auto 0;
+  font-size: 12px;
+}
+
 .editorContainer {
   display: none;
   box-sizing: border-box;
@@ -1106,6 +1144,14 @@ h3 {
 
 .editorTextContainer {
   color: #fff;
+}
+
+#codeEditor {
+  border: 1px solid #111;
+}
+
+#codeEditor .cm-editor {
+  font-size: 16px;
 }
 
 /*.editorTextContainer input {
@@ -1409,3 +1455,28 @@ h3 {
     border: none !important;
     box-shadow: none !important;
 }
+
+/*
+.editorTextContent .syntax-command {
+  color: #9fd3bb;
+}
+
+.editorTextContent .syntax-mixin {
+  color: #e4a86b;
+}
+
+.editorTextContent .syntax-name {
+  color: #d8a0df;
+}
+
+.editorTextContent .syntax-label {
+  color: #e4c07a;
+}
+
+.editorTextContent .syntax-variable {
+  color: #76d6c9;
+}
+
+.editorTextContent .syntax-number {
+  color: #91b7f4;
+}*/

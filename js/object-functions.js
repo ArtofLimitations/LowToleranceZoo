@@ -366,24 +366,23 @@ export function adjustStat(player, item, amount) {
     // console.log(`Adjusted ${item}: ${player.stats[item]}`);
 }
 
-// Helper function to extract RGB values
-export function extractRGB(str) {
-    let match = str.match(/\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(\.\d+)?)?\)/); // Capture RGB, ignore alpha
-    return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3]), 1] : [0, 0, 0, 1]; // Default to black with full alpha
-}
+export function parseHexColor(value) {
+    if (typeof value !== 'string') return null;
 
-// Named color lookup table
-export const namedColors = {
-    "red": [255, 0, 0, 255],
-    "pink": [255, 182, 193, 255],
-    "blue": [0, 0, 255, 255],
-    "green": [0, 255, 0, 255],
-    "yellow": [255, 255, 0, 255],
-    "purple": [128, 0, 128, 255],
-    "orange": [255, 165, 0, 255],
-    "white": [255, 255, 255, 255],
-    "black": [0, 0, 0, 255]
-};
+    const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value.trim());
+    if (!match) return null;
+
+    const hex = match[1].length === 3
+        ? [...match[1]].map(digit => digit + digit).join('')
+        : match[1];
+
+    return [
+        parseInt(hex.slice(0, 2), 16),
+        parseInt(hex.slice(2, 4), 16),
+        parseInt(hex.slice(4, 6), 16),
+        1
+    ];
+}
 
 export function convertDirections(direction) {
     const dir = direction.toLowerCase(); // Normalize to lowercase 
