@@ -8,7 +8,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>LTZ Editor</title>
-    
+
     <meta name="description" content="Low Tolerance Zoo - A ZZT-style game and editor for the modern web.">
     <!-- Schema JSON-LD -->
     <script type="application/ld+json">
@@ -46,7 +46,8 @@
 
     <div class="fieldContainer">
         <div class="fieldRow" style="color: #fff">
-            Ctrl + Scroll: zoom in/out | Ctrl + 0: reset zoom | F1: Save | F3: Load | Go to Player: <a href="player.html" target="_blank">Here</a>
+            Ctrl + Scroll: zoom in/out | Ctrl + 0: reset zoom | F1: Save | F3: Load | Go to Player: <a
+                href="player.html" target="_blank">Here</a>
         </div>
     </div>
 
@@ -96,7 +97,7 @@
 
                 <div class="fieldRow"><button class="material-symbols-outlined" id="layer1Button"
                         title="Layer 1">visibility</button><span class="layerBox" id="layer1">Layer 1</span> </div>
-                
+
                 <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</span></div>
                 <div class="fieldRow">
                     <div class="container">
@@ -184,9 +185,10 @@
             </div>
         </div>
         <!----------------->
-        
+
         <div class="spriteContainer" id="spriteContainer" oncontextmenu="event.preventDefault();">
-            <button class="material-symbols-outlined popup-close-btn" id="spriteContainerClose" title="Close (Esc)">close</button>
+            <button class="material-symbols-outlined popup-close-btn" id="spriteContainerClose"
+                title="Close (Esc)">close</button>
             <div class="spriteInfo" id="spriteInfo"><strong>Sprite Editor</strong><br> F: fill | D: draw | esc: save and
                 close editor - <em><span class="spriteInfoMode">Mode:</span> <span id="spriteDrawMode">Draw</span></em>
             </div>
@@ -196,289 +198,320 @@
                     <div class="fieldContainer">
 
                         <div class="fieldRow"><span class="valueBox" id="spriteEditorCurrentSprite">1</span><span
-                                class="imageBox" id="spriteEditorCurrentSpriteImage"> 
-                                    <canvas class="spriteEditorPreviewCanvas" id="spritePreviewCanvas" width="32" height="32"></canvas>
-                                </span>
-                                <span class="fieldText">Current<br> Sprite</span></div>
+                                class="imageBox" id="spriteEditorCurrentSpriteImage">
+                                <canvas class="spriteEditorPreviewCanvas" id="spritePreviewCanvas" width="32"
+                                    height="32"></canvas>
+                            </span>
+                            <span class="fieldText">Current<br> Sprite</span>
                         </div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="spriteButton modeButton modeButton-active" id="spriteButtonDark" type="button">Dark</button>
-                                <button class="spriteButton modeButton" id="spriteButtonLight" type="button">Light</button>
+                    </div>
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="spriteButton modeButton modeButton-active" id="spriteButtonDark"
+                                type="button">Dark</button>
+                            <button class="spriteButton modeButton" id="spriteButtonLight" type="button">Light</button>
+                        </div>
+                    </div>
+                    <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░</span></div>
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <div class="tooltip-wrapper">
+                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonCopy"
+                                    type="button">content_copy</button>
+                                <span class="custom-tooltip"><span class="tooltip-key">Crtl+C</span> <span class="tooltip-desc"> - Copy Sprite</span></span>
                             </div>
-                        </div>
-                        <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░</span></div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonCopy" type="button">content_copy</button>
+                            <div class="tooltip-wrapper">
                                 <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonPaste" type="button">content_paste</button>
+                                <span class="custom-tooltip"><span class="tooltip-key">Crtl+V</span> <span class="tooltip-desc"> - Paste Sprite</span></span>
                             </div>
-                        </div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="spriteButton spriteButtonActions" id="spriteButtonFlipX" type="button">Flip X</button>
-                                <button class="spriteButton spriteButtonActions" id="spriteButtonFlipY" type="button">Flip Y</button>
-                            </div>
-                        </div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonRotateL" type="button">rotate_left</button>
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonRotateR" type="button">rotate_right</button>
-                            </div>
-                        </div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="spriteButton spriteButtonActions" id="spriteButtonInvert" type="button">Invert</button>
-                            </div>
-                        </div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="spriteButton spriteButtonActions" id="spriteButtonDelDark" type="button">Delete Dark</button>
-                                <button class="spriteButton spriteButtonActions" id="spriteButtonDelLight" type="button">Delete Light</button>
-                            </div>
-                        </div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonUndo" type="button">undo</button>
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonRedo" type="button">redo</button>
-                            </div>
-                        </div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonClear" type="button">delete</button>
-                            </div>
-                        </div>
-                                                <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░</span></div>
 
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNUP" type="button">arrow_drop_up</button>
-                            </div>
                         </div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNLEFT" type="button">arrow_left</button>
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNRIGHT" type="button">arrow_right</button>
-                            </div>
-                        </div>
-                        <div class="fieldRow">
-                            <div class="spriteButtonGroup">
-                                <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNDOWN" type="button">arrow_drop_down</button>
-                            </div>
-                        </div>
-
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="paletteContainer" id="paletteContainer">
-            <button class="material-symbols-outlined popup-close-btn" id="paletteContainerClose" title="Close (Esc)">close</button>
-            <p><strong>Color Palette</strong></p>
-            <div class="paletteColorContainer">
-                <div class="paletteColorBox" id="colorDark"><span class="paletteLabel">Dark</span>
-
-                </div>
-                <div class="paletteColorBox" id="colorLight"><span class="paletteLabel">Light</span>
-                </div>
-            </div>
-            <button class="paletteButton material-symbols-outlined" id="swapColorButton"
-                title="Swap colors">swap_horiz</button><button
-                class="paletteButton paletteButton-right material-symbols-outlined" id="blendRightButton"
-                title="Blend right">join_right</button>
-            <p>Recent Colors</p>
-            <div class="paletteRecentContainer">
-                <div class="paletteRecent" id="color1"></div>
-                <div class="paletteRecent" id="color2"></div>
-                <div class="paletteRecent" id="color3"></div>
-                <div class="paletteRecent" id="color4"></div>
-                <div class="paletteRecent" id="color5"></div>
-            </div>
-            <p>Common Colors</p>
-            <div class="commonColorsContainer" id="commonColorsContainer" oncontextmenu="event.preventDefault();"></div>
-            <p id="presetPaletteHeading">Preset Images</p>
-            <select id="presetPaletteSelect" aria-label="Choose a preset image">
-                <option value="">Loading preset images...</option>
-            </select>
-            <img id="presetPaletteImage" alt="" hidden draggable="false">
-            <p id="presetPaletteStatus" role="status" aria-live="polite">
-                Left-click for dark or right-click for light, then choose a color on screen.
-            </p>
-        </div>
-
-        <div class="editorContainer" id="editorContainer">
-            <button class="material-symbols-outlined popup-close-btn" id="editorContainerClose" title="Close (Esc)">close</button>
-            <p><strong>Script Editor</strong></p>
-            <div class="editorTextContainer" id="editorTextContainer">
-                <div id="codeEditor"></div>
-            </div>
-            <div>Option 1</div><div>Option 2</div>
-        </div>
-
-        <div class="boardInfoBox" id="boardInfoBox">
-            <p><strong>Board Information</strong></p>
-            <div class="boardInfoContent" id="boardInfoContent">
-                <div class="board-info-row">
-                    <label for="boardInfoName">Board name</label>
-                    <input class="inputField" type="text" id="boardInfoName" />
-                </div>
-                <div class="board-info-row">
-                    <label for="boardInfoBulletLimit">Bullet limit</label>
-                    <input class="inputField" type="number" min="0" id="boardInfoBulletLimit" />
-                </div>
-                <div class="board-info-row">
-                    <label>Player start (x, y, layer)</label>
-                    <div class="board-info-inline">
-                        <input class="inputField" type="number" min="0" id="boardInfoStartX" />
-                        <input class="inputField" type="number" min="0" id="boardInfoStartY" />
-                        <input class="inputField" type="number" min="1" max="3" id="boardInfoStartLayer" />
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="spriteButton spriteButtonActions" id="spriteButtonFlipX" type="button">Flip
+                                X</button>
+                            <button class="spriteButton spriteButtonActions" id="spriteButtonFlipY" type="button">Flip
+                                Y</button>
+                        </div>
                     </div>
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonRotateL"
+                                type="button">rotate_left</button>
+                            <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonRotateR"
+                                type="button">rotate_right</button>
+                        </div>
+                    </div>
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="spriteButton spriteButtonActions" id="spriteButtonInvert"
+                                type="button">Invert</button>
+                        </div>
+                    </div>
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="spriteButton spriteButtonActions" id="spriteButtonDelDark"
+                                type="button">Delete Dark</button>
+                            <button class="spriteButton spriteButtonActions" id="spriteButtonDelLight"
+                                type="button">Delete Light</button>
+                        </div>
+                    </div>
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonUndo"
+                                type="button">undo</button>
+                            <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonRedo"
+                                type="button">redo</button>
+                        </div>
+                    </div>
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonClear"
+                                type="button">delete</button>
+                        </div>
+                    </div>
+                    <div class="fieldRow"><span class="divider">░░░░░░░░░░░░░░░░░░░</span></div>
+
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNUP"
+                                type="button">arrow_drop_up</button>
+                        </div>
+                    </div>
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNLEFT"
+                                type="button">arrow_left</button>
+                            <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNRIGHT"
+                                type="button">arrow_right</button>
+                        </div>
+                    </div>
+                    <div class="fieldRow">
+                        <div class="spriteButtonGroup">
+                            <button class="material-symbols-outlined spriteButtonActions" id="spriteButtonNDOWN"
+                                type="button">arrow_drop_down</button>
+                        </div>
+                    </div>
+
                 </div>
-                <div class="board-info-row board-info-checkboxes">
-                    <label><input type="checkbox" id="boardInfoReenter" /> Re-enter when hurt</label>
-                    <label><input type="checkbox" id="boardInfoDark" /> Dark</label>
-                    <label><input type="checkbox" id="boardInfoNight" /> Night mode</label>
-                    <label><input type="checkbox" id="boardInfoLocked" /> Player locked</label>
-                    <label><input type="checkbox" id="boardInfoCanAttack" /> Player can attack</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="paletteContainer" id="paletteContainer">
+        <button class="material-symbols-outlined popup-close-btn" id="paletteContainerClose"
+            title="Close (Esc)">close</button>
+        <p><strong>Color Palette</strong></p>
+        <div class="paletteColorContainer">
+            <div class="paletteColorBox" id="colorDark"><span class="paletteLabel">Dark</span>
+
+            </div>
+            <div class="paletteColorBox" id="colorLight"><span class="paletteLabel">Light</span>
+            </div>
+        </div>
+        <button class="paletteButton material-symbols-outlined" id="swapColorButton"
+            title="Swap colors">swap_horiz</button><button
+            class="paletteButton paletteButton-right material-symbols-outlined" id="blendRightButton"
+            title="Blend right">join_right</button>
+        <p>Recent Colors</p>
+        <div class="paletteRecentContainer">
+            <div class="paletteRecent" id="color1"></div>
+            <div class="paletteRecent" id="color2"></div>
+            <div class="paletteRecent" id="color3"></div>
+            <div class="paletteRecent" id="color4"></div>
+            <div class="paletteRecent" id="color5"></div>
+        </div>
+        <p>Common Colors</p>
+        <div class="commonColorsContainer" id="commonColorsContainer" oncontextmenu="event.preventDefault();"></div>
+        <p id="presetPaletteHeading">Preset Images</p>
+        <select id="presetPaletteSelect" aria-label="Choose a preset image">
+            <option value="">Loading preset images...</option>
+        </select>
+        <img id="presetPaletteImage" alt="" hidden draggable="false">
+        <p id="presetPaletteStatus" role="status" aria-live="polite">
+            Left-click for dark or right-click for light, then choose a color on screen.
+        </p>
+    </div>
+
+    <div class="editorContainer" id="editorContainer">
+        <button class="material-symbols-outlined popup-close-btn" id="editorContainerClose"
+            title="Close (Esc)">close</button>
+        <p><strong>Script Editor</strong></p>
+        <div class="editorTextContainer" id="editorTextContainer">
+            <div id="codeEditor"></div>
+        </div>
+        <div>Option 1</div>
+        <div>Option 2</div>
+    </div>
+
+    <div class="boardInfoBox" id="boardInfoBox">
+        <p><strong>Board Information</strong></p>
+        <div class="boardInfoContent" id="boardInfoContent">
+            <div class="board-info-row">
+                <label for="boardInfoName">Board name</label>
+                <input class="inputField" type="text" id="boardInfoName" />
+            </div>
+            <div class="board-info-row">
+                <label for="boardInfoBulletLimit">Bullet limit</label>
+                <input class="inputField" type="number" min="0" id="boardInfoBulletLimit" />
+            </div>
+            <div class="board-info-row">
+                <label>Player start (x, y, layer)</label>
+                <div class="board-info-inline">
+                    <input class="inputField" type="number" min="0" id="boardInfoStartX" />
+                    <input class="inputField" type="number" min="0" id="boardInfoStartY" />
+                    <input class="inputField" type="number" min="1" max="3" id="boardInfoStartLayer" />
                 </div>
-                <div class="board-info-row board-info-links">
-                    <label>Linked boards</label>
-                    <!--<div class="board-info-inline">
+            </div>
+            <div class="board-info-row board-info-checkboxes">
+                <label><input type="checkbox" id="boardInfoReenter" /> Re-enter when hurt</label>
+                <label><input type="checkbox" id="boardInfoDark" /> Dark</label>
+                <label><input type="checkbox" id="boardInfoNight" /> Night mode</label>
+                <label><input type="checkbox" id="boardInfoLocked" /> Player locked</label>
+                <label><input type="checkbox" id="boardInfoCanAttack" /> Player can attack</label>
+            </div>
+            <div class="board-info-row board-info-links">
+                <label>Linked boards</label>
+                <!--<div class="board-info-inline">
                     <input class="inputField" type="number" min="1" id="boardInfoNorth" placeholder="North" />
                     <input class="inputField" type="number" min="1" id="boardInfoEast" placeholder="East" />
                     <input class="inputField" type="number" min="1" id="boardInfoSouth" placeholder="South" />
                     <input class="inputField" type="number" min="1" id="boardInfoWest" placeholder="West" />
                 </div>-->
-                    <div class="board-info-inline">
-                        <label for="boardInfoNorth">North <span
-                                class="material-symbols-outlined">arrow_drop_up</span></label>
-                        <label for="boardInfoEast">East <span
-                                class="material-symbols-outlined">arrow_right</span></label>
-                        <label for="boardInfoSouth">South <span
-                                class="material-symbols-outlined">arrow_drop_down</span></label>
-                        <label for="boardInfoWest">West <span
-                                class="material-symbols-outlined">arrow_left</span></label>
-                    </div>
-
-                    <div class="board-info-inline">
-                        <select class="inputField" id="boardInfoNorth">
-                            <option value="none">None</option>
-                        </select>
-                        <select class="inputField" id="boardInfoEast">
-                            <option value="none">None</option>
-                        </select>
-                        <select class="inputField" id="boardInfoSouth">
-                            <option value="none">None</option>
-                        </select>
-                        <select class="inputField" id="boardInfoWest">
-                            <option value="none">None</option>
-                        </select>
-                    </div>
-
+                <div class="board-info-inline">
+                    <label for="boardInfoNorth">North <span
+                            class="material-symbols-outlined">arrow_drop_up</span></label>
+                    <label for="boardInfoEast">East <span class="material-symbols-outlined">arrow_right</span></label>
+                    <label for="boardInfoSouth">South <span
+                            class="material-symbols-outlined">arrow_drop_down</span></label>
+                    <label for="boardInfoWest">West <span class="material-symbols-outlined">arrow_left</span></label>
                 </div>
-                <div class="board-info-row">
-                    <label for="boardInfoScript">Board script</label>
-                    <textarea class="inputField" id="boardInfoScript" rows="5"></textarea>
-                </div>
-            </div>
-            <button class="material-symbols-outlined popup-close-btn" id="boardInfoClose" title="Close (Esc)">close</button>
-        </div>
 
-        <div class="audioImporterBox" id="audioImporterBox">
-            <p><strong>Audio Importer</strong></p>
-            <div class="audioImportContent" id="audioImportContent">
-                <div class="audio-import-row">
-                    <label for="audioCategorySelect">Category</label>
-                    <select class="audio-input-field" id="audioCategorySelect">
-                        <option value="sfx">SFX</option>
-                        <option value="music">Music</option>
+                <div class="board-info-inline">
+                    <select class="inputField" id="boardInfoNorth">
+                        <option value="none">None</option>
+                    </select>
+                    <select class="inputField" id="boardInfoEast">
+                        <option value="none">None</option>
+                    </select>
+                    <select class="inputField" id="boardInfoSouth">
+                        <option value="none">None</option>
+                    </select>
+                    <select class="inputField" id="boardInfoWest">
+                        <option value="none">None</option>
                     </select>
                 </div>
-                <div class="audio-import-row">
-                    <label for="audioFileInput">Audio file (.ogg, .mp3, .wav, .flac, .m4a)</label>
-                    <input class="audio-input-field" type="file" id="audioFileInput"
-                        accept=".ogg,.oga,.opus,.mp3,.wav,.flac,.m4a,.aac,.webm,audio/*" />
-                </div>
-                <div class="audio-import-row">
-                    <label for="audioNameInput">Save as name <span class="audio-hint">(leave blank to use
-                            filename)</span></label>
-                    <input class="audio-input-field" type="text" id="audioNameInput" placeholder="e.g. coin.ogg"
-                        autocomplete="off" />
-                </div>
-                <button class="material-symbols-outlined audio-import-submit" id="importAudioButton"
-                    title="Import">file_upload</button>
-                <div class="audio-import-row audio-list-section">
-                    <label>Imported audio</label>
-                    <ul id="audioImportList" class="audio-import-list"></ul>
-                </div>
-            </div>
-            <button class="material-symbols-outlined popup-close-btn" id="audioImporterClose"
-                title="Close (Esc)">close</button>
-        </div>
 
-        <div class="selectAmount" id="selectAmount">
-            <button class="material-symbols-outlined popup-close-btn" id="selectAmountClose" title="Close (Esc)">close</button>
-        </div>
-        <div class="pushType" id="pushType">
-            <button class="material-symbols-outlined popup-close-btn" id="pushTypeClose" title="Close (Esc)">close</button>
-        </div>
-
-        <div class="boardSelect" id="boardSelect">
-            <p><strong>Select Board</strong></p>
-            <div class="boardList" id="boardList">
-                <ol id="boardListItems">
-                    <li>Title Board</li>
-                    <li>Default</li>
-                </ol>
             </div>
-            <button class="material-symbols-outlined" id="addBoardButton" title="Add New Board">add</button>
-            <button class="material-symbols-outlined popup-close-btn" id="boardSelectClose" title="Close (Esc)">close</button>
+            <div class="board-info-row">
+                <label for="boardInfoScript">Board script</label>
+                <div id="boardInfoScript" class="board-info-script-editor"></div>
+            </div>
         </div>
-        <div class="selectSprite" id="selectSpriteBox">
-            <p><strong>Select Sprite</strong></p>
-            <div id="spriteGallery" class="sprite-gallery"></div>
-            <button class="material-symbols-outlined popup-close-btn" id="selectSpriteClose" title="Close (Esc)">close</button>
+        <button class="material-symbols-outlined popup-close-btn" id="boardInfoClose" title="Close (Esc)">close</button>
+    </div>
+
+    <div class="audioImporterBox" id="audioImporterBox">
+        <p><strong>Audio Importer</strong></p>
+        <div class="audioImportContent" id="audioImportContent">
+            <div class="audio-import-row">
+                <label for="audioCategorySelect">Category</label>
+                <select class="audio-input-field" id="audioCategorySelect">
+                    <option value="sfx">SFX</option>
+                    <option value="music">Music</option>
+                </select>
+            </div>
+            <div class="audio-import-row">
+                <label for="audioFileInput">Audio file (.ogg, .mp3, .wav, .flac, .m4a)</label>
+                <input class="audio-input-field" type="file" id="audioFileInput"
+                    accept=".ogg,.oga,.opus,.mp3,.wav,.flac,.m4a,.aac,.webm,audio/*" />
+            </div>
+            <div class="audio-import-row">
+                <label for="audioNameInput">Save as name <span class="audio-hint">(leave blank to use
+                        filename)</span></label>
+                <input class="audio-input-field" type="text" id="audioNameInput" placeholder="e.g. coin.ogg"
+                    autocomplete="off" />
+            </div>
+            <button class="material-symbols-outlined audio-import-submit" id="importAudioButton"
+                title="Import">file_upload</button>
+            <div class="audio-import-row audio-list-section">
+                <label>Imported audio</label>
+                <ul id="audioImportList" class="audio-import-list"></ul>
+            </div>
         </div>
-        <div class="extraTiles" id="extraTerrain">
-            <p><span class="char">■</span><strong>Terrain</strong></p>
-            <br>
-            <ul id="extraTilesList">
-                <li><span>W</span>Wall</li><span class="fieldText">Standard wall tile. Blocks movement.</span>
-                <li><span>S</span>Step Tile</li><span class="fieldText">Item like tile. Destroyed upon stepping
-                    on.</span>
-                <li><span>B</span>Break</li><span class="fieldText">Like a wall but breaks when hit.</span>
-                <li><span>P</span>Push</li><span class="fieldText">Can be pushed by player and objects</span>
-                <li><span>A</span>Animation Tile</li><span class="fieldText">Efficient animation tile. Pre-rendered and
-                    can't be changed by objects without destroying.</span>
-                <li><span>I</span>Invisible Wall</li><span class="fieldText">Blocks player and objects but not
-                    bullets.</span>
-                <li><span>E</span>Empty</li><span class="fieldText">Deletes tiles or objects. Can be filled.</span>
-            </ul>
+        <button class="material-symbols-outlined popup-close-btn" id="audioImporterClose"
+            title="Close (Esc)">close</button>
+    </div>
+
+    <div class="selectAmount" id="selectAmount">
+        <button class="material-symbols-outlined popup-close-btn" id="selectAmountClose"
+            title="Close (Esc)">close</button>
+    </div>
+    <div class="pushType" id="pushType">
+        <button class="material-symbols-outlined popup-close-btn" id="pushTypeClose" title="Close (Esc)">close</button>
+    </div>
+
+    <div class="boardSelect" id="boardSelect">
+        <p><strong>Select Board</strong></p>
+        <div class="boardList" id="boardList">
+            <ol id="boardListItems">
+                <li>Title Board</li>
+                <li>Default</li>
+            </ol>
         </div>
-        <div class="extraTiles" id="extraItems">
-            <p><span class="char">♦</span><strong>Items</strong></p>
-            <br>
-            <ul id="extraTilesList">
-                <li><span>C</span>Coin</li><span class="fieldText">Standard currency item.</span>
-                <li><span>A</span>Ammo</li><span class="fieldText">Standard ammo item.</span>
-                <li><span>K</span>Key</li><span class="fieldText">Key for unlocking same color door.</span>
-                <li><span>D</span>Door</li><span class="fieldText">Standard door item. Can be opened by player.</span>
-                <li><span>P</span>Passage</li><span class="fieldText">Move to another board. Use same color to dictate
-                    where player appears.</span>
-                <li><span>I</span>Sign</li><span class="fieldText">Enter text to display when touched. Use &lt;page&gt;
-                    to force pagination. Accepts some html (br, em, strong, b, i, center)</span>
-            </ul>
-        </div>
-        <div class="extraTiles" id="extraCreatures">
-            <p><span class="char">☺</span><strong>Creatures</strong></p>
-            <br>
-            <p class="fieldText">Creature presets are coming soon. Use scripted objects for interactive actors.</p>
-        </div>
+        <button class="material-symbols-outlined" id="addBoardButton" title="Add New Board">add</button>
+        <button class="material-symbols-outlined popup-close-btn" id="boardSelectClose"
+            title="Close (Esc)">close</button>
+    </div>
+    <div class="selectSprite" id="selectSpriteBox">
+        <p><strong>Select Sprite</strong></p>
+        <div id="spriteGallery" class="sprite-gallery"></div>
+        <button class="material-symbols-outlined popup-close-btn" id="selectSpriteClose"
+            title="Close (Esc)">close</button>
+    </div>
+    <div class="extraTiles" id="extraTerrain">
+        <p><span class="char">■</span><strong>Terrain</strong></p>
+        <br>
+        <ul id="extraTilesList">
+            <li><span>W</span>Wall</li><span class="fieldText">Standard wall tile. Blocks movement.</span>
+            <li><span>S</span>Step Tile</li><span class="fieldText">Item like tile. Destroyed upon stepping
+                on.</span>
+            <li><span>B</span>Break</li><span class="fieldText">Like a wall but breaks when hit.</span>
+            <li><span>P</span>Push</li><span class="fieldText">Can be pushed by player and objects</span>
+            <li><span>A</span>Animation Tile</li><span class="fieldText">Efficient animation tile. Pre-rendered and
+                can't be changed by objects without destroying.</span>
+            <li><span>I</span>Invisible Wall</li><span class="fieldText">Blocks player and objects but not
+                bullets.</span>
+            <li><span>E</span>Empty</li><span class="fieldText">Deletes tiles or objects. Can be filled.</span>
+        </ul>
+    </div>
+    <div class="extraTiles" id="extraItems">
+        <p><span class="char">♦</span><strong>Items</strong></p>
+        <br>
+        <ul id="extraTilesList">
+            <li><span>C</span>Coin</li><span class="fieldText">Standard currency item.</span>
+            <li><span>A</span>Ammo</li><span class="fieldText">Standard ammo item.</span>
+            <li><span>K</span>Key</li><span class="fieldText">Key for unlocking same color door.</span>
+            <li><span>D</span>Door</li><span class="fieldText">Standard door item. Can be opened by player.</span>
+            <li><span>P</span>Passage</li><span class="fieldText">Move to another board. Use same color to dictate
+                where player appears.</span>
+            <li><span>I</span>Sign</li><span class="fieldText">Enter text to display when touched. Use &lt;page&gt;
+                to force pagination. Accepts some html (br, em, strong, b, i, center)</span>
+        </ul>
+    </div>
+    <div class="extraTiles" id="extraCreatures">
+        <p><span class="char">☺</span><strong>Creatures</strong></p>
+        <br>
+        <p class="fieldText">Creature presets are coming soon. Use scripted objects for interactive actors.</p>
+    </div>
     </div>
 
     <canvas id="exportedSpriteCanvas" width="32" height="32" style="margin-top: 20px;"></canvas>
 
-    <div class="info"><span id="versionInfo">LTZ Alpha Version</span><br>ZZT Style Editor for the modern web.<br>2026 Art Of Limitations - <a href="https://github.com/ArtofLimitations/LowToleranceZoo" target="_blank">GitHub</a></div>
+    <div class="info"><span id="versionInfo">LTZ Alpha Version</span><br>ZZT Style Editor for the modern web.<br>2026
+        Art Of Limitations - <a href="https://github.com/ArtofLimitations/LowToleranceZoo" target="_blank">GitHub</a>
+    </div>
     <script type="module" src="js/main.js"></script>
 </body>
 <!--  http-server ./ -c-1 -->

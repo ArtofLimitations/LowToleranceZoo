@@ -43,12 +43,12 @@ export const PALETTE_RGBA = {
     dosLightMagenta: "rgba(255, 85, 255, 1)",  // DOS 13: Light Magenta
 
     // --- GRAYS & NEUTRALS ---
-    black:          "rgba(0, 0, 0, 1)",           // DOS 0: Black
-    dosDarkGray:    "rgba(85, 85, 85, 1)",        // DOS 8: Dark Gray
+    white:        "rgba(255, 255, 255, 1)",            // DOS 15: Bright White
     dosLightGray:   "rgba(170, 170, 170, 1)",     // DOS 7: Light Gray
-
+    dosDarkGray:    "rgba(85, 85, 85, 1)",        // DOS 8: Dark Gray
+    
     // --- WHITES & OFF-WHITES ---
-    white:        "rgba(255, 255, 255, 1)"            // DOS 15: Bright White
+    black:          "rgba(0, 0, 0, 1)",           // DOS 0: Black
 };
 
 export let currentColors = [[0, 0, 0, 1], [255, 255, 255, 1]];

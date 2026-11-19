@@ -184,6 +184,7 @@ These labels are triggered automatically by the engine:
 | `#restart` | Restart script from the top |
 | `#send :label` | Jump to a label in this object |
 | `#send @Name :label` | Send a label trigger to a named object |
+| `#send @board :label` | Send a label trigger to the current board script |
 
 ---
 
@@ -229,7 +230,9 @@ These labels are triggered automatically by the engine:
 | `#take item all` | Take all of a stat |
 | `#take item half` | Take half of a stat |
 | `#take item n :label` | Take n, jump to label if player can't afford it |
-| `#hurt` | Flash the player red |
+| `#playerhurt` | Flash the player red and re-enter at the board entry point if enabled; does not change health |
+| `#playerflash` | Flash the player red without re-entering |
+| `#hurt` | Compatibility alias for `#playerhurt` |
 
 **Stat names:** `health`, `ammo`, `coins` (and any custom stats defined in world settings)
 
@@ -383,6 +386,12 @@ Configured through the Object Editor or programmatically in world save data.
 - Player locked, player can attack
 - Bullet limit
 - Board script
+
+The board script is updated before placed-object scripts on that board each
+tick, but a `#wait` or `#sleep` only pauses the board script. It can receive
+`#send @board :label` messages. Board scripts have no tile location or sprite,
+so movement, sprite, color, shooting, and `#die` commands are ignored with a
+console warning.
 
 ---
 

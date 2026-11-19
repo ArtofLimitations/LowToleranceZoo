@@ -337,6 +337,39 @@ function parseScript(text) {
     return { script, labels };
 }
 
+export function createBoardScriptObject(boardId, text = "") {
+    if (text == null) return null;
+    if (typeof text !== "string") {
+        throw new TypeError("Board script must be a string.");
+    }
+    if (text.trim() === "") return null;
+
+    const parsedScript = parseScript(text);
+    const namedCommand = parsedScript.script.find(
+        command => command.type === "name" && typeof command.value === "string" && command.value.length > 0
+    );
+
+    return {
+        id: `board-${boardId}`,
+        type: "board",
+        scope: "board",
+        boardId,
+        name: namedCommand ? namedCommand.value : "board",
+        scriptTargetName: "board",
+        statusMessageStyle: { ...defaultStatusMessageStyle },
+        waiting: false,
+        waitTime: 0,
+        timeSinceLastMove: 0,
+        moveInterval: 100,
+        script: parsedScript.script,
+        scriptIndex: 0,
+        labels: parsedScript.labels,
+        zappedLabels: {},
+        resting: false,
+        locked: false,
+    };
+}
+
 export function resolveLabel(obj, label) {
     const locations = obj.labels[label];
     const zapped = obj.zappedLabels?.[label] || 0;

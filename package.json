@@ -8,7 +8,7 @@
     "prestart-player": "node js/generate-preset-index.mjs",
     "start": "http-server ./ -c-1",
     "start-player": "http-server ./ -c-1 -o player.html",
-    "test": "node js/imports.test.mjs && node js/audio.test.mjs && node js/howler-interop.test.mjs"
+    "test": "node js/imports.test.mjs && node js/audio.test.mjs && node js/howler-interop.test.mjs && node js/object-functions.test.mjs"
   },
   "author": "Dustin Davidson",
   "license": "ISC",

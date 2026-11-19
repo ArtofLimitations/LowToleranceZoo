@@ -26,7 +26,7 @@ const allowedInlineTags = new Set(['B', 'I', 'EM', 'STRONG', 'CENTER', 'PAGE', '
 
 const hexColorPattern = /#(?:[0-9a-f]{6}|[0-9a-f]{3})(?![0-9a-f])/gi;
 
-const scriptLanguage = StreamLanguage.define({
+export const scriptLanguage = StreamLanguage.define({
     startState() {
         return { mixinNamePending: false };
     },
@@ -114,7 +114,7 @@ const editorTheme = EditorView.theme({
         backgroundColor: '#514800'
     },*/
 
-const scriptHighlightStyle = syntaxHighlighting(HighlightStyle.define([
+export const scriptHighlightStyle = syntaxHighlighting(HighlightStyle.define([
     { tag: tags.comment, color: '#888888' },
     { tag: tags.keyword, color: '#9fd3bb' },
     { tag: tags.atom, color: '#e4a86b' },

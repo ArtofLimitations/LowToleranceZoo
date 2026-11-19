@@ -13,6 +13,7 @@ import {
     setMasterVolume,
     getMasterVolume,
     playAudio,
+    previewAudio,
     stopAudio,
     pauseAudio,
     resumeAudio,
@@ -110,6 +111,8 @@ check('delegated level reached Howler', Howler.volume() === 0.8, String(Howler.v
 const missing = await playAudio('does-not-exist.ogg');
 check('unknown track returns null', missing === null, String(missing));
 check('unknown track warned', warnedAbout('does-not-exist'));
+const missingPreview = await previewAudio('does-not-exist.ogg');
+check('unknown preview returns null', missingPreview === null, String(missingPreview));
 
 check('no music before anything plays', getCurrentMusicKey() === null);
 check('isMusicPlaying() false initially', isMusicPlaying() === false);

@@ -231,6 +231,7 @@ function stopCurrentMusic({ fadeOut = 0 } = {}) {
  * @param {number}  [options.fadeIn=0]       Fade in over N ms.
  * @param {number}  [options.fadeOut=0]      Fade out the outgoing music over N ms.
  * @param {number}  [options.volume=1]       Track volume multiplier, 0..1.
+ * @param {boolean} [options.restart=false]  Restart the current music track.
  * @returns {Promise<number|null>} Howl sound id, or null if the track is unknown.
  */
 export async function playAudio(trackName, {
@@ -239,6 +240,7 @@ export async function playAudio(trackName, {
     fadeIn = 0,
     fadeOut = 0,
     volume = 1,
+    restart = false,
 } = {}) {
     const key = resolveAudioKey(trackName);
     if (!key) {
@@ -250,7 +252,7 @@ export async function playAudio(trackName, {
     const target = typeof volume === 'number' ? Math.min(Math.max(volume, 0), 1) : 1;
 
     // Re-requesting the music that is already playing is a no-op.
-    if (isMusic && currentMusicKey === key && !musicPaused) {
+    if (isMusic && currentMusicKey === key && !musicPaused && !restart) {
         return currentMusicId;
     }
 
@@ -283,6 +285,41 @@ export async function playAudio(trackName, {
     }
 
     return soundId;
+}
+
+/**
+ * Play a one-shot preview and return a handle that stops only that instance.
+ * The callback runs when playback ends naturally.
+ */
+export async function previewAudio(trackName, onEnd = () => {}) {
+    const key = resolveAudioKey(trackName);
+    if (!key) {
+        console.warn(`audio: track "${trackName}" not found in the audio store.`);
+        return null;
+    }
+
+    const soundId = await playAudio(key, { loop: false, volume: 1, restart: true });
+    if (soundId === null) return null;
+
+    const howl = howls[key];
+    let active = true;
+    howl.once('end', () => {
+        if (!active) return;
+        active = false;
+        onEnd();
+    }, soundId);
+
+    return {
+        stop() {
+            if (!active) return;
+            active = false;
+            if (isMusicKey(key) && currentMusicKey === key && currentMusicId === soundId) {
+                stopCurrentMusic();
+            } else {
+                howl.stop(soundId);
+            }
+        },
+    };
 }
 
 function waitForUnlock() {

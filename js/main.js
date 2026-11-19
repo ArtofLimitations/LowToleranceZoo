@@ -1,11 +1,47 @@
 import { toolbar, updateType, updateLayers } from './toolbar.js';
-import { drawSprite, createDataURL, adjustColor } from './sprite.js';
+import { drawSprite, createDataURL, convertToImageData, adjustColor } from './sprite.js';
 import { editSprite, updateSpriteData } from './sprite-editor.js';
 import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-sheet.js';
 import { pickColor, currentColors, updateColor, toolbarSwapColor } from './palette.js';
 import { saveCombinedData, loadCombinedData, saveLtz, loadLtz, loadSpriteSheetDialog } from './file.js';
 import { addAudioToStore, removeAudioFromStore, getAudioStore } from './ltz.js';
-import { editObject, getObjectData } from './object-editor.js';
+import { previewAudio } from './audio.js';
+import { editObject, getObjectData, scriptLanguage, scriptHighlightStyle } from './object-editor.js';
+import { EditorView, basicSetup } from 'https://esm.sh/codemirror';
+
+const boardScriptEditorTheme = EditorView.theme({
+    '&': {
+        height: '100%',
+        backgroundColor: '#131313',
+        color: '#ffc800'
+    },
+    '.cm-scroller': {
+        overflow: 'auto',
+        fontFamily: "'Courier New', Courier, monospace"
+    },
+    '.cm-content': {
+        whiteSpace: 'pre-wrap',
+        overflowWrap: 'anywhere',
+        caretColor: '#ffc800'
+    },
+    '.cm-gutters': {
+        backgroundColor: '#1b1b1b',
+        color: '#888',
+        borderRight: '1px solid #333'
+    },
+    '&.cm-focused': {
+        outline: '1px solid #111'
+    },
+    '.cm-activeLine': {
+        backgroundColor: '#41414173'
+    },
+    '.cm-cursor, .cm-dropCursor': {
+        borderLeft: '1px solid #ffc800'
+    },
+    '.cm-selectionBackground': {
+        backgroundColor: '#2f3d64'
+    }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Low Tolerance Zoo');
@@ -799,7 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateToolbar () {
-            toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY);
+            toolbar(currentSprite, colors, currentLayer, mouse, hiddenLayers, handleToolbarClick, type, cursorX, cursorY, getLayerOpacity(3));
     }
 
     // ######################################
@@ -1090,9 +1126,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const container = document.getElementById('audioImporterBox');
         if (!container) { console.warn('audioImporterBox not found'); return; }
+        let activePreview = null;
+
+        const setPreviewButtonState = (button, isPlaying) => {
+            button.textContent = isPlaying ? 'stop' : 'play_arrow';
+            button.title = isPlaying ? 'Stop preview' : 'Preview audio';
+            button.setAttribute('aria-label', button.title);
+        };
+
+        const stopPreview = () => {
+            if (!activePreview) return false;
+            const preview = activePreview;
+            activePreview = null;
+            preview.handle?.stop();
+            setPreviewButtonState(preview.button, false);
+            return true;
+        };
 
         // Render the current audio list
         function renderAudioList() {
+            stopPreview();
             const list = document.getElementById('audioImportList');
             if (!list) return;
             list.innerHTML = '';
@@ -1122,6 +1175,56 @@ document.addEventListener('DOMContentLoaded', () => {
                 const kb = (store[key].byteLength / 1024).toFixed(1);
                 sizeLabel.textContent = `${kb} KB`;
 
+                // buttons
+
+                const previewBtn = document.createElement('button');
+                previewBtn.className = 'material-symbols-outlined audio-preview-btn';
+                setPreviewButtonState(previewBtn, false);
+                previewBtn.onclick = async () => {
+                    if (activePreview?.key === key) {
+                        stopPreview();
+                        return;
+                    }
+
+                    stopPreview();
+                    const preview = { key, button: previewBtn, handle: null };
+                    activePreview = preview;
+                    setPreviewButtonState(previewBtn, true);
+                    try {
+                        const handle = await previewAudio(key, () => {
+                            if (activePreview !== preview) return;
+                            activePreview = null;
+                            setPreviewButtonState(previewBtn, false);
+                        });
+                        if (activePreview !== preview) {
+                            handle?.stop();
+                            return;
+                        }
+                        if (!handle) {
+                            activePreview = null;
+                            setPreviewButtonState(previewBtn, false);
+                            return;
+                        }
+                        preview.handle = handle;
+                    } catch (error) {
+                        if (activePreview === preview) {
+                            activePreview = null;
+                            setPreviewButtonState(previewBtn, false);
+                        }
+                        console.error('Audio preview failed:', error);
+                        showStatusMessage(`Could not preview audio: ${name}`);
+                    }
+                };
+
+                const copyBtn =  document.createElement('button');
+                copyBtn.className = 'material-symbols-outlined audio-copy-btn';
+                copyBtn.title = 'Copy Name';
+                copyBtn.textContent = 'content_copy';
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(name);
+                    showStatusMessage(`Copied to clipboard: ${name}`);
+                };
+
                 const removeBtn = document.createElement('button');
                 removeBtn.className = 'material-symbols-outlined audio-remove-btn';
                 removeBtn.title = 'Remove';
@@ -1131,6 +1234,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderAudioList();
                 };
 
+                li.appendChild(previewBtn);
+                li.appendChild(copyBtn);
                 li.appendChild(label);
                 li.appendChild(sizeLabel);
                 li.appendChild(removeBtn);
@@ -1176,10 +1281,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (event.key === 'Escape') {
                 event.preventDefault();
-                closePopup();
+                if (!stopPreview()) closePopup();
             }
         };
         addPopupKeydownHandler(handleClose);
+        popupCloseCallback = stopPreview;
 
         // Wire close button
         const closeBtn = document.getElementById('audioImporterClose');
@@ -1246,7 +1352,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const eastInput = document.getElementById('boardInfoEast');
         const southInput = document.getElementById('boardInfoSouth');
         const westInput = document.getElementById('boardInfoWest');
-        const scriptInput = document.getElementById('boardInfoScript');
+        const scriptEditorHost = document.getElementById('boardInfoScript');
+        let scriptEditor = null;
 
         // Populate board dropdowns with current board list
         const populateBoardSelect = (selectEl, currentValue) => {
@@ -1282,9 +1389,22 @@ document.addEventListener('DOMContentLoaded', () => {
         reenterInput.checked = !!settings.reenterWhenHurt;
         darkInput.checked = !!settings.dark;
         nightInput.checked = !!settings.nightMode;
-        lockedInput.checked = !!settings.playerLocked;
+        lockedInput.checked = !!settings.playerLocked; // playerLocked is a boolean, defaulting to false if undefined
         canAttackInput.checked = !!settings.playerCanAttack;
-        scriptInput.value = settings.boardScript || '';
+        scriptEditor = new EditorView({
+            doc: settings.boardScript || '',
+            extensions: [
+                basicSetup,
+                EditorView.lineWrapping,
+                scriptLanguage,
+                scriptHighlightStyle,
+                boardScriptEditorTheme,
+                EditorView.updateListener.of((update) => {
+                    if (update.docChanged) settings.boardScript = update.state.doc.toString();
+                })
+            ],
+            parent: scriptEditorHost
+        });
 
         // Event handlers to keep data in sync
         nameInput.oninput = () => {
@@ -1350,10 +1470,6 @@ document.addEventListener('DOMContentLoaded', () => {
             input.onchange = updateLinkedBoards;
         });
 
-        scriptInput.oninput = () => {
-            settings.boardScript = scriptInput.value;
-        };
-
         const syncBoardInfoSettings = () => {
             settings.boardName = nameInput.value.trim() || `Board ${boardId}`;
             settings.bulletLimit = Number.isFinite(parseInt(bulletLimitInput.value, 10)) ? parseInt(bulletLimitInput.value, 10) : 0;
@@ -1368,11 +1484,11 @@ document.addEventListener('DOMContentLoaded', () => {
             settings.playerLocked = lockedInput.checked;
             settings.playerCanAttack = canAttackInput.checked;
             updateLinkedBoards();
-            settings.boardScript = scriptInput.value;
+            settings.boardScript = scriptEditor.state.doc.toString();
             worldSaveData.boardSettings[boardId] = JSON.parse(JSON.stringify(settings));
         };
 
-        [nameInput, bulletLimitInput, startXInput, startYInput, startLayerInput, reenterInput, darkInput, nightInput, lockedInput, canAttackInput, northInput, eastInput, southInput, westInput, scriptInput].forEach((input) => {
+        [nameInput, bulletLimitInput, startXInput, startYInput, startLayerInput, reenterInput, darkInput, nightInput, lockedInput, canAttackInput, northInput, eastInput, southInput, westInput].forEach((input) => {
             if (!input) return;
             input.onchange = syncBoardInfoSettings;
         });
@@ -1391,6 +1507,8 @@ document.addEventListener('DOMContentLoaded', () => {
         popupCloseCallback = () => {
             syncBoardInfoSettings();
             worldSaveData.boardSettings[boardId] = JSON.parse(JSON.stringify(settings));
+            scriptEditor.destroy();
+            scriptEditor = null;
             console.log('Saved board settings for board', boardId, worldSaveData.boardSettings[boardId]);
         };
 
@@ -1398,6 +1516,7 @@ document.addEventListener('DOMContentLoaded', () => {
         popup.type = 'boardInfoBox';
         overlay.style.display = 'block';
         boardInfoContainer.style.display = 'flex';
+        requestAnimationFrame(() => scriptEditor?.requestMeasure());
         const boardCloseBtn = document.getElementById('boardInfoClose');
         if (boardCloseBtn) boardCloseBtn.onclick = () => closePopup();
         addPopupOutsideClickHandler();
@@ -1411,29 +1530,7 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.style.display = 'block';
 
         const spriteContainer = document.getElementById('selectSpriteBox');
-
         spriteContainer.style.display = 'flex';
-
-        createSpriteGallery(getSpriteSheet(), (index) => {
-            currentSprite = index; // Update the current sprite
-            console.log('Selected sprite:', index);
-            updateSpriteData(currentSprite); // Update the sprite data in the toolbar
-            popup.active = false; // Close the popup
-            overlay.style.display = 'none'; // Hide the overlay
-            spriteContainer.style.display = 'none'; // Hide the popup container
-            canvas.focus(); // Focus back on the canvas
-        });
-        // Append or update sprite sheet length in spriteContainer
-        let spriteSheetLength = spriteContainer.querySelector('.spriteSheetLength');
-        if (!spriteSheetLength) {
-            // If the element doesn't exist, create it
-            spriteSheetLength = document.createElement('div');
-            spriteSheetLength.classList.add('spriteSheetLength');
-            spriteContainer.appendChild(spriteSheetLength);
-        }
-
-        // Update the text content of the element
-        spriteSheetLength.textContent = `(${getSpriteSheet().length}/${tileSetLength})`;
 
         const handleSpriteSelectClose = (event) => {
             if (!popup.active || popup.type !== 'selectSpriteBox') {
@@ -1441,13 +1538,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             if (event.key === 'Enter' || event.key === 'Escape') {
+                event.preventDefault();
                 closePopup();
-                spriteContainer.style.display = 'none';
             }
         };
         addPopupKeydownHandler(handleSpriteSelectClose);
         const spriteCloseBtn = document.getElementById('selectSpriteClose');
         if (spriteCloseBtn) spriteCloseBtn.onclick = () => closePopup();
+
+        let spriteSheetLength = spriteContainer.querySelector('.spriteSheetLength');
+        if (!spriteSheetLength) {
+            spriteSheetLength = document.createElement('div');
+            spriteSheetLength.classList.add('spriteSheetLength');
+            spriteContainer.appendChild(spriteSheetLength);
+        }
+
+        spriteSheetLength.textContent = `(${getSpriteSheet().length}/${tileSetLength})`;
+        createSpriteGallery(getSpriteSheet(), (index) => {
+            currentSprite = index;
+            console.log('Selected sprite:', index);
+            updateSpriteData(currentSprite);
+            closePopup();
+        });
     }
 
     function createSpriteGallery(spriteSheet, onSpriteClick) {
@@ -1455,17 +1567,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const gallery = document.getElementById('spriteGallery');
         gallery.innerHTML = ''; // Clear any existing content
 
-        for (let index = 1; index <= spriteSheet.length; index++) {
-            if (index === 0) return; // Skip the first sprite (empty sprite)
+        const emptySprite = Array(16).fill().map(() => Array(16).fill(2));
+        for (let index = 1; index < spriteSheet.length; index++) {
             const spriteElement = document.createElement('div');
             spriteElement.classList.add('sprite-item');
             spriteElement.style.width = `${tileSizeX}px`;
             spriteElement.style.height = `${tileSizeY}px`;
-            spriteElement.style.backgroundImage = createDataURL(getDataFromSheet(index), colors[0], colors[1]).then((img) => {
-                spriteElement.appendChild(img); // Append the image to the sprite element
-            });
-            spriteElement.style.backgroundSize = 'contain';
             spriteElement.style.cursor = 'pointer';
+
+            const spriteCanvas = document.createElement('canvas');
+            spriteCanvas.width = tileSizeX;
+            spriteCanvas.height = tileSizeY;
+            spriteCanvas.getContext('2d').putImageData(
+                convertToImageData(getDataFromSheet(index) ?? emptySprite, colors[0], colors[1]),
+                0,
+                0
+            );
+            spriteElement.appendChild(spriteCanvas);
 
             // Add a click event to change the current sprite
             spriteElement.onclick = () => {
@@ -1488,15 +1606,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectContainer = document.getElementById('boardSelect');
         const listItems = document.getElementById('boardListItems');
         let boardSelected = ''; // Variable to store the selected board
+        let focusedIndex = boardList.findIndex((item) => item[0] === (selected ?? currentBoard));
+        if (focusedIndex < 0) focusedIndex = 0;
 
         listItems.innerHTML = ''; // Clear previous items
+        listItems.tabIndex = 0;
+        listItems.setAttribute('role', 'listbox');
+        listItems.setAttribute('aria-label', 'Boards');
 
-        boardList.forEach((item) => {
+        boardList.forEach((item, index) => {
             const listItem = document.createElement('li');
             listItem.textContent = item[1]; // Display the name of the board
-            if (item[0] === currentBoard) {
-                listItem.classList.add('selected'); // Highlight the selected board
-            }
+            listItem.setAttribute('role', 'option');
+            listItem.setAttribute('aria-selected', String(index === focusedIndex));
+            if (index === focusedIndex) listItem.classList.add('selected');
             if (item[0] === selected) { // append <strong> Selected </strong> to the selected board
                 listItem.innerHTML = `${item[1]} <span class="selectedBoard">Selected</span>`;
             }
@@ -1508,6 +1631,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showStatusMessage(`Selected Board: ${item[1]} (ID: ${item[0]})`); // Show status message with board name and ID
                     placedSprites = world[currentBoard]; // Get the selected board from the world object
                     findPlayerSprite(); // Find the player sprite on the selected board
+                    updateToolbar();
                     drawBoard();
                 }
                 boardSelected = item[0]; // Store the selected board ID
@@ -1522,6 +1646,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 //if (onlySelect) return boardSelected; // Return the selected board ID if only selecting
             };
             listItems.appendChild(listItem);
+        });
+        const updateBoardSelection = () => {
+            Array.from(listItems.children).forEach((listItem, index) => {
+                const isFocused = index === focusedIndex;
+                listItem.classList.toggle('selected', isFocused);
+                listItem.setAttribute('aria-selected', String(isFocused));
+            });
+        };
+        addPopupKeydownHandler((event) => {
+            if (!popup.active || popup.type !== 'boardSelect') {
+                removePopupKeydownHandler();
+                return;
+            }
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closePopup();
+                return;
+            }
+            if (event.target !== listItems) return;
+
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                listItems.children[focusedIndex]?.click();
+                return;
+            }
+
+            let direction = 0;
+            if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') direction = -1;
+            if (event.key === 'ArrowDown' || event.key === 'ArrowRight') direction = 1;
+            if (direction === 0 || listItems.children.length === 0) return;
+
+            event.preventDefault();
+            focusedIndex = (focusedIndex + direction + listItems.children.length) % listItems.children.length;
+            updateBoardSelection();
+            listItems.children[focusedIndex].scrollIntoView({ block: 'nearest' });
         });
         addButton.onclick = () => { // Add new board button
             const newBoardName = prompt('Enter new board name:');
@@ -1543,6 +1702,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         selectContainer.style.display = 'block';
+        listItems.focus();
         const boardSelectCloseBtn = document.getElementById('boardSelectClose');
         if (boardSelectCloseBtn) boardSelectCloseBtn.onclick = () => closePopup();
     }
@@ -1613,9 +1773,9 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function selectPushType(current = 'ANY', tileKey) {
+    function selectPushType(current = 'ANY', tileKey) { // Push tile types popup
         popup.active = true;
-        popup.type = 'selectPushType';
+        popup.type = 'pushType';
 
         overlay.style.display = 'block';
 
@@ -1623,31 +1783,63 @@ document.addEventListener('DOMContentLoaded', () => {
         selectContainer.style.display = 'flex';
         selectContainer.innerHTML = `<strong>Select Push Tile Type:</strong>`;
 
-        const options = ['EW', 'NS', 'ANY'];
+        const options = ['EW', 'NS', 'ANY']; // Push tile types options (east-west, north-south, any direction)
+        const optionButtons = []; // Store the button type elemements 
+        let selectedIndex = options.indexOf(current); // Index for which button is selected when using keyboard
+        if (selectedIndex < 0) selectedIndex = options.indexOf('ANY');
+
+        const updateSelection = () => { // Style the selected button
+            optionButtons.forEach((button, index) => {
+                const selected = index === selectedIndex;
+                button.style.fontWeight = selected ? 'bold' : 'normal';
+                button.style.background = selected ? '#5f76aa' : '';
+            });
+        };
+        const selectOption = (index) => {
+            placedSprites[tileKey].data.pushType = options[index];
+            showStatusMessage(`Push tile type set to: ${options[index]}`);
+            closePopup();
+        };
+
         options.forEach(option => {
             const btn = document.createElement('button');
             btn.textContent = option;
             btn.className = 'inputField';
-            if (option === current) btn.style.fontWeight = 'bold';
-            btn.onclick = () => {
-                placedSprites[tileKey].data.pushType = option;
-                popup.active = false;
-                overlay.style.display = 'none';
-                selectContainer.style.display = 'none';
-                canvas.focus();
-            };
+            btn.onclick = () => selectOption(options.indexOf(option));
             selectContainer.appendChild(btn);
+            optionButtons.push(btn);
         });
+        updateSelection();
 
-        // Allow Escape to close
-        selectContainer.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                popup.active = false;
-                overlay.style.display = 'none';
-                selectContainer.style.display = 'none';
-                canvas.focus();
+        selectContainer.onkeydown = (event) => {
+            if (event.key === 'Escape') { // Esc key. Close. No change
+                event.preventDefault();
+                closePopup();
+                return;
             }
-        });
+            if (event.key === 'Enter') { // Select current option then close
+                if (event.target.id === 'pushTypeClose') return;
+                event.preventDefault();
+                const focusedOptionIndex = optionButtons.indexOf(event.target);
+                selectOption(focusedOptionIndex >= 0 ? focusedOptionIndex : selectedIndex);
+                return;
+            }
+
+            if (/^[1-3]$/.test(event.key)) { // Number keys (1,2,3). Select one of the options then close
+                event.preventDefault();
+                selectOption(Number(event.key) - 1);
+                return;
+            }
+
+            let direction = 0;
+            if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') direction = -1; // Arrow keys to select an option.
+            if (event.key === 'ArrowDown' || event.key === 'ArrowRight') direction = 1;
+            if (direction !== 0) {
+                event.preventDefault();
+                selectedIndex = (selectedIndex + direction + options.length) % options.length;
+                updateSelection();
+            }
+        };
 
         selectContainer.tabIndex = 0;
         selectContainer.focus();
@@ -1661,12 +1853,7 @@ document.addEventListener('DOMContentLoaded', () => {
             selectCloseBtn.textContent = 'close';
             selectContainer.appendChild(selectCloseBtn);
         }
-        selectCloseBtn.onclick = () => {
-            popup.active = false;
-            overlay.style.display = 'none';
-            selectContainer.style.display = 'none';
-            canvas.focus();
-        };
+        selectCloseBtn.onclick = () => closePopup();
     }
 
     const quickMenuPopups = new Set(['extraTerrain', 'extraItems', 'extraCreatures']);
@@ -2018,6 +2205,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentBoard = boardList[previousIndex][0];
                             placedSprites = world[currentBoard];
                             findPlayerSprite();
+                            updateToolbar();
                             drawBoard();
                             console.log('Switched to previous board:', currentBoard);
                             showStatusMessage('Switched to previous board: ' + currentBoard);
@@ -2030,6 +2218,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentBoard = boardList[nextIndex][0];
                             placedSprites = world[currentBoard];
                             findPlayerSprite();
+                            updateToolbar();
                             drawBoard();
                             console.log('Switched to next board:', currentBoard);
                             showStatusMessage('Switched to next board: ' + currentBoard);

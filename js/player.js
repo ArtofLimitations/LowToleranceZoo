@@ -3,7 +3,7 @@ import { getDataFromSheet, getSpriteSheet, replaceSpriteSheet } from './sprite-s
 import { drawSprite, drawPlayerSprite, drawSpriteImage, getSprite } from './sprite.js';
 import { createBullet, deactivateAllBullets, weaponDefinitions } from './weapons.js';
 import { defaultPlayerStats } from './player-stats.js';
-import { parseHexColor, loadObjectsFromGameData, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, resolveNumericArg, RESERVED_FLAG_WORDS, defaultDialogStyle, validTypes } from './object-functions.js';
+import { parseHexColor, loadObjectsFromGameData, createBoardScriptObject, resolveLabel, convertDirections, adjustStat, calculateSeekDirection, calculateBulletPosition, worldSaveData, scriptMixins, defaultStatusMessageStyle, messageStylePresets, evaluateIfCondition, resolveNumericArg, RESERVED_FLAG_WORDS, defaultDialogStyle, validTypes } from './object-functions.js';
 import { startTileAnimation, updateAnimations } from './animations.js';
 import {
     playAudio,
@@ -54,6 +54,13 @@ let bulletArray = [];
 let shiftAiming = false;             // When true, arrows aim+shoot without moving
 const scriptGlobals = {};            // Global variables for scripts
 const spriteCache = {};              // Cache for sprites to avoid redundant redrawing
+const scriptFlags = {};              // Stores all set flags as { flagName: true }
+const boardScriptSpatialCommands = new Set([
+    'move', 'moveto', 'step', 'push', 'try',
+    'change', 'changesprite', 'changecolor', 'color', 'sprite', 'become',
+    'shoot', 'die'
+]);
+
 // Timing
 let fps = 60;
 let lastTime = 0;                    // Timing variables
@@ -64,15 +71,17 @@ let accumulatedTime = 0;
 let currentBoard = 2;                // Current board number
 let boards = {};
 let boardData = {};                  // Stores metadata for each board
+let boardEntryPositions = {};
 let loaded = false;
 let nightMode = true;
 
 // World variables
 let world = {};                      // World object
 let worldObjects = {};               // Stores objects for all boards
+let worldBoardObjects = {};           // Stores board script actors for all boards
+let boardScriptObject = null;        // Board script actor for the active board
 let worldPassages = {};              // Stores passages for all boards
-let worldData = {};             // Stores world-level settings
-const scriptFlags = {};              // Stores all set flags as { flagName: true } 77777777777777
+let worldData = {};                  // Stores world-level settings
 
 // Player variables
 let player = structuredClone(defaultPlayerStats); // Player object
@@ -344,21 +353,33 @@ function getCachedSprite(spriteNum, color) {
     return off;
 }
 
-function drawDefaultTitleScreen() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.font = "bold 32px Arial";
-    ctx.fillStyle = "#fff";
-    ctx.textBaseline = "top";
-    ctx.fillText("Low Tolerance Zoo", 16, 16);
+const titleScreenImage = new Image();
+titleScreenImage.addEventListener('load', drawDefaultTitleScreen, { once: true });
+titleScreenImage.addEventListener('error', () => {
+    console.error('Failed to load title screen image:', titleScreenImage.src);
+}, { once: true });
+titleScreenImage.src = new URL('../assets/backgrounds/play-title.png', import.meta.url).href;
 
+function drawDefaultTitleScreen() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (titleScreenImage.complete && titleScreenImage.naturalWidth > 0) {
+        ctx.drawImage(titleScreenImage, 0, 0, canvas.width, canvas.height);
+    }
+
+    ctx.save();
+    ctx.textAlign = 'right';
+    ctx.textBaseline = "top";
     ctx.font = "bold 20px Arial";
     ctx.fillStyle = "#ff0";
-    ctx.fillText("Press F3 to load a world", 16, 64);
+    ctx.fillText("Press F9 to load a world", canvas.width - 32, canvas.height - 190);
 
     ctx.font = "16px Arial";
     ctx.fillStyle = "#ccc";
-    ctx.fillText("ARROW keys to move | SPACE to shoot | P to pause | F for console stats | R force redraw", 16, 100);
+    ctx.fillText("ARROW keys to move", canvas.width - 32, canvas.height - 154);
+    ctx.fillText("SPACE / SHIFT to shoot", canvas.width - 32, canvas.height - 130);
+    ctx.fillText("P to pause | F for console stats", canvas.width - 32, canvas.height - 106);
+    ctx.fillText("R to force redraw", canvas.width - 32, canvas.height - 82);
     ctx.restore();
 }
 
@@ -410,59 +431,67 @@ function canvasFade({ duration = 1000, color = 'black', direction = 'out', pause
 // ##########################################
 
 function updateObjects(deltaTime) {
-    const objectsToUpdate = Object.values(placedObjects).filter(obj => !obj.resting);
-
-    for (let obj of objectsToUpdate) {
-        // Handle waiting state
-        if (obj.waiting) {
-            //console.log(`Object ${obj.name || 'unknown'} is waiting. Time left: ${obj.waitTime}`);
-            obj.waitTime -= deltaTime; // Decrement waitTime
-            if (obj.waitTime <= 0) {
-                obj.waiting = false; // Reset waiting state
-            }
-            continue; // Skip executing new commands while waiting
-        }
-
-        // Process objects that are not waiting
-        obj.timeSinceLastMove += deltaTime;
-        if (obj.timeSinceLastMove >= obj.moveInterval) {
-            while (obj.scriptIndex < obj.script.length) {
-                let command = obj.script[obj.scriptIndex];
-                if (obj.scriptIndex == undefined) {
-                    console.error("Error: scriptIndex is undefined for object", obj.name || 'unknown');
-                    break;
-                }
-                executeObjectCommand(obj, command);
-
-                // Handle #loop command immediately
-                if (command.type === "command" && command.name === "loop") {
-                    if (obj.labels[":loop"] !== undefined) {
-                        obj.scriptIndex = obj.labels[":loop"];
-                    } else {
-                        console.error("Error: Missing ':loop' label in script.");
-                    }
-                    break; // Stop further execution this tick
-                }
-
-                // If the command is blocking or the object is now waiting, stop here
-                if (command.blocking || obj.waiting) {
-                    obj.scriptIndex++;
-                    break;
-                }
-                obj.scriptIndex++;
-            }
-
-            // Auto-stop if script ends without `#end`
-            if (obj.scriptIndex >= obj.script.length) {
-                obj.resting = true;
-            }
-
-            obj.timeSinceLastMove = 0;
-        }
+    for (const obj of getCurrentScriptObjects()) {
+        updateScriptObject(obj, deltaTime);
     }
 }
 
+function updateScriptObject(obj, deltaTime) {
+    if (obj.resting) return;
+
+    if (obj.waiting) {
+        obj.waitTime -= deltaTime;
+        if (obj.waitTime <= 0) obj.waiting = false;
+        return;
+    }
+
+    obj.timeSinceLastMove += deltaTime;
+    if (obj.timeSinceLastMove < obj.moveInterval) return;
+
+    while (obj.scriptIndex < obj.script.length) {
+        const command = obj.script[obj.scriptIndex];
+        if (obj.scriptIndex === undefined) {
+            console.error("Error: scriptIndex is undefined for object", obj.name || obj.id);
+            break;
+        }
+        executeObjectCommand(obj, command);
+
+        if (command.type === "command" && command.name === "loop") {
+            if (obj.labels[":loop"] !== undefined) {
+                obj.scriptIndex = obj.labels[":loop"];
+            } else {
+                console.error("Error: Missing ':loop' label in script.");
+            }
+            break;
+        }
+
+        if (command.blocking || obj.waiting) {
+            obj.scriptIndex++;
+            break;
+        }
+        obj.scriptIndex++;
+    }
+
+    if (obj.scriptIndex >= obj.script.length) obj.resting = true;
+    obj.timeSinceLastMove = 0;
+}
+
+function getCurrentScriptObjects() {
+    const objects = Object.values(placedObjects);
+    if (boardScriptObject) objects.unshift(boardScriptObject);
+    return objects;
+}
+
 function executeObjectCommand(obj, command) {
+    if (
+        obj.scope === "board" &&
+        command.type === "command" &&
+        boardScriptSpatialCommands.has(command.name)
+    ) {
+        console.warn(`#${command.name}: ignored in a board script because it has no sprite or location.`);
+        return;
+    }
+
     switch (command.type) {
         case "name":
             obj.name = command.value;
@@ -491,7 +520,9 @@ function executeObjectCommand(obj, command) {
                         break;
                     }
                     const sourceName = command.args[0].slice(1);
-                    const sourceObj = Object.values(placedObjects).find(o => o.name === sourceName);
+                    const sourceObj = getCurrentScriptObjects().find(
+                        o => o.name === sourceName || o.scriptTargetName === sourceName
+                    );
                     if (!sourceObj) {
                         console.warn(`#bind: Source object "${sourceName}" not found.`);
                         break;
@@ -712,7 +743,8 @@ function executeObjectCommand(obj, command) {
                         switchBoard(targetBoard, null, { targetBoard: targetBoard, targetLayer: player.layer || 2, targetX: targetX, targetY: targetY });
                     } else {
                         // If teleporting within the same board, just move the player
-                        movePlayerTo(targetX, targetY);
+                        movePlayer(player.layer, targetX, targetY);
+                        recordBoardEntryPosition(currentBoard);
                     }
                     break;
                 }
@@ -889,6 +921,10 @@ function executeObjectCommand(obj, command) {
                 case "playerunlock":
                 case "playerUnlock":
                     player.locked = false;
+                    // Also change the board setting to reflect that the player is unlocked
+                    if (boardData[currentBoard]) {
+                        boardData[currentBoard].playerLocked = false;
+                    }
                     break;
                 case "let": {
                     // Usage: #let $var = value
@@ -1132,8 +1168,13 @@ function executeObjectCommand(obj, command) {
                     break;
                 }
                 case 'hurt':
-                    player.flashRed = true;
-                    player.flashTimer = 200; // flash for 200ms
+                case 'playerhurt':
+                case 'playerHurt':
+                    handlePlayerHurt();
+                    break;
+                case 'playerflash':
+                case 'playerFlash':
+                    flashPlayer();
                     break;
                 case 'die':
                     //console.log("object died via #die command");
@@ -1189,7 +1230,9 @@ function executeObjectCommand(obj, command) {
                         const targetName = command.args[0].slice(1);
                         let label = command.args[1];
                         if (!label.startsWith(":")) label = ":" + label;
-                        const targetObjects = Object.values(placedObjects).filter(o => o.name === targetName);
+                        const targetObjects = getCurrentScriptObjects().filter(
+                            o => o.name === targetName || o.scriptTargetName === targetName
+                        );
                         if (targetObjects.length === 0) {
                             console.error(`Error: Object with name "${targetName}" not found.`);
                             break;
@@ -1274,7 +1317,7 @@ function executeObjectCommand(obj, command) {
                     //set current board setting to nightmode
                     boardData[currentBoard].settings.nightMode = nightMode;
                     break;
-                case "play": 
+                case "play":
                 case "music": {
                     // args[0] is already unquoted thanks to tokenizeCommand in the parser
                     const trackName = command.args[0];
@@ -1840,6 +1883,26 @@ function youDied() {
     cancelAnimationFrame(animateGame);
 }
 
+function flashPlayer() {
+    player.flashRed = true;
+    player.flashTimer = 200;
+}
+
+function handlePlayerHurt() {
+    flashPlayer();
+    if (boardData[currentBoard]?.reenterWhenHurt) reenterPlayer();
+}
+
+function applyPlayerDamage(amount) {
+    player.stats.health -= amount;
+    if (player.stats.health > 0) {
+        handlePlayerHurt();
+    } else {
+        flashPlayer();
+    }
+    if (player.stats.health <= 0) youDied();
+}
+
 // #############################################
 // ############ Collision detection ############
 // #############################################
@@ -2019,10 +2082,7 @@ function canMoveTo(x, y, object = player) {
             // --- Handle bullet hitting player ---
             if (sprite.type === 'player' && object.type === 'bullet' && object.origin !== 'player') {
                 console.log('Bullet hit player!');
-                player.stats.health -= object.damage || 1; // Reduce player health
-                player.flashRed = true;
-                player.flashTimer = 200; // flash for 200ms
-                if (player.stats.health <= 0) youDied(); // Check if player died
+                applyPlayerDamage(object.damage || 1);
                 return false; // Bullet stops here
             }
 
@@ -2544,6 +2604,28 @@ function movePlayer(newLayer, newX, newY, shouldRender = true) {
     player.locked = false; // Ensure player is unlocked after moving
 }
 
+function recordBoardEntryPosition(board) {
+    if (!Number.isFinite(player.x) || !Number.isFinite(player.y)) return;
+    boardEntryPositions[board] = {
+        layer: player.layer ?? 2,
+        x: player.x,
+        y: player.y,
+    };
+}
+
+function reenterPlayer() {
+    const entry = boardEntryPositions[currentBoard] || boardData[currentBoard]?.playerStart;
+    if (!entry || !Number.isFinite(entry.x) || !Number.isFinite(entry.y)) {
+        console.warn(`Cannot re-enter: no entry position for board ${currentBoard}.`);
+        return false;
+    }
+
+    movePlayer(entry.layer ?? player.layer ?? 2, entry.x, entry.y, false);
+    player.locked = boardData[currentBoard]?.playerLocked ?? false;
+    renderLayersToMainCanvas();
+    return true;
+}
+
 // Remove invalid or undefined entries from placedSprites to avoid runtime errors
 function sanitizePlacedSprites() {
     for (const key in placedSprites) {
@@ -2568,6 +2650,8 @@ function sanitizePlacedSprites() {
 function handleLoadedBoard(spriteSheetData, boardData) {
     deactivateAllBullets(bulletArray); // Deactivate all bullets
     unloadAllAudio(); // Drop the previous project's Howls and blob: URLs
+    worldBoardObjects = {};
+    boardScriptObject = null;
     placedSprites = boardData;
     replaceSpriteSheet(spriteSheetData);
 
@@ -2608,6 +2692,8 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
     worldData = worldSettingsData || {};
     const savedBoardSettings = boardSettingsData || {};
     boardData = {}; // Reset board metadata
+    boardEntryPositions = {};
+    worldBoardObjects = {};
 
     replaceSpriteSheet(spriteSheetData); // Load the sprite sheet data
 
@@ -2617,13 +2703,13 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
         return entry ? entry[1] : `Board ${boardNum}`;
     }
 
-    // Extract passages and objects for all boards
+    // Extract board scripts before tile objects so their mixins are available first.
     for (const board in world) {
+        const saved = savedBoardSettings[board] || savedBoardSettings[String(board)] || savedBoardSettings[Number(board)];
+        const boardScript = createBoardScriptObject(board, saved?.boardScript || "");
+        if (boardScript) worldBoardObjects[board] = boardScript;
         loadPassagesFromGameData(world[board], board);
         worldObjects[board] = loadObjectsFromGameData(world[board]);
-
-        // Pull saved board settings (keys may be numeric or string)
-        const saved = savedBoardSettings[board] || savedBoardSettings[String(board)] || savedBoardSettings[Number(board)];
 
         // Fallback player start from tile data if not provided in settings
         const fallbackPlayerStart = (() => {
@@ -2636,7 +2722,7 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
             return null;
         })();
 
-        
+
         // Normalizing night mode setting for the board, allowing the legacy "nightmode" key as well ( ?? saved?.dark )
         const savedNightMode = saved?.nightMode ?? saved?.nightmode ?? false;
 
@@ -2644,6 +2730,7 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
             ...(saved || {}),
             boardName: (saved && saved.boardName) || getBoardName(board),
             playerStart: (saved && saved.playerStart) || fallbackPlayerStart,
+            playerLocked: (saved && saved.playerLocked) || false,
             light: world[board].light !== undefined ? world[board].light : (saved?.light ?? true),
             nightMode: world[board].nightMode !== undefined ? world[board].nightMode : savedNightMode
         };
@@ -2659,6 +2746,7 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
     currentBoard = 2;
     placedSprites = world[currentBoard];                // Get the current board from the world object
     placedObjects = worldObjects[currentBoard];         // Get objects for the current board
+    boardScriptObject = worldBoardObjects[currentBoard] || null;
     placedPassages = worldPassages[currentBoard] || {}; // Load passages for the current board
     sanitizePlacedSprites();
     Object.keys(spriteCache).forEach(key => delete spriteCache[key]); // Safe clear sprite cache
@@ -2669,15 +2757,21 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
     playerStats = structuredClone(defaultPlayerStats);       // Reset player stats
     player = { ...playerStats, ...player };                  // Merge default stats with player sprite data
     nightMode = boardData[currentBoard]?.nightMode || false; // Set night mode based on current board settings
-    gamePaused = false;      // Unpause the game
-    if (playerPaused) {      // If the player was paused, hide the pause message
+    gamePaused = false;        // Unpause the game
+    if (playerPaused) {        // If the player was paused, hide the pause message
         hidePauseMessage();
         playerPaused = false;
     }
-    player.locked = false;   // Unlock player movement
-    player.gameOver = false; // Reset game over state
-    player.flags = {};       // Reset player flags
-    player.vars = {};        // Reset player variables
+    player.locked = boardData[currentBoard]?.playerLocked ?? false;     // Apply the starting board's lock setting
+    player.gameOver = false;   // Reset game over state
+    recordBoardEntryPosition(currentBoard);
+
+    //scriptFlags.length = 0;          // Clear set flags
+    Object.keys(scriptFlags).forEach(key => delete scriptFlags[key]);
+    //scriptGlobals.length = 0;        // Clear global variables
+    Object.keys(scriptGlobals).forEach(key => delete scriptGlobals[key]);
+    //player.flags = {};       // Reset player flags
+    //player.vars = {};        // Reset player variables
 
     // Hide dialog and game over boxes
     document.getElementById('dialog-box').style.display = 'none';    // Hide any open dialog box
@@ -2729,6 +2823,7 @@ async function switchBoard(board, colorKey = null, edgePlacement = null) {
 
     placedSprites = world[board]; // Get the current board from the world object
     placedObjects = worldObjects[board]; // Use preloaded objects
+    boardScriptObject = worldBoardObjects[board] || null;
     placedPassages = worldPassages[board] || {}; // Load passages for the current board
     sanitizePlacedSprites();
 
@@ -2778,9 +2873,9 @@ async function switchBoard(board, colorKey = null, edgePlacement = null) {
     //nightmode
     nightMode = boardData[board]?.nightMode || false;
 
-    player.locked = false; // Unlock player movement
-
     currentBoard = board;
+    recordBoardEntryPosition(currentBoard);
+    player.locked = boardData[currentBoard]?.playerLocked ?? false;
     drawBoard();
     renderLayersToMainCanvas(); // Draw them onto the main canvas
 
@@ -2827,6 +2922,11 @@ document.addEventListener("keydown", (event) => {
     // Set key state, but clear movement keys immediately if player is locked
     keys[event.key] = true;
 
+    // Loading and saving - F5 and F9 are the industry standard for saving and loading.
+    if (event.key === 'F9') { // loading whole worlds
+        loadLtz(handleLoadedGame);
+    }
+
     if (player.locked) {
         // Prevent arrow movement while locked
         keys['ArrowUp'] = false;
@@ -2841,9 +2941,6 @@ document.addEventListener("keydown", (event) => {
         event.preventDefault();
     }
     //console.log(event.key, event.code); // Debugging
-    if (event.key === 'F3') { // loading whole worlds
-        loadLtz(handleLoadedGame);
-    }
 
     if (event.key === 'f') { // show player location
         console.log('Placed sprites:', placedSprites);
@@ -2879,27 +2976,30 @@ document.addEventListener("keydown", (event) => {
             event.preventDefault();
             keys[event.key] = false;
 
-            // Update direction based on the arrow pressed
-            if (event.key === 'ArrowUp') player.direction = 'up';
-            else if (event.key === 'ArrowDown') player.direction = 'down';
-            else if (event.key === 'ArrowLeft') player.direction = 'left';
-            else if (event.key === 'ArrowRight') player.direction = 'right';
-            const w = getEquippedWeaponConfig();
-            bulletArray.push(createBullet(
-                canvas,
-                player.x + 0.5,
-                player.y + 0.5,
-                player.direction,
-                w.speed,
-                w.color,
-                'player',
-                w.size,
-                w.damage
-            ));
-            return;
+            if (player.canShoot && bulletArray.filter(b => b.active).length < player.maxBullets) {
+
+                // Update direction based on the arrow pressed
+                if (event.key === 'ArrowUp') player.direction = 'up';
+                else if (event.key === 'ArrowDown') player.direction = 'down';
+                else if (event.key === 'ArrowLeft') player.direction = 'left';
+                else if (event.key === 'ArrowRight') player.direction = 'right';
+                const w = getEquippedWeaponConfig();
+                bulletArray.push(createBullet(
+                    canvas,
+                    player.x + 0.5,
+                    player.y + 0.5,
+                    player.direction,
+                    w.speed,
+                    w.color,
+                    'player',
+                    w.size,
+                    w.damage
+                ));
+            }
+            //return;
         }
 
-        if (event.key === 'l' && !gamePaused) { // load game
+        if (event.key === 'l' && !gamePaused) { // load game (possibly DEPRECATED  )
             loadCombinedData(handleLoadedBoard);
         }
 

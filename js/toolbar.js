@@ -161,7 +161,7 @@ Object.entries(modeButtons).forEach(([mode, button]) => {
   };
 });
 
-export function toolbar(current, currentColors, layer, mouse, hiddenLayers, callback, currentType, x, y) { // Main toolbar function
+export function toolbar(current, currentColors, layer, mouse, hiddenLayers, callback, currentType, x, y, layer3Opacity = 1) { // Main toolbar function
   //console.log('Function called from toolbar.js');
   //const leftSide = canvas.width - toolBarSize;
   colors = currentColors || [[0, 0, 0, 1], [255, 255, 255, 1]];
@@ -212,6 +212,7 @@ export function toolbar(current, currentColors, layer, mouse, hiddenLayers, call
   });
 
   if (layerOpacity) {
+    layerOpacity.value = String(Math.round(layer3Opacity * 20));
     layerOpacity.oninput = () => {
       const opacity = Number(layerOpacity.value) / 20;
       console.log('opacity:', opacity);
