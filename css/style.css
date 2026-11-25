@@ -1428,6 +1428,23 @@ select#presetPaletteSelect {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
+.sprite-gallery-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  color: var(--text-primary);
+}
+
+.sprite-monochrome-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .lowToleranceCanvas {
   border-radius: 4px;
 }

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data-driven Scrollbox</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: "Fira Code", monospace;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: rgb(55, 85, 7);
+        }
+
+        .scrollbox-container {
+            box-sizing: border-box;
+            width: min(540px, calc(100vw - 32px));
+            padding: 10px 20px 20px;
+            border-radius: 2px;
+            background: rgb(34, 34, 34);
+            box-shadow: rgba(0, 0, 0, 0.25) 0 8px 24px;
+        }
+
+        .scrollbox-title {
+            margin-bottom: 10px;
+            padding: 4px 10px;
+            background: rgb(17, 17, 17);
+            color: yellow;
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 1.4px;
+            text-align: center;
+        }
+
+        .scrollbox-contents {
+            position: relative;
+            box-sizing: border-box;
+            height: 400px;
+            padding: 10px;
+            overflow-y: auto;
+            background: rgb(17, 17, 17);
+            color: rgb(255, 255, 255);
+            font-size: 14px;
+            line-height: 1.5;
+            scrollbar-width: none;
+        }
+
+        .scrollbox-contents::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbox-contents:focus-visible {
+            outline: 2px solid darkseagreen;
+            outline-offset: 2px;
+        }
+
+        .scrollbox-cursor {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            height: 1.5em;
+            margin-bottom: -1.5em;
+            pointer-events: none;
+        }
+
+        .scrollbox-cursor::before,
+        .scrollbox-cursor::after {
+            position: absolute;
+            color: darkseagreen;
+        }
+
+        .scrollbox-cursor::before {
+            left: -10px;
+            content: "\00BB";
+        }
+
+        .scrollbox-cursor::after {
+            right: -10px;
+            content: "\00AB";
+        }
+
+        .scrollbox-lines {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .scrollbox-line {
+            min-height: 1.5em;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+        }
+
+        .scrollbox-line.current {
+            margin-inline: -9px;
+            padding-inline: 9px;
+            background: rgb(43, 43, 43);
+        }
+
+        .scrollbox-line.link {
+            color: #62b8ed;
+            cursor: pointer;
+            padding-left: 1.5em;
+            text-indent: -1.5em;
+        }
+
+        .scrollbox-line.link::before {
+            content: "\21B3  ";
+            color: darkseagreen;
+        }
+
+        .scrollbox-status {
+            min-height: 1.5em;
+            margin: 8px 0 0;
+            color: #ffb36b;
+            font-size: 12px;
+        }
+
+        .scrollbox-reopen {
+            padding: 8px 12px;
+            border: 0;
+            background: rgb(17, 17, 17);
+            color: white;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .scrollbox-reopen[hidden] {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <section class="scrollbox-container" aria-label="Text scrollbox">
+            <div class="scrollbox-title" id="scrollboxTitle">Kitchen Notes</div>
+            <div class="scrollbox-contents" tabindex="0" role="application"
+                aria-label="Text box. Use the up and down arrow keys to navigate, and Enter to follow a link.">
+                <div class="scrollbox-cursor" aria-hidden="true"></div>
+                <ul class="scrollbox-lines" role="listbox" aria-label="Text lines"></ul>
+            </div>
+            <p class="scrollbox-status" role="status" aria-live="polite"></p>
+        </section>
+        <button class="scrollbox-reopen" type="button" hidden>Open text</button>
+    </main>
+
+    <script>
+        // Each newline becomes one selectable entry. A long entry wraps visually
+        // but remains a single stop in the keyboard navigation.
+        const scrollText = [
+            "Mom's onion soup recipe:",
+            "",
+            "A good soup starts with patience. Let the onions soften slowly until sweet and golden.",
+            "",
+            "Use a heavy pot and keep the heat low. Stir now and then so the onions cook evenly.",
+            "",
+            "A splash of broth lifts the browned bits from the bottom of the pot.",
+            "",
+            "Season gradually, taste as you go, and give the flavors time to come together.",
+            "",
+            "!advice;Get cooking advice?",
+            "",
+            "When the soup is ready, serve it hot with toasted bread.",
+            "",
+            "!recipe;Show the step-by-step recipe",
+            "",
+            ":advice",
+            "A few extra tips:",
+            "",
+            "Slice the onions evenly so they soften at the same pace.",
+            "",
+            "If the pot gets too hot, lower the heat before the onions darken too quickly.",
+            "",
+            "!recipe;Go to the recipe steps",
+            "!;Close text",
+            "",
+            ":recipe",
+            "Step-by-step:",
+            "",
+            "1. Slowly soften sliced onions in butter.",
+            "2. Add broth and simmer until the flavors blend.",
+            "3. Taste, season, and serve with toasted bread.",
+            "",
+            "!advice;Read the cooking advice",
+            "!;Close text",
+        ].join("\n");
+
+        const container = document.querySelector('.scrollbox-container');
+        const scrollbox = document.querySelector('.scrollbox-contents');
+        const linesList = document.querySelector('.scrollbox-lines');
+        const status = document.querySelector('.scrollbox-status');
+        const reopenButton = document.querySelector('.scrollbox-reopen');
+        const entries = [];
+        const labels = new Map();
+        let currentIndex = 0;
+
+        function parseScrollText(text) {
+            entries.length = 0;
+            labels.clear();
+
+            for (const [lineNumber, rawLine] of String(text).split(/\r?\n/).entries()) {
+                const line = rawLine.replace(/\r$/, '');
+                const labelMatch = line.match(/^:([a-z0-9_-]+)\s*$/i);
+                if (labelMatch) {
+                    const label = labelMatch[1].toLowerCase();
+                    if (labels.has(label)) {
+                        throw new Error(`Duplicate label "${label}" on line ${lineNumber + 1}.`);
+                    }
+                    labels.set(label, entries.length);
+                    continue;
+                }
+
+                if (line.startsWith('!')) {
+                    const linkMatch = line.match(/^!([^;]*);(.*)$/);
+                    if (!linkMatch) {
+                        throw new Error(`Invalid hyperlink syntax on line ${lineNumber + 1}. Use !label;text.`);
+                    }
+                    entries.push({
+                        type: 'link',
+                        target: linkMatch[1].trim().toLowerCase(),
+                        text: linkMatch[2]
+                    });
+                    continue;
+                }
+
+                entries.push({ type: 'text', text: line });
+            }
+        }
+
+        function updateSelection(nextIndex, smooth = true) {
+            if (!entries.length) return;
+
+            currentIndex = Math.max(0, Math.min(nextIndex, entries.length - 1));
+            const rows = linesList.querySelectorAll('.scrollbox-line');
+            rows.forEach((row, index) => {
+                const selected = index === currentIndex;
+                row.classList.toggle('current', selected);
+                row.setAttribute('aria-selected', String(selected));
+            });
+            status.textContent = '';
+            alignCurrentLine(smooth);
+        }
+
+        function alignCurrentLine(smooth) {
+            const row = linesList.children[currentIndex];
+            if (!row) return;
+
+            const boxRect = scrollbox.getBoundingClientRect();
+            const rowRect = row.getBoundingClientRect();
+            const rowTop = rowRect.top - boxRect.top - scrollbox.clientTop + scrollbox.scrollTop;
+            const maxScroll = scrollbox.scrollHeight - scrollbox.clientHeight;
+            const target = Math.max(0, Math.min(rowTop - 10, maxScroll));
+
+            if (smooth) {
+                scrollbox.scrollTo({ top: target, behavior: 'smooth' });
+            } else {
+                scrollbox.scrollTop = target;
+            }
+        }
+
+        function renderScrollText(text) {
+            parseScrollText(text);
+            linesList.replaceChildren();
+
+            entries.forEach((entry, index) => {
+                const row = document.createElement('li');
+                row.className = 'scrollbox-line';
+                row.setAttribute('role', 'option');
+                row.setAttribute('aria-selected', 'false');
+                row.setAttribute('aria-posinset', String(index + 1));
+                row.setAttribute('aria-setsize', String(entries.length));
+                row.textContent = entry.text || '\u00a0';
+
+                if (entry.type === 'link') {
+                    row.classList.add('link');
+                    row.setAttribute('aria-label', `Link: ${entry.text}. Press Enter to follow.`);
+                    row.dataset.target = entry.target;
+                }
+
+                row.addEventListener('click', () => {
+                    updateSelection(index, false);
+                    scrollbox.focus();
+                });
+                linesList.appendChild(row);
+            });
+
+            linesList.style.paddingBottom = `${scrollbox.clientHeight}px`;
+            currentIndex = 0;
+            updateSelection(currentIndex, false);
+        }
+
+        function followCurrentLink() {
+            const entry = entries[currentIndex];
+            if (!entry || entry.type !== 'link') return;
+
+            if (!entry.target) {
+                container.hidden = true;
+                reopenButton.hidden = false;
+                reopenButton.focus();
+                return;
+            }
+
+            const destination = labels.get(entry.target);
+            if (destination === undefined || destination >= entries.length) {
+                status.textContent = `No text found for label "${entry.target}".`;
+                return;
+            }
+
+            updateSelection(destination);
+        }
+
+        scrollbox.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                updateSelection(currentIndex + (event.key === 'ArrowDown' ? 1 : -1));
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                followCurrentLink();
+            }
+        });
+
+        reopenButton.addEventListener('click', () => {
+            container.hidden = false;
+            reopenButton.hidden = true;
+            scrollbox.focus();
+        });
+
+        window.addEventListener('resize', () => {
+            linesList.style.paddingBottom = `${scrollbox.clientHeight}px`;
+            alignCurrentLine(false);
+        });
+
+        renderScrollText(scrollText);
+        requestAnimationFrame(() => scrollbox.focus());
+    </script>
+</body>
+
+</html>

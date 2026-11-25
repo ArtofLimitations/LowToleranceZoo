@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scrollbox</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: rgb(55, 85, 7);
+        }
+
+        .scrollbox-container {
+            background-color: rgb(34, 34, 34);
+            width: 500px;
+            min-height: 400px;
+            margin: 0px auto;
+            padding: 10px 20px 20px;
+            box-shadow: rgba(0, 0, 0, 0.15) 0px 8px 16px 8px;
+            border-radius: 2px;
+            animation: 0.5s ease 0s 1 normal none running fade_in_show;
+            z-index: 99;
+        }
+
+        .scrollbox-title {
+            color: yellow;
+            background-color: rgb(17, 17, 17);
+            font-family: "Fira Code", monospace;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 2px 10px;
+            text-align: center;
+            text-decoration: none;
+            letter-spacing: 1.4px;
+            margin-bottom: 10px;
+        }
+
+        .scrollbox-contents {
+            position: relative;
+            background-color: rgb(17, 17, 17);
+            color: rgb(255, 255, 255);
+            font-family: "Fira Code", monospace;
+            font-size: 14px;
+            padding: 10px;
+            height: 400px;
+            border-width: 1px;
+            text-shadow: rgb(68, 68, 68) 0px 1px 20px, rgba(255, 255, 255, 0.8) 0px 1px 10px;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+
+        .scrollbox-contents::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbox-contents:focus-visible {
+            outline: 2px solid darkseagreen;
+            outline-offset: 2px;
+        }
+
+        .scrollbox-lines {
+            list-style: none;
+            padding: 0 0 400px 0;
+            
+        }
+
+        .scrollbox-line {
+            display: flex;
+            align-items: baseline;
+            margin: 0;
+            padding: 0;
+        }
+
+        .scrollbox-line.current {
+            background-color: rgb(43, 43, 43);
+            margin: 0 -9px;
+            padding-inline: 9px;
+        }
+
+        .scrollbox-line.link {
+            color: #1b86c4;
+        }
+
+        .scrollbox-cursor {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            height: 1.25em;
+            margin-bottom: -1.25em;
+            /*background-color: rgba(43, 43, 43, 0.9);*/
+            pointer-events: none;
+        }
+
+        .scrollbox-cursor::before {
+            content: "\00BB";
+            position: absolute;
+            left: -10px;
+        }
+
+        .scrollbox-cursor::after {
+            content: "\00AB";
+            position: absolute;
+            right: -10px;
+        }
+
+        .scrollbox-cursor::before,
+        .scrollbox-cursor::after {
+            color: darkseagreen;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="scrollbox-container">
+        <div class="scrollbox-title">Title</div>
+        <div class="scrollbox-contents" tabindex="0"
+            aria-label="Scrollbox. Use the up and down arrow keys to navigate.">
+            <div class="scrollbox-cursor" aria-hidden="true"></div>
+            <ul class="scrollbox-lines">
+                <li class="scrollbox-line current">Mom's onion soup recipe:</li>
+                <li class="scrollbox-line">&nbsp;</li>
+                <li class="scrollbox-line">&nbsp;</li>
+                <li class="scrollbox-line">&nbsp;</li>
+                <li class="scrollbox-line">Lorem ipsum dolor, sit amet consectetur adipisicing elit.</li>
+                <li class="scrollbox-line">Magni dignissimos exercitationem sed adipisci quod
+                    aut.</li>
+                <li class="scrollbox-line">Numquam, iste magnam aut laudantium earum, corporis quidem repudiandae alias
+                    aperiam porro dolore cum
+                    sed.</li>
+                <li class="scrollbox-line">&nbsp;</li>
+                <li class="scrollbox-line link">Link to 2nd page.</li>
+                <li class="scrollbox-line link">Link to 3rd page.</li>
+                <li class="scrollbox-line">&nbsp;</li>
+                <li class="scrollbox-line">Magni dignissimos exercitationem sed adipisci quod
+                    aut.</li>
+            </ul>
+        </div>
+    </div>
+    <script>
+        const scrollbox = document.querySelector('.scrollbox-contents');
+        const linesList = scrollbox.querySelector('.scrollbox-lines');
+        const getLines = () => [...linesList.querySelectorAll('.scrollbox-line')];
+        let currentIndex = Math.max(0, getLines().findIndex((line) => line.classList.contains('current')));
+
+        function alignCurrentLine(smooth = false) {
+            const line = getLines()[currentIndex];
+            if (!line) return;
+
+            const viewportRect = scrollbox.getBoundingClientRect();
+            const lineRect = line.getBoundingClientRect();
+            const lineTop = lineRect.top - viewportRect.top - scrollbox.clientTop + scrollbox.scrollTop;
+            const maxTop = scrollbox.scrollHeight - scrollbox.clientHeight;
+            const targetTop = Math.max(0, Math.min(lineTop - 10, maxTop));
+
+            if (smooth) {
+                scrollbox.scrollTo({ top: targetTop, behavior: 'smooth' });
+            } else {
+                scrollbox.scrollTop = targetTop;
+            }
+        }
+
+        scrollbox.addEventListener('keydown', (event) => {
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+
+            event.preventDefault();
+            const lines = getLines();
+            if (!lines.length) return;
+
+            const nextIndex = Math.max(0, Math.min(
+                currentIndex + (event.key === 'ArrowDown' ? 1 : -1),
+                lines.length - 1
+            ));
+
+            if (nextIndex === currentIndex) return;
+            lines[currentIndex]?.classList.remove('current');
+            currentIndex = nextIndex;
+            lines[currentIndex].classList.add('current');
+            alignCurrentLine(true);
+        });
+
+        requestAnimationFrame(() => {
+            alignCurrentLine();
+            scrollbox.focus();
+        });
+    </script>
+</body>
+
+</html>

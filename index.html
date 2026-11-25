@@ -346,8 +346,9 @@
     </div>
 
     <div class="boardInfoBox" id="boardInfoBox">
-        <p><strong>Board Information</strong></p>
-        <div class="boardInfoContent" id="boardInfoContent">
+        <p id="boardInfoHeading"><strong>Board Information</strong></p>
+        <div class="boardInfoContent" id="boardInfoContent" role="region" aria-labelledby="boardInfoHeading"
+            tabindex="0">
             <div class="board-info-row">
                 <label for="boardInfoName">Board name</label>
                 <input class="inputField" type="text" id="boardInfoName" />
@@ -467,6 +468,13 @@
     <div class="selectSprite" id="selectSpriteBox">
         <p><strong>Select Sprite</strong></p>
         <div id="spriteGallery" class="sprite-gallery"></div>
+        <div class="sprite-gallery-footer">
+            <div class="spriteSheetLength"></div>
+            <label class="sprite-monochrome-toggle">
+                <input id="spriteMonochromeToggle" type="checkbox">
+                <span>Display in monochrome</span>
+            </label>
+        </div>
         <button class="material-symbols-outlined popup-close-btn" id="selectSpriteClose"
             title="Close (Esc)">close</button>
     </div>

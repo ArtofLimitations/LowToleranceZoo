@@ -23,7 +23,7 @@ import {
 } from './audio.js';
 
 // Canvas Configurations
-const displayWidth = 1154;
+const displayWidth = 1153;
 const displayHeight = 800;
 const canvas = document.getElementById('lowToleranceCanvas');
 const scale = 1;
@@ -495,6 +495,10 @@ function executeObjectCommand(obj, command) {
     switch (command.type) {
         case "name":
             obj.name = command.value;
+            break;
+        case "scroll":
+            gamePaused = true;
+            showScrollBox(command.title, command.lines, obj);
             break;
         case "status":
             // Use the object's style (set via #message on that object)
@@ -1451,6 +1455,10 @@ function executeObjectCommand(obj, command) {
                 }
             }
             break;
+        case "scroll":
+            gamePaused = true;
+            showScrollBox(command.title, command.lines, obj);
+            break;
         case "text":
             gamePaused = true; // Pause the game loop
             showDialog(command.text, obj);
@@ -1676,6 +1684,88 @@ function jumpToLabel(obj, label) {
 // ##############################################
 
 // Paginated text that appears in the dialog box (or bubble)
+
+function showScrollBox(title, lines, object = null) {
+    const scrollBox = document.getElementById('scroll-box');
+    const titleElement = document.getElementById('scroll-box-title');
+    const content = document.getElementById('scroll-box-content');
+    if (!scrollBox || !titleElement || !content) {
+        console.warn('Scroll box elements are missing.');
+        gamePaused = false;
+        requestAnimationFrame(animateGame);
+        return;
+    }
+
+    const scrollLines = Array.isArray(lines) && lines.length
+        ? lines
+        : [''];
+    let currentIndex = 0;
+    let inputBlocked = true;
+    let active = true;
+
+    titleElement.textContent = title || (object?.name) || '';
+    content.innerHTML = '';
+
+    const rowElements = scrollLines.map((text, index) => {
+        const row = document.createElement('div');
+        row.className = 'scroll-box-line';
+        row.dataset.index = String(index);
+        row.textContent = text;
+        row.addEventListener('mouseenter', () => setCurrent(index));
+        row.addEventListener('click', (event) => {
+            event.preventDefault();
+            setCurrent(index);
+        });
+        content.appendChild(row);
+        return row;
+    });
+
+    function setCurrent(index) {
+        if (!active) return;
+        currentIndex = Math.max(0, Math.min(rowElements.length - 1, index));
+        rowElements.forEach((row, rowIndex) => {
+            row.classList.toggle('current', rowIndex === currentIndex);
+        });
+        rowElements[currentIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    function cleanupScrollBox() {
+        if (!active) return;
+        active = false;
+        scrollBox.style.display = 'none';
+        gamePaused = false;
+        document.removeEventListener('keydown', handleKeydown);
+        document.removeEventListener('click', handleClick);
+        requestAnimationFrame(animateGame);
+    }
+
+    function handleKeydown(event) {
+        if (inputBlocked || !active) return;
+
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setCurrent(currentIndex - 1);
+        } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setCurrent(currentIndex + 1);
+        } else if (event.key === 'Enter' || event.key === 'Escape') {
+            event.preventDefault();
+            cleanupScrollBox();
+        }
+    }
+
+    function handleClick(event) {
+        if (content.contains(event.target) || titleElement.contains(event.target)) return;
+        event.preventDefault();
+        cleanupScrollBox();
+    }
+
+    setCurrent(0);
+    scrollBox.style.display = 'flex';
+    document.addEventListener('keydown', handleKeydown);
+    document.addEventListener('click', handleClick);
+    setTimeout(() => inputBlocked = false, 300);
+}
 
 function paginateText(text, maxLength) { // Split text into pages
     let pages = [];
@@ -2763,6 +2853,7 @@ function handleLoadedGame(spriteSheetData, boardList, worldData, worldSettingsDa
         playerPaused = false;
     }
     player.locked = boardData[currentBoard]?.playerLocked ?? false;     // Apply the starting board's lock setting
+    player.canShoot = boardData[currentBoard]?.playerCanAttack ?? false; // Apply the starting board's shooting ability
     player.gameOver = false;   // Reset game over state
     recordBoardEntryPosition(currentBoard);
 
@@ -2800,17 +2891,6 @@ function loadPassagesFromGameData(gameData, board) {
     }
 
     return worldPassages[board]; // Return the passages for the current board
-}
-
-function loadBoard(boardNum, x, y) {
-    if (world[boardNum]) {
-        // Delegate to switchBoard to ensure consistent sanitization and rendering
-        switchBoard(boardNum, null, { targetBoard: boardNum, targetLayer: player.layer || 2, targetX: x, targetY: y }).catch(err => {
-            console.error('loadBoard -> switchBoard failed:', err);
-        });
-    } else {
-        console.warn(`Board ${boardNum} does not exist in the world data.`);
-    }
 }
 
 async function switchBoard(board, colorKey = null, edgePlacement = null) {
@@ -2870,12 +2950,13 @@ async function switchBoard(board, colorKey = null, edgePlacement = null) {
         }
     }
 
-    //nightmode
+    // Update game state based on the new board's settings
     nightMode = boardData[board]?.nightMode || false;
-
     currentBoard = board;
-    recordBoardEntryPosition(currentBoard);
     player.locked = boardData[currentBoard]?.playerLocked ?? false;
+    player.canShoot = boardData[currentBoard]?.playerCanAttack ?? true; // Apply the starting board's shooting ability
+
+    recordBoardEntryPosition(board);
     drawBoard();
     renderLayersToMainCanvas(); // Draw them onto the main canvas
 
@@ -2919,12 +3000,19 @@ document.addEventListener("keydown", (event) => {
     // would silently drop any track a script starts on board load. Every
     // keydown is a valid gesture, so wake the context on the first one.
     if (!isAudioUnlocked()) unlockAudio();
+
     // Set key state, but clear movement keys immediately if player is locked
     keys[event.key] = true;
 
     // Loading and saving - F5 and F9 are the industry standard for saving and loading.
     if (event.key === 'F9') { // loading whole worlds
+        console.log('Opening file system');
         loadLtz(handleLoadedGame);
+    }
+
+    const key = event.code;
+    if (util[key]) {
+        event.preventDefault();
     }
 
     if (player.locked) {
@@ -2936,10 +3024,6 @@ document.addEventListener("keydown", (event) => {
         return; // still allow other global keys (F3 etc.) handled above
     }
 
-    var key = event.code; // Use event.code
-    if (util[key]) {
-        event.preventDefault();
-    }
     //console.log(event.key, event.code); // Debugging
 
     if (event.key === 'f') { // show player location

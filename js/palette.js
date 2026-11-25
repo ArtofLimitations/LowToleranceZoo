@@ -46,8 +46,6 @@ export const PALETTE_RGBA = {
     white:        "rgba(255, 255, 255, 1)",            // DOS 15: Bright White
     dosLightGray:   "rgba(170, 170, 170, 1)",     // DOS 7: Light Gray
     dosDarkGray:    "rgba(85, 85, 85, 1)",        // DOS 8: Dark Gray
-    
-    // --- WHITES & OFF-WHITES ---
     black:          "rgba(0, 0, 0, 1)",           // DOS 0: Black
 };
 

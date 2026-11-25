@@ -1516,7 +1516,10 @@ document.addEventListener('DOMContentLoaded', () => {
         popup.type = 'boardInfoBox';
         overlay.style.display = 'block';
         boardInfoContainer.style.display = 'flex';
-        requestAnimationFrame(() => scriptEditor?.requestMeasure());
+        requestAnimationFrame(() => {
+            boardInfoContent.focus();
+            scriptEditor?.requestMeasure();
+        });
         const boardCloseBtn = document.getElementById('boardInfoClose');
         if (boardCloseBtn) boardCloseBtn.onclick = () => closePopup();
         addPopupOutsideClickHandler();
@@ -1546,28 +1549,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const spriteCloseBtn = document.getElementById('selectSpriteClose');
         if (spriteCloseBtn) spriteCloseBtn.onclick = () => closePopup();
 
-        let spriteSheetLength = spriteContainer.querySelector('.spriteSheetLength');
+        const spriteSheet = getSpriteSheet();
+        const spriteSheetLength = spriteContainer.querySelector('.spriteSheetLength');
         if (!spriteSheetLength) {
-            spriteSheetLength = document.createElement('div');
-            spriteSheetLength.classList.add('spriteSheetLength');
-            spriteContainer.appendChild(spriteSheetLength);
+            throw new Error('Sprite selector is missing its sprite count element.');
         }
+        spriteSheetLength.textContent = `(${spriteSheet.length}/${tileSetLength})`;
 
-        spriteSheetLength.textContent = `(${getSpriteSheet().length}/${tileSetLength})`;
-        createSpriteGallery(getSpriteSheet(), (index) => {
+        const monochromeToggle = spriteContainer.querySelector('#spriteMonochromeToggle');
+        if (!monochromeToggle) {
+            throw new Error('Sprite selector is missing its monochrome toggle.');
+        }
+        monochromeToggle.checked = false;
+        const renderSpriteGallery = () => createSpriteGallery(spriteSheet, (index) => {
             currentSprite = index;
             console.log('Selected sprite:', index);
             updateSpriteData(currentSprite);
             closePopup();
-        });
+        }, monochromeToggle.checked);
+        monochromeToggle.onchange = renderSpriteGallery;
+        renderSpriteGallery();
     }
 
-    function createSpriteGallery(spriteSheet, onSpriteClick) {
+    function createSpriteGallery(spriteSheet, onSpriteClick, monochrome = false) {
         console.log('Creating sprite gallery...', spriteSheet);
         const gallery = document.getElementById('spriteGallery');
         gallery.innerHTML = ''; // Clear any existing content
 
         const emptySprite = Array(16).fill().map(() => Array(16).fill(2));
+        const darkColor = monochrome ? [48, 48, 48, 1] : colors[0];
+        const lightColor = monochrome ? [255, 255, 255, 1] : colors[1];
         for (let index = 1; index < spriteSheet.length; index++) {
             const spriteElement = document.createElement('div');
             spriteElement.classList.add('sprite-item');
@@ -1579,7 +1590,7 @@ document.addEventListener('DOMContentLoaded', () => {
             spriteCanvas.width = tileSizeX;
             spriteCanvas.height = tileSizeY;
             spriteCanvas.getContext('2d').putImageData(
-                convertToImageData(getDataFromSheet(index) ?? emptySprite, colors[0], colors[1]),
+                convertToImageData(getDataFromSheet(index) ?? emptySprite, darkColor, lightColor),
                 0,
                 0
             );
